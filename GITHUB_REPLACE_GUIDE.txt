@@ -1,0 +1,33 @@
+GitHub 교체 파일
+================
+
+1. streamlit_app.py
+   - 기존 streamlit_app.py를 이 파일로 교체
+
+2. demo_v3_hackathon_enhanced.py
+   - GitHub 루트에 추가
+   - 기존 demo_v2_backend.py는 더 이상 streamlit_app.py에서 import하지 않음
+
+3. 모델
+   - 기존 성능 좋은 best_deploy.pt 유지
+   - consistency 실험 모델은 사용하지 않음
+   - 앱은 best_deploy.pt를 우선 자동 탐색하고, 없으면 best.pt를 탐색함
+
+4. Case Info
+   - Case Info 200 DesignPoints - 최종본.xlsx를 기존처럼 유지
+
+새 앱 기능
+- 간편 단계(low/medium/high) 입력 유지
+- exact W 세밀 입력 추가
+- CFD 학습범위 내 interpolation / 범위 밖 warning
+- 목표온도 0.1°C 단위
+- 54개 HVAC 후보 가상시험
+- 현재 추정 hotspot 위치와 추천 후 예상 변화
+- Top-5 hotspot 해소 여부
+- 현재/추천 후 동일 색상범위 온도장 비교
+- Before/After 전체 노드 CSV 다운로드
+- Hotspot 변화 CSV 다운로드
+
+주의
+- 현재 상태는 실제 센서 실측이 아니라 현재 HVAC 설정 + 입력 열부하에 대한 PopField 정상상태 추정
+- 공식 Zone mask가 없으면 Zone_Q1~Q4는 좌표 사분면 placeholder
