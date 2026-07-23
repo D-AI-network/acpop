@@ -556,6 +556,34 @@ def status_box(status: str, target: float):
     )
 
 
+def thermal_state_explanation(rec: Dict, target: float) -> tuple[str, str, str]:
+    state = str(rec.get("thermal_state", "NEAR_TARGET"))
+    cur_mean = float(rec.get("current_mean_temp_C", rec.get("mean_temp_C", target)))
+    if state == "TOO_HOT":
+        return (
+            "🔥 과열 상태",
+            f"현재 센서 복원 평균 {cur_mean:.2f}℃가 목표 {target:.1f}℃보다 높습니다.",
+            "현재 Hotspot을 실제로 줄이는 후보를 우선하고, 비슷한 후보끼리는 더 강한 냉방을 선호합니다.",
+        )
+    if state == "TOO_COLD":
+        return (
+            "🧊 과냉각 상태",
+            f"현재 센서 복원 평균 {cur_mean:.2f}℃가 목표 {target:.1f}℃보다 낮습니다.",
+            "Coldspot을 더 악화시키는 후보를 제외하고, 비슷한 후보끼리는 높은 토출온도·낮은 풍량 등 약한 냉방을 우선합니다.",
+        )
+    if state == "MIXED_HOT_COLD":
+        return (
+            "🌡️ Hot/Cold 혼재",
+            f"현재 공간에 과열과 과냉각 영역이 함께 존재합니다. 목표는 {target:.1f}℃입니다.",
+            "전체 평균보다 국부 Hotspot 냉각과 Coldspot 완화를 동시에 개선하는 방향/풍량을 우선합니다.",
+        )
+    return (
+        "✅ 목표 근접 상태",
+        f"현재 센서 복원 평균이 목표 {target:.1f}℃ 부근입니다.",
+        "과도한 추가 냉방보다 공간 균일도와 최소 운전부하를 함께 고려합니다.",
+    )
+
+
 def constraint_rows(diag: Dict) -> pd.DataFrame:
     labels = {
         "zone_range": ("Zone 편차", "℃"),
@@ -1100,6 +1128,22 @@ elif st.session_state["page"] == "result":
             unsafe_allow_html=True,
         )
 
+        if result.get("sensor_mode"):
+            state_title, state_line, state_reason = thermal_state_explanation(rec, target_for_result)
+            st.markdown(
+                f"""
+                <div class="pf-shell" style="padding-top:0;padding-bottom:0">
+                  <div class="pf-card">
+                    <div class="pf-label">센서 기반 제어 판단</div>
+                    <div style="font-size:17px;font-weight:800;color:#131e33;margin-bottom:6px">{state_title}</div>
+                    <div style="font-size:14px;color:#334155;margin-bottom:7px">{state_line}</div>
+                    <div class="pf-note">{state_reason}</div>
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
         spatial = result["spatial_change"]
         hottest = spatial["hottest_current_location"]
         cur_m = spatial["current_metrics"]
@@ -1121,8 +1165,8 @@ elif st.session_state["page"] == "result":
             change_label = "⚪ 온도 변화 거의 없음"
             change_color = "#64748b"
 
-        safety_ok = bool(rec.get("hotspot_safety_constraint_met", True))
-        safety_text = "🛡️ Hotspot Safety 통과" if safety_ok else "⚠️ Hotspot Safety 확인 필요"
+        safety_ok = bool(rec.get("thermal_safety_constraint_met", rec.get("hotspot_safety_constraint_met", True)))
+        safety_text = "🛡️ Hot/Cold Safety 통과" if safety_ok else "⚠️ Hot/Cold Safety 확인 필요"
 
         st.markdown(
             f"""
@@ -1146,7 +1190,7 @@ elif st.session_state["page"] == "result":
               </div>
               <div class="pf-note">
                 {"현재 값은 실제 센서 입력을 PCA/QR basis로 복원한 현재 온도장입니다. 추천 후 온도장은 이 현재 상태에 PopField가 예측한 HVAC 변경 효과(ΔT)를 더해 계산합니다." if result.get("sensor_mode") else "현재 값은 센서 실측이 아니라 현재 HVAC 설정 + 입력 열부하에 대한 PopField 정상상태 추정입니다."}
-                추천 후보는 새로운 Hotspot 생성, 기존 Hotspot 악화, 최대온도 악화를 막는 Safety Guardrail을 거쳐 선택됩니다.
+                추천 후보는 새로운 Hotspot/Coldspot 생성과 기존 과열·과냉각 악화를 막는 Safety Guardrail을 거친 뒤, 센서 기반 현재 상태에 맞춰 54개 후보를 다시 순위화해 선택됩니다.
               </div>
             </div>
             """,
@@ -1165,7 +1209,8 @@ elif st.session_state["page"] == "result":
         before_label = "현재 센서 복원" if result.get("sensor_mode") else "현재 추정"
         tab_before, tab_after = st.tabs([before_label, "추천 적용 후"])
         with tab_before:
-            fig = temperature_map(comp, value_col="current_estimated_temp_C", title="Current estimated field", vmin=vmin, vmax=vmax)
+            current_map_title = "Sensor-reconstructed current field" if result.get("sensor_mode") else "Current estimated field"
+            fig = temperature_map(comp, value_col="current_estimated_temp_C", title=current_map_title, vmin=vmin, vmax=vmax)
             st.pyplot(fig, use_container_width=True)
             plt.close(fig)
         with tab_after:
@@ -1179,7 +1224,7 @@ elif st.session_state["page"] == "result":
             sensor_rows = result["sensor_info"].get("sensor_locations", [])
             if sensor_rows:
                 st.dataframe(pd.DataFrame(sensor_rows), use_container_width=True, hide_index=True)
-            st.caption("센서 입력 → PCA/QR 현재 온도장 복원 → PopField HVAC ΔT 예측 순서로 계산합니다.")
+            st.caption("센서 입력 → PCA/QR 현재 온도장 복원 → PopField 54개 HVAC ΔT 예측 → 현재 Hot/Cold 상태 기준 재평가 순서로 계산합니다.")
 
         st.markdown("#### 🌡️ 대표 고온 위치 변화")
         hotspot_show = result["hotspots"].copy()
