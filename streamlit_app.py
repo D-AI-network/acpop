@@ -832,12 +832,12 @@ elif st.session_state["page"] == "setup":
     )
 
     st.session_state["target_temp"] = st.slider(
-        "🌡️ 목표 온도",
+        "🌡️ 목표 온도 (℃)",
         min_value=22.0,
         max_value=28.0,
         value=float(st.session_state["target_temp"]),
         step=0.1,
-        format="%.1f℃",
+        format="%.1f",
         key="target_temp_widget",
     )
 
@@ -930,9 +930,9 @@ elif st.session_state["page"] == "setup":
                         st.session_state[state_key] = 24.0
                     value = st.number_input(
                         f"Sensor {j} · Node {node_idx} · XYZ "
-                        f"({coords_s[node_idx,0]:.2f}, {coords_s[node_idx,1]:.2f}, {coords_s[node_idx,2]:.2f}) m",
+                        f"({coords_s[node_idx,0]:.2f}, {coords_s[node_idx,1]:.2f}, {coords_s[node_idx,2]:.2f}) m · 온도 (℃)",
                         min_value=10.0, max_value=40.0,
-                        value=float(st.session_state[state_key]), step=0.1, format="%.1f℃",
+                        value=float(st.session_state[state_key]), step=0.1, format="%.1f",
                         key=f"sensor_temp_widget_{j}",
                     )
                     st.session_state[state_key] = float(value)
