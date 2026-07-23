@@ -1,0 +1,10 @@
+# 1) Upload/copy these files to /content/popfield_app/
+#    streamlit_app.py
+#    demo_v2_backend.py
+#    requirements.txt
+#    best.pt
+#    Case Info 200 DesignPoints - 최종본.xlsx
+
+%cd /content/popfield_app
+!pip -q install -r requirements.txt
+!streamlit run streamlit_app.py --server.address 0.0.0.0 --server.port 8501
