@@ -447,6 +447,7 @@ def run_ai(
         max_cold_fraction=0.05,
         max_p95_temp_c=None,
         energy_weight=0.35,
+        airflow_weight=0.25,
         current_temp_override=current_temp_override,
     )
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -1100,6 +1101,45 @@ elif st.session_state["page"] == "result":
             unsafe_allow_html=True,
         )
 
+        # Airflow-aware direction diagnostics from the selected candidate.
+        priority_air_speed = float(rec.get("priority_air_speed_mps", float("nan")))
+        priority_cooling = float(rec.get("priority_temp_improvement_C", float("nan")))
+        priority_stagnant = 100.0 * float(rec.get("priority_stagnant_fraction", float("nan")))
+        airflow_region = str(rec.get("airflow_priority_region", "thermal_priority_region"))
+
+        st.markdown(
+            f"""
+            <div class="pf-shell" style="padding-top:0;padding-bottom:0">
+              <div class="pf-card">
+                <div class="pf-section-title">💨 풍향 선택 근거</div>
+                <div class="pf-note" style="margin-bottom:10px">
+                  온도만 비교하지 않고, 현재 고온 우선영역에 실제로 바람이 도달하는지와
+                  그 영역의 예상 냉각 효과를 함께 반영해 L/M/R 방향을 선택합니다.
+                </div>
+                <div class="pf-metric-grid" style="margin-bottom:0">
+                  <div class="pf-metric">
+                    <div class="pf-metric-label">고온 우선영역 평균 풍속</div>
+                    <div class="pf-metric-value">{priority_air_speed:.3f} m/s</div>
+                  </div>
+                  <div class="pf-metric">
+                    <div class="pf-metric-label">고온 우선영역 예상 냉각</div>
+                    <div class="pf-metric-value">{priority_cooling:+.2f}℃</div>
+                  </div>
+                  <div class="pf-metric">
+                    <div class="pf-metric-label">우선영역 정체 비율</div>
+                    <div class="pf-metric-value">{priority_stagnant:.1f}%</div>
+                  </div>
+                  <div class="pf-metric">
+                    <div class="pf-metric-label">풍향 평가 모드</div>
+                    <div class="pf-metric-value" style="font-size:14px">Airflow-aware</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
         spatial = result["spatial_change"]
         hottest = spatial["hottest_current_location"]
         cur_m = spatial["current_metrics"]
@@ -1207,6 +1247,24 @@ elif st.session_state["page"] == "result":
             })
             hotspot_table["온도 변화(℃)"] = hotspot_table["온도 변화(℃)"].map(lambda x: round(float(x), 2))
             st.dataframe(hotspot_table, use_container_width=True, hide_index=True)
+
+        with st.expander("💨 풍향·풍량 후보 비교"):
+            cand = result["all_candidates"].copy()
+            show_cols = [
+                "rank", "Inlet_L", "Inlet_M", "Inlet_R", "CMM", "AirTemp_C",
+                "mean_temp_C", "priority_air_speed_mps", "priority_temp_improvement_C",
+                "priority_stagnant_fraction", "airflow_score", "combined_score",
+                "recommendation_constraint_met",
+            ]
+            show_cols = [c for c in show_cols if c in cand.columns]
+            cand_show = cand[show_cols].head(15).copy()
+            if "priority_stagnant_fraction" in cand_show:
+                cand_show["priority_stagnant_fraction"] *= 100.0
+            st.dataframe(cand_show, use_container_width=True, hide_index=True)
+            st.caption(
+                "airflow_score와 combined_score는 낮을수록 유리합니다. "
+                "풍향은 온도 쾌적성뿐 아니라 고온 우선영역 풍속·냉각·정체까지 함께 비교합니다."
+            )
 
         st.markdown(
             f"""
