@@ -1955,35 +1955,7 @@ def optimize_hvac(
         current_state_source = "sparse_sensor_reconstruction"
 
     current_hot_mask = current_temp > upper
-    current_cold_mask = current_temp < lower
     current_max_temp = float(np.max(current_temp))
-    current_min_temp = float(np.min(current_temp))
-    current_mean_temp = float(np.mean(current_temp))
-    current_hot_fraction = float(np.mean(current_hot_mask))
-    current_cold_fraction = float(np.mean(current_cold_mask))
-
-    # ------------------------------------------------------------
-    # SENSOR-STATE-AWARE CONTROL MODE
-    # The sensor reconstruction defines the real current thermal state.
-    # PopField remains the counterfactual surrogate; the optimizer uses the
-    # sensor-anchored state to decide whether stronger cooling, weaker cooling,
-    # or spatially selective correction should be preferred.
-    # ------------------------------------------------------------
-    state_deadband_c = min(0.5, max(0.2, 0.25 * float(comfort_band_c)))
-    if current_hot_fraction > max_hot_fraction and current_cold_fraction > max_cold_fraction:
-        thermal_state = "MIXED_HOT_COLD"
-    elif current_mean_temp > float(target_temp_c) + state_deadband_c or current_hot_fraction > max_hot_fraction:
-        thermal_state = "TOO_HOT"
-    elif current_mean_temp < float(target_temp_c) - state_deadband_c or current_cold_fraction > max_cold_fraction:
-        thermal_state = "TOO_COLD"
-    else:
-        thermal_state = "NEAR_TARGET"
-
-    cmm_values = np.asarray([float(a[3]) for a in actions], dtype=float)
-    supply_values = np.asarray([float(a[4]) for a in actions], dtype=float)
-    cmm_min, cmm_max = float(cmm_values.min()), float(cmm_values.max())
-    supply_min, supply_max = float(supply_values.min()), float(supply_values.max())
-
     rows = []
 
     for i, action in enumerate(actions):
@@ -2009,56 +1981,11 @@ def optimize_hvac(
         cold_excess_mean = float(np.mean(np.maximum(lower - temp, 0.0)))
 
         l, m, r, cmm, supply = action
-
-        # Normalized cooling intensity is used only as a state-aware tie-break/prior.
-        # The actual candidate ranking is still driven primarily by the PopField
-        # counterfactual temperature field and comfort/safety metrics.
-        cmm_norm = (float(cmm) - cmm_min) / (cmm_max - cmm_min + 1e-12)
-        supply_cooling_norm = (supply_max - float(supply)) / (supply_max - supply_min + 1e-12)
-        cooling_intensity = float(0.55 * cmm_norm + 0.45 * supply_cooling_norm)
-
-        # How well does this action respond to the ACTUAL sensor-anchored problem areas?
-        if bool(np.any(current_hot_mask)):
-            hotspot_cooling_gain = float(np.mean(current_temp[current_hot_mask] - temp[current_hot_mask]))
-        else:
-            hotspot_cooling_gain = 0.0
-        if bool(np.any(current_cold_mask)):
-            coldspot_warming_gain = float(np.mean(temp[current_cold_mask] - current_temp[current_cold_mask]))
-        else:
-            coldspot_warming_gain = 0.0
-
-        target_mean_error = float(abs(np.mean(temp) - target_temp_c))
-        if thermal_state == "TOO_HOT":
-            state_response_benefit = float(
-                hotspot_cooling_gain + 2.0 * (current_hot_fraction - hot_fraction)
-            )
-            state_control_penalty = float(1.0 - cooling_intensity)
-        elif thermal_state == "TOO_COLD":
-            state_response_benefit = float(
-                coldspot_warming_gain + 2.0 * (current_cold_fraction - cold_fraction)
-            )
-            # When the measured space is already too cold, prefer less aggressive
-            # cooling among otherwise similar candidates.
-            state_control_penalty = float(cooling_intensity)
-        elif thermal_state == "MIXED_HOT_COLD":
-            state_response_benefit = float(
-                hotspot_cooling_gain
-                + coldspot_warming_gain
-                + (current_hot_fraction - hot_fraction)
-                + (current_cold_fraction - cold_fraction)
-            )
-            state_control_penalty = 0.0
-        else:
-            state_response_benefit = float(-target_mean_error)
-            state_control_penalty = float(0.25 * cooling_intensity)
-
         # Cooling-load proxy only; no COP/electrical-power data are provided.
         cooling_proxy = float(max(float(ra[i]) - supply, 0.0) * cmm)
         estimated_sensible_cooling_kw = sensible_cooling_capacity_kw(float(ra[i]), supply, cmm)
 
-        # Comfort score includes global uniformity, local hot/cold risk, and direct
-        # distance to the user target. This prevents a merely "inside the band"
-        # candidate from being treated the same as one centered near the target.
+        # Comfort score includes both global uniformity and local hot/cold risk.
         p95_excess = max(p95_temp - float(max_p95_temp_c), 0.0)
         comfort_raw = (
             zone_range
@@ -2067,7 +1994,6 @@ def optimize_hvac(
             + 2.0 * hot_fraction
             + 2.0 * cold_fraction
             + 1.5 * p95_excess
-            + 0.75 * target_mean_error
         )
 
         zone_ok = zone_range <= max_zone_range_c
@@ -2098,27 +2024,7 @@ def optimize_hvac(
         existing_hotspot_ok = existing_hotspot_max_increase <= safety_tol
         max_temp_ok = max_temp_change_vs_current <= safety_tol
         hotspot_safety_ok = bool(no_new_hotspot_ok and existing_hotspot_ok and max_temp_ok)
-
-        # Symmetric COLDSPOT guardrail. This is important when the sensor-reconstructed
-        # current state is already over-cooled: a recommendation must not create new
-        # coldspots or materially worsen existing ones merely to improve another metric.
-        new_coldspot_mask = (current_temp >= lower) & (temp < lower)
-        new_coldspot_count = int(np.sum(new_coldspot_mask))
-        new_coldspot_fraction = float(np.mean(new_coldspot_mask))
-        if bool(np.any(current_cold_mask)):
-            existing_coldspot_max_decrease = float(
-                np.max(current_temp[current_cold_mask] - temp[current_cold_mask])
-            )
-        else:
-            existing_coldspot_max_decrease = 0.0
-        min_temp_change_vs_current = float(np.min(temp) - current_min_temp)
-        no_new_coldspot_ok = new_coldspot_count == 0
-        existing_coldspot_ok = existing_coldspot_max_decrease <= safety_tol
-        min_temp_ok = min_temp_change_vs_current >= -safety_tol
-        coldspot_safety_ok = bool(no_new_coldspot_ok and existing_coldspot_ok and min_temp_ok)
-
-        thermal_safety_ok = bool(hotspot_safety_ok and coldspot_safety_ok)
-        recommendation_ok = bool(comfort_ok and thermal_safety_ok)
+        recommendation_ok = bool(comfort_ok and hotspot_safety_ok)
 
         # Dimensionless violation scores for transparent fallback/ranking.
         violation = (
@@ -2131,9 +2037,6 @@ def optimize_hvac(
             new_hotspot_fraction / max(max_hot_fraction, 1e-6)
             + max(existing_hotspot_max_increase - safety_tol, 0.0) / max(comfort_band_c, 1e-6)
             + max(max_temp_change_vs_current - safety_tol, 0.0) / max(comfort_band_c, 1e-6)
-            + new_coldspot_fraction / max(max_cold_fraction, 1e-6)
-            + max(existing_coldspot_max_decrease - safety_tol, 0.0) / max(comfort_band_c, 1e-6)
-            + max(-min_temp_change_vs_current - safety_tol, 0.0) / max(comfort_band_c, 1e-6)
         )
 
         row = {
@@ -2159,16 +2062,6 @@ def optimize_hvac(
             "cooling_load_proxy": cooling_proxy,
             "estimated_sensible_cooling_kw": estimated_sensible_cooling_kw,
             "comfort_raw": comfort_raw,
-            "target_mean_error_C": target_mean_error,
-            "cooling_intensity": cooling_intensity,
-            "hotspot_cooling_gain_C": hotspot_cooling_gain,
-            "coldspot_warming_gain_C": coldspot_warming_gain,
-            "state_response_benefit": state_response_benefit,
-            "state_control_penalty": state_control_penalty,
-            "thermal_state": thermal_state,
-            "current_mean_temp_C": current_mean_temp,
-            "current_hot_fraction": current_hot_fraction,
-            "current_cold_fraction": current_cold_fraction,
             "zone_constraint_met": bool(zone_ok),
             "hot_fraction_constraint_met": bool(hot_ok),
             "cold_fraction_constraint_met": bool(cold_ok),
@@ -2183,15 +2076,6 @@ def optimize_hvac(
             "existing_hotspot_nonworsening_met": bool(existing_hotspot_ok),
             "max_temp_nonworsening_met": bool(max_temp_ok),
             "hotspot_safety_constraint_met": bool(hotspot_safety_ok),
-            "new_coldspot_count": int(new_coldspot_count),
-            "new_coldspot_fraction": float(new_coldspot_fraction),
-            "existing_coldspot_max_decrease_C": float(existing_coldspot_max_decrease),
-            "min_temp_change_vs_current_C": float(min_temp_change_vs_current),
-            "no_new_coldspot_constraint_met": bool(no_new_coldspot_ok),
-            "existing_coldspot_nonworsening_met": bool(existing_coldspot_ok),
-            "min_temp_nonworsening_met": bool(min_temp_ok),
-            "coldspot_safety_constraint_met": bool(coldspot_safety_ok),
-            "thermal_safety_constraint_met": bool(thermal_safety_ok),
             "recommendation_constraint_met": bool(recommendation_ok),
             "constraint_violation_score": float(violation),
             "safety_violation_score": float(safety_violation),
@@ -2202,31 +2086,9 @@ def optimize_hvac(
     df = pd.DataFrame(rows)
     c = df["comfort_raw"].to_numpy(float)
     e = df["cooling_load_proxy"].to_numpy(float)
-    target_err = df["target_mean_error_C"].to_numpy(float)
-    response = df["state_response_benefit"].to_numpy(float)
-    control_penalty = df["state_control_penalty"].to_numpy(float)
-
-    def _minmax(v: np.ndarray) -> np.ndarray:
-        v = np.asarray(v, dtype=float)
-        return (v - v.min()) / (v.max() - v.min() + 1e-12)
-
-    c_norm = _minmax(c)
-    e_norm = _minmax(e)
-    target_norm = _minmax(target_err)
-    # Higher response benefit is better, so convert it to a minimization penalty.
-    response_penalty_norm = 1.0 - _minmax(response)
-    control_penalty_norm = _minmax(control_penalty)
-
-    # State-aware score: actual sensor-anchored comfort remains dominant, while
-    # target centering + local hot/cold response + sensible control intensity break
-    # ties in a physically intuitive direction.
-    df["state_aware_score"] = (
-        0.60 * c_norm
-        + 0.20 * target_norm
-        + 0.15 * response_penalty_norm
-        + 0.05 * control_penalty_norm
-    )
-    df["combined_score"] = (1.0 - energy_weight) * df["state_aware_score"] + energy_weight * e_norm
+    c_norm = (c - c.min()) / (c.max() - c.min() + 1e-12)
+    e_norm = (e - e.min()) / (e.max() - e.min() + 1e-12)
+    df["combined_score"] = (1.0 - energy_weight) * c_norm + energy_weight * e_norm
     df["pareto_optimal"] = pareto_flags(c, e)
 
     # DO-NO-HARM ranking: a candidate must satisfy both comfort AND hotspot safety
@@ -2234,15 +2096,14 @@ def optimize_hvac(
     df = df.sort_values(
         [
             "recommendation_constraint_met",
-            "thermal_safety_constraint_met",
+            "hotspot_safety_constraint_met",
             "constraint_violation_score",
             "safety_violation_score",
-            "state_aware_score",
             "combined_score",
             "comfort_raw",
             "cooling_load_proxy",
         ],
-        ascending=[False, False, True, True, True, True, True, True],
+        ascending=[False, False, True, True, True, True, True],
     ).reset_index(drop=True)
     df.insert(0, "rank", np.arange(1, len(df) + 1))
     df.to_csv(save_dir / "hvac_optimization.csv", index=False)
@@ -2251,21 +2112,14 @@ def optimize_hvac(
     has_feasible = bool(len(feasible) > 0)
 
     if has_feasible:
-        balanced = feasible.sort_values(["combined_score", "state_aware_score", "comfort_raw"]).iloc[0].to_dict()
-        comfort_best = feasible.sort_values(["state_aware_score", "comfort_raw", "cooling_load_proxy"]).iloc[0].to_dict()
-        eco_best = feasible.sort_values(["cooling_load_proxy", "state_aware_score", "comfort_raw"]).iloc[0].to_dict()
+        balanced = feasible.sort_values(["combined_score", "comfort_raw"]).iloc[0].to_dict()
+        comfort_best = feasible.sort_values(["comfort_raw", "cooling_load_proxy"]).iloc[0].to_dict()
+        eco_best = feasible.sort_values(["cooling_load_proxy", "comfort_raw"]).iloc[0].to_dict()
         recommendations = {
             "status": "SAFE_FEASIBLE_RECOMMENDATIONS_AVAILABLE",
             "fully_feasible_action_exists": True,
             "hotspot_safety_guardrail_active": True,
-            "coldspot_safety_guardrail_active": True,
-            "thermal_safety_tolerance_C": float(safety_tol),
             "hotspot_safety_tolerance_C": float(safety_tol),
-            "state_aware_optimizer_active": True,
-            "thermal_state": thermal_state,
-            "current_mean_temp_C": current_mean_temp,
-            "current_hot_fraction": current_hot_fraction,
-            "current_cold_fraction": current_cold_fraction,
             "current_state_source": current_state_source,
             "sensor_anchored_counterfactual": bool(current_temp_override is not None),
             "facility_limit_warning": False,
@@ -2280,31 +2134,21 @@ def optimize_hvac(
             "feasibility_diagnostics": {
                 "num_candidates": int(len(df)),
                 "num_hotspot_safe_candidates": int(df["hotspot_safety_constraint_met"].sum()),
-                "num_coldspot_safe_candidates": int(df["coldspot_safety_constraint_met"].sum()),
-                "num_thermal_safe_candidates": int(df["thermal_safety_constraint_met"].sum()),
                 "num_safe_fully_feasible_candidates": int(df["recommendation_constraint_met"].sum()),
             },
             "note": (
-                "Balanced/Comfort/Eco recommendations satisfy the configured comfort constraints and symmetric thermal-safety guardrails "
-                "(no harmful new/worsened hotspot or coldspot). Sensor-anchored hot/cold response is used in candidate ranking."
+                "Balanced/Comfort/Eco recommendations satisfy both the configured comfort constraints "
+                "and the hotspot-safety guardrail (no harmful new/worsened hotspot or maximum-temperature increase beyond tolerance)."
             ),
         }
     else:
         # Never prefer a locally harmful action merely because its aggregate score is good.
         # Restrict fallback to hotspot-safe candidates first. The current action is normally
         # in this set and is safe relative to itself.
-        safe_pool = df[df["thermal_safety_constraint_met"]].copy()
+        safe_pool = df[df["hotspot_safety_constraint_met"]].copy()
         fallback_pool = safe_pool if len(safe_pool) else df.copy()
         best_achievable = fallback_pool.sort_values(
-            [
-                "constraint_violation_score",
-                "safety_violation_score",
-                "state_aware_score",
-                "state_control_penalty",
-                "combined_score",
-                "comfort_raw",
-                "cooling_load_proxy",
-            ]
+            ["constraint_violation_score", "safety_violation_score", "comfort_raw", "combined_score", "cooling_load_proxy"]
         ).iloc[0].to_dict()
 
         failed_constraints = []
@@ -2318,22 +2162,13 @@ def optimize_hvac(
             failed_constraints.append("p95_temperature")
         if not bool(best_achievable["hotspot_safety_constraint_met"]):
             failed_constraints.append("hotspot_safety")
-        if not bool(best_achievable["coldspot_safety_constraint_met"]):
-            failed_constraints.append("coldspot_safety")
 
         capacity_gap = estimate_capacity_gap_lower_bound(loads, best_achievable, df)
         recommendations = {
             "status": "NO_SAFE_FEASIBLE_ACTION",
             "fully_feasible_action_exists": False,
             "hotspot_safety_guardrail_active": True,
-            "coldspot_safety_guardrail_active": True,
-            "thermal_safety_tolerance_C": float(safety_tol),
             "hotspot_safety_tolerance_C": float(safety_tol),
-            "state_aware_optimizer_active": True,
-            "thermal_state": thermal_state,
-            "current_mean_temp_C": current_mean_temp,
-            "current_hot_fraction": current_hot_fraction,
-            "current_cold_fraction": current_cold_fraction,
             "current_state_source": current_state_source,
             "sensor_anchored_counterfactual": bool(current_temp_override is not None),
             "facility_limit_warning": True,
@@ -2350,14 +2185,12 @@ def optimize_hvac(
                 "min_p95_temp_C_across_candidates": float(df["p95_temp_C"].min()),
                 "num_candidates": int(len(df)),
                 "num_hotspot_safe_candidates": int(df["hotspot_safety_constraint_met"].sum()),
-                "num_coldspot_safe_candidates": int(df["coldspot_safety_constraint_met"].sum()),
-                "num_thermal_safe_candidates": int(df["thermal_safety_constraint_met"].sum()),
                 "num_safe_fully_feasible_candidates": 0,
             },
             "note": (
-                "No candidate satisfies every comfort constraint while also passing symmetric hot/cold safety. "
-                "The fallback is selected from thermally safe actions first and is ranked using the sensor-anchored current state. "
-                "When the room is already too cold, weaker cooling is preferred among otherwise similar candidates."
+                "No candidate satisfies every comfort constraint while also passing hotspot safety. "
+                "The fallback is selected from hotspot-safe actions first; unsafe local warming is not "
+                "silently presented as an optimal recommendation."
             ),
         }
     with open(save_dir / "hvac_recommendations.json", "w", encoding="utf-8") as f:
