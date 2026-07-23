@@ -21,7 +21,7 @@ What this single script does (including complete console reporting)
    (No unstable residual pseudo-inverse fusion is used.)
 6) Searches all observed HVAC actions (direction x CMM x supply temperature) for fixed heat loads.
 7) Applies strict comfort constraints: zone spread, hot/cold fractions, and 95th-percentile temperature,
-   then ranks feasible actions by comfort + cooling-load proxy and writes Pareto/recommendation tables.
+   then ranks feasible actions by temperature comfort + hotspot-aware airflow effectiveness + cooling-load proxy.
 8) Compares DP 0 (Current) against AI recommendations and reports temperature-uniformity / hotspot / estimated sensible-cooling-capacity improvements.
 9) Provides RECOMMEND/DEMO modes: enter current conditions -> evaluate all HVAC candidates -> return Balanced / Comfort / Eco actions with 3-stage feasibility (feasible / near-feasible / infeasible).
 10) Optionally exports thermal influence maps for external/meeting/server/working heat loads.
@@ -1855,13 +1855,22 @@ def optimize_hvac(
     max_cold_fraction: float = 0.05,
     max_p95_temp_c: Optional[float] = None,
     energy_weight: float = 0.35,
+    airflow_weight: float = 0.25,
     hotspot_safety_tolerance_c: float = 0.20,
     current_temp_override: Optional[np.ndarray] = None,
 ) -> pd.DataFrame:
     """
-    Counterfactual HVAC search with STRICT comfort constraints.
+    Counterfactual HVAC search with STRICT comfort constraints and airflow-aware ranking.
 
     Recommendation feasibility requires BOTH comfort and hotspot-safety constraints.
+    Among safe candidates, ranking also uses the already-predicted CFD velocity field (u/v/w):
+      - deliver more air to the currently warmest / above-target region,
+      - reduce stagnation in that thermal-priority region,
+      - reward actual predicted cooling at that region,
+      - avoid choosing direction from temperature score alone.
+
+    This changes only recommendation/ranking. It does NOT require retraining because the
+    trained PopField already predicts temperature + u/v/w for every candidate.
 
     Comfort:
       1) zone mean spread <= max_zone_range_c
@@ -1899,6 +1908,7 @@ def optimize_hvac(
     upper = float(target_temp_c + comfort_band_c)
     lower = float(target_temp_c - comfort_band_c)
     safety_tol = max(0.0, float(hotspot_safety_tolerance_c))
+    airflow_weight = float(np.clip(float(airflow_weight), 0.0, 0.80))
 
     # ------------------------------------------------------------
     # HOTSPOT-SAFETY REFERENCE
@@ -1927,7 +1937,7 @@ def optimize_hvac(
             break
 
     if current_idx is not None:
-        model_current_temp = field[current_idx, :, 0].astype(np.float32, copy=False)
+        model_current_field = field[current_idx].astype(np.float32, copy=False)
     else:
         # Defensive fallback if the Case Info "Current" action is not one of the
         # enumerated action tuples.
@@ -1939,7 +1949,10 @@ def optimize_hvac(
         current_field, _current_ra = predict_conditions(
             model, current_cond, cond_scaler, coords_norm_t, field_scaler, ra_scaler, device
         )
-        model_current_temp = current_field[0, :, 0].astype(np.float32, copy=False)
+        model_current_field = current_field[0].astype(np.float32, copy=False)
+
+    model_current_temp = model_current_field[:, 0]
+    model_current_speed = np.linalg.norm(model_current_field[:, 1:4], axis=-1)
 
     if current_temp_override is None:
         current_temp = model_current_temp.copy()
@@ -1954,6 +1967,26 @@ def optimize_hvac(
             raise ValueError("current_temp_override contains NaN/Inf")
         current_state_source = "sparse_sensor_reconstruction"
 
+    # Airflow-priority region:
+    # 1) use nodes already above the requested target when enough exist;
+    # 2) otherwise use the warmest 20% of the current field.
+    # This is deliberately derived from the current thermal state instead of hard-coding
+    # a room direction, so L/M/R can change when the thermal pattern changes.
+    target_mask = current_temp > float(target_temp_c)
+    min_priority_nodes = max(3, int(round(0.02 * len(current_temp))))
+    if int(np.sum(target_mask)) >= min_priority_nodes:
+        airflow_priority_mask = target_mask
+        airflow_priority_source = "current_nodes_above_target"
+    else:
+        warm_cut = float(np.quantile(current_temp, 0.80))
+        airflow_priority_mask = current_temp >= warm_cut
+        airflow_priority_source = "warmest_20_percent_current_field"
+
+    # Relative stagnation threshold anchored to the current predicted velocity field.
+    # It is NOT presented as a universal comfort standard.
+    current_speed_p25 = float(np.percentile(model_current_speed, 25))
+    stagnation_threshold_mps = max(1e-4, current_speed_p25)
+
     current_hot_mask = current_temp > upper
     current_max_temp = float(np.max(current_temp))
     rows = []
@@ -1966,7 +1999,23 @@ def optimize_hvac(
             temp = raw_temp
         else:
             temp = current_temp + (raw_temp - model_current_temp)
-        vel = np.linalg.norm(field[i, :, 1:4], axis=-1)
+        vel_vec = field[i, :, 1:4]
+        vel = np.linalg.norm(vel_vec, axis=-1)
+
+        # Airflow-direction diagnostics over the thermal-priority region.
+        # These metrics make direction responsive to WHERE cooling/air movement is needed,
+        # rather than rewarding only whole-room average temperature.
+        priority_speed = vel[airflow_priority_mask]
+        priority_temp_change = current_temp[airflow_priority_mask] - temp[airflow_priority_mask]
+        priority_air_speed_mps = float(np.mean(priority_speed))
+        priority_air_speed_p25_mps = float(np.percentile(priority_speed, 25))
+        priority_stagnant_fraction = float(
+            np.mean(priority_speed <= stagnation_threshold_mps)
+        )
+        priority_temp_improvement_c = float(np.mean(priority_temp_change))
+        mean_air_speed_mps = float(np.mean(vel))
+        airflow_spatial_cv = float(np.std(vel) / (mean_air_speed_mps + 1e-6))
+
         zone_means = {name: float(np.mean(temp[mask])) for name, mask in zones.items()}
         zvals = np.asarray(list(zone_means.values()), dtype=float)
 
@@ -2058,7 +2107,15 @@ def optimize_hvac(
             "cold_excess_mean_C": cold_excess_mean,
             "hot_fraction": hot_fraction,
             "cold_fraction": cold_fraction,
-            "mean_air_speed_mps": float(np.mean(vel)),
+            "mean_air_speed_mps": mean_air_speed_mps,
+            "priority_air_speed_mps": priority_air_speed_mps,
+            "priority_air_speed_p25_mps": priority_air_speed_p25_mps,
+            "priority_stagnant_fraction": priority_stagnant_fraction,
+            "priority_temp_improvement_C": priority_temp_improvement_c,
+            "airflow_spatial_cv": airflow_spatial_cv,
+            "airflow_priority_region": airflow_priority_source,
+            "airflow_priority_node_fraction": float(np.mean(airflow_priority_mask)),
+            "stagnation_reference_speed_mps": float(stagnation_threshold_mps),
             "cooling_load_proxy": cooling_proxy,
             "estimated_sensible_cooling_kw": estimated_sensible_cooling_kw,
             "comfort_raw": comfort_raw,
@@ -2084,12 +2141,53 @@ def optimize_hvac(
         rows.append(row)
 
     df = pd.DataFrame(rows)
+
+    def _minmax01(values: np.ndarray) -> np.ndarray:
+        x = np.asarray(values, dtype=float)
+        span = float(np.max(x) - np.min(x))
+        if span <= 1e-12:
+            return np.zeros_like(x)
+        return (x - np.min(x)) / span
+
     c = df["comfort_raw"].to_numpy(float)
     e = df["cooling_load_proxy"].to_numpy(float)
-    c_norm = (c - c.min()) / (c.max() - c.min() + 1e-12)
-    e_norm = (e - e.min()) / (e.max() - e.min() + 1e-12)
-    df["combined_score"] = (1.0 - energy_weight) * c_norm + energy_weight * e_norm
-    df["pareto_optimal"] = pareto_flags(c, e)
+
+    # Lower is better for every normalized component below.
+    c_norm = _minmax01(c)
+    e_norm = _minmax01(e)
+
+    # Direction-sensitive airflow score:
+    # - higher speed in the thermal-priority region is better,
+    # - more predicted cooling in that region is better,
+    # - less stagnation is better,
+    # - extremely uneven airflow distribution is mildly penalized.
+    hot_speed_bad = 1.0 - _minmax01(df["priority_air_speed_mps"].to_numpy(float))
+    hot_cooling_bad = 1.0 - _minmax01(df["priority_temp_improvement_C"].to_numpy(float))
+    stagnation_bad = _minmax01(df["priority_stagnant_fraction"].to_numpy(float))
+    uneven_airflow_bad = _minmax01(df["airflow_spatial_cv"].to_numpy(float))
+
+    airflow_score = (
+        0.40 * hot_speed_bad
+        + 0.35 * hot_cooling_bad
+        + 0.20 * stagnation_bad
+        + 0.05 * uneven_airflow_bad
+    )
+    df["airflow_score"] = airflow_score
+
+    # Preserve the original energy-vs-comfort structure, but allocate part of the
+    # non-energy term to airflow effectiveness. Default airflow_weight=0.25 is
+    # intentionally moderate: it makes L/M/R more responsive without forcing needless
+    # direction changes or always selecting the maximum fan setting.
+    thermal_airflow_score = (
+        (1.0 - airflow_weight) * c_norm
+        + airflow_weight * airflow_score
+    )
+    df["thermal_airflow_score"] = thermal_airflow_score
+    df["combined_score"] = (
+        (1.0 - energy_weight) * thermal_airflow_score
+        + energy_weight * e_norm
+    )
+    df["pareto_optimal"] = pareto_flags(thermal_airflow_score, e)
 
     # DO-NO-HARM ranking: a candidate must satisfy both comfort AND hotspot safety
     # before it can be labeled Balanced / Comfort / Eco.
@@ -2112,14 +2210,24 @@ def optimize_hvac(
     has_feasible = bool(len(feasible) > 0)
 
     if has_feasible:
-        balanced = feasible.sort_values(["combined_score", "comfort_raw"]).iloc[0].to_dict()
-        comfort_best = feasible.sort_values(["comfort_raw", "cooling_load_proxy"]).iloc[0].to_dict()
-        eco_best = feasible.sort_values(["cooling_load_proxy", "comfort_raw"]).iloc[0].to_dict()
+        balanced = feasible.sort_values(
+            ["combined_score", "thermal_airflow_score", "comfort_raw"]
+        ).iloc[0].to_dict()
+        comfort_best = feasible.sort_values(
+            ["thermal_airflow_score", "comfort_raw", "airflow_score", "cooling_load_proxy"]
+        ).iloc[0].to_dict()
+        eco_best = feasible.sort_values(
+            ["cooling_load_proxy", "thermal_airflow_score", "comfort_raw"]
+        ).iloc[0].to_dict()
         recommendations = {
             "status": "SAFE_FEASIBLE_RECOMMENDATIONS_AVAILABLE",
             "fully_feasible_action_exists": True,
             "hotspot_safety_guardrail_active": True,
             "hotspot_safety_tolerance_C": float(safety_tol),
+            "airflow_aware_ranking_active": True,
+            "airflow_weight": float(airflow_weight),
+            "airflow_priority_region": airflow_priority_source,
+            "stagnation_reference_speed_mps": float(stagnation_threshold_mps),
             "current_state_source": current_state_source,
             "sensor_anchored_counterfactual": bool(current_temp_override is not None),
             "facility_limit_warning": False,
@@ -2138,7 +2246,8 @@ def optimize_hvac(
             },
             "note": (
                 "Balanced/Comfort/Eco recommendations satisfy both the configured comfort constraints "
-                "and the hotspot-safety guardrail (no harmful new/worsened hotspot or maximum-temperature increase beyond tolerance)."
+                "and the hotspot-safety guardrail. Safe candidates are then ranked using temperature comfort, "
+                "hotspot-aware airflow effectiveness from predicted u/v/w, and cooling-load proxy."
             ),
         }
     else:
@@ -2148,7 +2257,7 @@ def optimize_hvac(
         safe_pool = df[df["hotspot_safety_constraint_met"]].copy()
         fallback_pool = safe_pool if len(safe_pool) else df.copy()
         best_achievable = fallback_pool.sort_values(
-            ["constraint_violation_score", "safety_violation_score", "comfort_raw", "combined_score", "cooling_load_proxy"]
+            ["constraint_violation_score", "safety_violation_score", "thermal_airflow_score", "comfort_raw", "combined_score", "cooling_load_proxy"]
         ).iloc[0].to_dict()
 
         failed_constraints = []
@@ -2169,6 +2278,10 @@ def optimize_hvac(
             "fully_feasible_action_exists": False,
             "hotspot_safety_guardrail_active": True,
             "hotspot_safety_tolerance_C": float(safety_tol),
+            "airflow_aware_ranking_active": True,
+            "airflow_weight": float(airflow_weight),
+            "airflow_priority_region": airflow_priority_source,
+            "stagnation_reference_speed_mps": float(stagnation_threshold_mps),
             "current_state_source": current_state_source,
             "sensor_anchored_counterfactual": bool(current_temp_override is not None),
             "facility_limit_warning": True,
@@ -2190,7 +2303,8 @@ def optimize_hvac(
             "note": (
                 "No candidate satisfies every comfort constraint while also passing hotspot safety. "
                 "The fallback is selected from hotspot-safe actions first; unsafe local warming is not "
-                "silently presented as an optimal recommendation."
+                "silently presented as an optimal recommendation. Airflow effectiveness is used only within "
+                "that safety-first ranking."
             ),
         }
     with open(save_dir / "hvac_recommendations.json", "w", encoding="utf-8") as f:
@@ -2207,6 +2321,9 @@ def optimize_hvac(
         "max_cold_fraction": max_cold_fraction,
         "max_p95_temp_c": float(max_p95_temp_c),
         "energy_weight": energy_weight,
+        "airflow_weight": airflow_weight,
+        "airflow_priority_region": airflow_priority_source,
+        "stagnation_reference_speed_mps": float(stagnation_threshold_mps),
         "zone_mode": "official_json" if zone_json else "placeholder_xy_quadrants",
         "fully_feasible_action_exists": has_feasible,
         "best_ranked_action": best,
@@ -4615,6 +4732,7 @@ def run_demo(args) -> None:
         max_cold_fraction=float(args.max_cold_fraction),
         max_p95_temp_c=args.max_p95_temp,
         energy_weight=float(args.energy_weight),
+        airflow_weight=float(args.airflow_weight),
     )
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
 
@@ -4680,6 +4798,7 @@ def run_demo(args) -> None:
             "Current spatial diagnosis is a PopField estimate under the current HVAC action unless real sparse-sensor measurements are separately connected; it is not direct measurement.",
             "Demo status uses three levels: FEASIBLE, NEAR_FEASIBLE (small threshold exceedance), and INFEASIBLE. Strict optimizer feasibility is also stored separately.",
             "Consumer UI recommended target-temperature range defaults to 22-28C; out-of-range targets are still evaluated but explicitly warned.",
+            "HVAC direction ranking uses the checkpoint's existing u/v/w predictions to reward airflow and cooling in the current thermal-priority region; no retraining is required for this ranking change.",
         ],
     }
     result_path = save_dir / "DEMO_RESULT.json"
@@ -4729,6 +4848,9 @@ def run_demo(args) -> None:
     print(f"  Zone range       : {float(rec['zone_range_C']):.2f} °C")
     print(f"  Hot fraction     : {100.0 * float(rec['hot_fraction']):.2f} %")
     print(f"  Cold fraction    : {100.0 * float(rec['cold_fraction']):.2f} %")
+    print(f"  Priority airflow : {float(rec.get('priority_air_speed_mps', float('nan'))):.3f} m/s")
+    print(f"  Priority cooling : {float(rec.get('priority_temp_improvement_C', float('nan'))):+.3f} °C vs current")
+    print(f"  Priority stagnant: {100.0 * float(rec.get('priority_stagnant_fraction', float('nan'))):.2f} %")
     print(f"  Sensible cooling : {float(rec['estimated_sensible_cooling_kw']):.2f} kW (thermal estimate)")
 
     _print_demo_spatial_change_report(spatial_change)
@@ -4947,6 +5069,8 @@ def parse_args():
     p.add_argument("--max_p95_temp", type=float, default=None,
                    help="Maximum allowed 95th-percentile temperature; default=target_temp+comfort_band")
     p.add_argument("--energy_weight", type=float, default=0.35)
+    p.add_argument("--airflow_weight", type=float, default=0.25,
+                   help="Weight of hotspot-aware airflow effectiveness inside the non-energy ranking term. Uses existing predicted u/v/w; no retraining required.")
     p.add_argument("--zone_json", type=str, default=None)
     p.add_argument("--export_influence", action="store_true")
 
