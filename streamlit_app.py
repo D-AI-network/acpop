@@ -238,6 +238,20 @@ div[data-testid="stDataFrame"] {
   margin-bottom: 10px;
 }
 
+[data-testid="stWidgetLabel"] {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+[data-testid="stWidgetLabel"] p {
+  color: var(--pf-text) !important;
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: normal !important;
+  word-break: keep-all;
+}
+
 .pf-note {
   color: var(--pf-muted);
   font-size: 12px;
@@ -248,7 +262,37 @@ div[data-testid="stDataFrame"] {
   .stApp { background: var(--pf-bg); }
   .block-container { max-width: 100% !important; }
 }
+
+div[data-testid="stButton"] > button,
+div[data-testid="stButton"] > button p {
+  color: white !important;
+}
+
+div[data-testid="stDownloadButton"] > button,
+div[data-testid="stDownloadButton"] > button p {
+  color: white !important;
+}
+
+div[data-testid="stVerticalBlockBorderWrapper"] {
+  border-radius: 20px !important;
+  border-color: var(--pf-line) !important;
+  background: var(--pf-card) !important;
+  padding: 6px 12px !important;
+  color: #000000 !important;
+}
+
+div[data-testid="stVerticalBlockBorderWrapper"] p,
+div[data-testid="stVerticalBlockBorderWrapper"] span,
+div[data-testid="stVerticalBlockBorderWrapper"] label,
+div[data-testid="stVerticalBlockBorderWrapper"] div {
+  color: #000000 !important;
+}
+
+div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"] {
+  color: var(--pf-muted) !important;
+}
 </style>
+
 """,
     unsafe_allow_html=True,
 )
@@ -783,11 +827,12 @@ if st.session_state["page"] == "home":
             <div class="pf-blue-text">목표 24.0°C · 냉방 최적화 필요</div>
           </div>
 
-          <div class="pf-twin">
+        <div class="pf-twin">
             <div class="pf-twin-title">Digital Twin · Temperature Field</div>
             <div class="pf-blob cool"></div>
             <div class="pf-blob hot"></div>
-          </div>
+        </div>
+        <div class="pf-note" style="padding: 0 4px;">This is an example image — see actual analysis in AI Cooling Optimization</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -821,139 +866,156 @@ elif st.session_state["page"] == "setup":
     st.markdown(
         """
         <div class="pf-shell" style="padding-top:0;padding-bottom:6px">
-          <div class="pf-card">
-            <div class="pf-section-title">원하는 실내 환경</div>
-            <div class="pf-note">
-              일반 사용자는 W 단위를 입력할 필요 없이 공간 상태만 선택하면 됩니다.
-            </div>
+          <div class="pf-note">
+            일반 사용자는 W 단위를 입력할 필요 없이 공간 상태만 선택하면 됩니다.
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.session_state["target_temp"] = st.slider(
-        "🌡️ 목표 온도 (℃)",
-        min_value=22.0,
-        max_value=28.0,
-        value=float(st.session_state["target_temp"]),
-        step=0.1,
-        format="%.1f",
-        key="target_temp_widget",
-    )
+    st.markdown('<div class="pf-shell" style="padding-top:0;padding-bottom:0">', unsafe_allow_html=True)
 
-    st.session_state["input_mode_ko"] = st.radio(
-        "🔥 열부하 입력 방식",
-        ["간편 단계", "세밀 입력(W)"],
-        horizontal=True,
-        index=["간편 단계", "세밀 입력(W)"].index(st.session_state["input_mode_ko"]),
-        key="input_mode_widget",
-        help="세밀 입력은 학습된 CFD 범위 안의 연속 보간 질의로 사용할 수 있습니다.",
-    )
+    # ---- Card 1: 목표 설정 ----
+    with st.container(border=True):
+        st.markdown('<div class="pf-section-title">🎯 목표 설정</div>', unsafe_allow_html=True)
 
-    if st.session_state["input_mode_ko"] == "간편 단계":
-        st.session_state["external_ko"] = st.select_slider(
-            "☀️ 외부 열환경", options=["낮음", "보통", "높음"],
-            value=st.session_state["external_ko"], key="external_widget",
-        )
-        st.session_state["meeting_ko"] = st.select_slider(
-            "👥 회의공간 사용", options=["낮음", "보통", "높음"],
-            value=st.session_state["meeting_ko"], key="meeting_widget",
-        )
-        st.session_state["server_ko"] = st.select_slider(
-            "🖥️ 서버·기기 발열", options=["낮음", "보통", "높음"],
-            value=st.session_state["server_ko"], key="server_widget",
-        )
-        st.session_state["working_ko"] = st.select_slider(
-            "💼 업무공간 사용", options=["낮음", "보통", "높음"],
-            value=st.session_state["working_ko"], key="working_widget",
-        )
-    else:
-        st.caption("CFD 관측 범위 안의 중간값도 입력할 수 있습니다. 범위를 벗어나면 결과 화면에 경고가 표시됩니다.")
-        bounds = None
-        if st.session_state.get("case_info_path"):
-            try:
-                bounds, _observed = load_input_metadata(st.session_state["case_info_path"])
-            except Exception:
-                bounds = None
-
-        def _range_text(key: str) -> str:
-            if not bounds:
-                return ""
-            lo, hi = bounds[key]
-            return f"관측 CFD 범위: {lo:.0f}~{hi:.0f} W"
-
-        st.session_state["external_w"] = st.number_input(
-            "☀️ 외부 열부하 (W)", min_value=0.0, value=float(st.session_state["external_w"]),
-            step=50.0, help=_range_text("external"), key="external_w_widget",
-        )
-        st.session_state["meeting_w"] = st.number_input(
-            "👥 회의공간 열부하 (W)", min_value=0.0, value=float(st.session_state["meeting_w"]),
-            step=50.0, help=_range_text("meeting"), key="meeting_w_widget",
-        )
-        st.session_state["server_w"] = st.number_input(
-            "🖥️ 서버·기기 열부하 (W)", min_value=0.0, value=float(st.session_state["server_w"]),
-            step=50.0, help=_range_text("server"), key="server_w_widget",
-        )
-        st.session_state["working_w"] = st.number_input(
-            "💼 업무공간 열부하 (W)", min_value=0.0, value=float(st.session_state["working_w"]),
-            step=50.0, help=_range_text("working"), key="working_w_widget",
+        st.session_state["target_temp"] = st.slider(
+            "🌡️ 목표 온도 (℃)",
+            min_value=22.0,
+            max_value=28.0,
+            value=float(st.session_state["target_temp"]),
+            step=0.1,
+            format="%.1f",
+            key="target_temp_widget",
         )
 
-    st.markdown("### 🌡️ 현재 실측 센서")
-    st.session_state["use_sensor_current"] = st.toggle(
-        "실제 센서 온도로 현재 공간 상태 복원",
-        value=bool(st.session_state.get("use_sensor_current", False)),
-        help="현재 온도장은 PCA+QR로 선정된 센서들의 실제 측정값에서 복원됩니다.",
-        key="use_sensor_current_widget",
-    )
+        st.session_state["policy_ko"] = st.radio(
+            "운전 목표",
+            ["⚖️ 균형", "🛋️ 쾌적 우선", "🍃 절약 우선"],
+            horizontal=False,
+            index=["⚖️ 균형", "🛋️ 쾌적 우선", "🍃 절약 우선"].index(
+                st.session_state["policy_ko"]
+            ),
+            key="policy_widget",
+        )
 
-    sensor_values_c = None
-    if st.session_state["use_sensor_current"]:
-        basis_path = st.session_state.get("sensor_basis_path")
-        ckpt_path = st.session_state.get("checkpoint_path")
-        case_path = st.session_state.get("case_info_path")
-        if basis_path and ckpt_path and case_path:
-            try:
-                _ckpt_s, _model_s, _scalers_s, coords_s, _coords_norm_s, _case_s, _levels_s, _device_s = load_runtime(
-                    ckpt_path, case_path, st.session_state.get("force_cpu", False)
-                )
-                sensor_assets = hvac.load_sensor_reconstruction_basis(basis_path, coords=coords_s)
-                sensor_idx = np.asarray(sensor_assets["selected_sensor_idx"], dtype=int)
-                st.caption(
-                    f"선정된 {len(sensor_idx)}개 센서의 실제 온도를 입력하세요. "
-                    "이 값으로 현재 전체 온도장을 복원합니다."
-                )
-                sensor_values_c = []
-                for j, node_idx in enumerate(sensor_idx.tolist(), 1):
-                    state_key = f"sensor_temp_{j}"
-                    if state_key not in st.session_state:
-                        st.session_state[state_key] = 24.0
-                    value = st.number_input(
-                        f"Sensor {j} · Node {node_idx} · XYZ "
-                        f"({coords_s[node_idx,0]:.2f}, {coords_s[node_idx,1]:.2f}, {coords_s[node_idx,2]:.2f}) m · 온도 (℃)",
-                        min_value=10.0, max_value=40.0,
-                        value=float(st.session_state[state_key]), step=0.1, format="%.1f",
-                        key=f"sensor_temp_widget_{j}",
-                    )
-                    st.session_state[state_key] = float(value)
-                    sensor_values_c.append(float(value))
-            except Exception as exc:
-                st.warning(f"센서 basis를 읽지 못했습니다: {exc}")
-                sensor_values_c = None
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+
+    # ---- Card 2: 공간 열부하 ----
+    with st.container(border=True):
+        st.markdown('<div class="pf-section-title">🔥 공간 열부하</div>', unsafe_allow_html=True)
+
+        st.session_state["input_mode_ko"] = st.radio(
+            "입력 방식",
+            ["간편 단계", "세밀 입력(W)"],
+            horizontal=True,
+            index=["간편 단계", "세밀 입력(W)"].index(st.session_state["input_mode_ko"]),
+            key="input_mode_widget",
+            help="세밀 입력은 학습된 CFD 범위 안의 연속 보간 질의로 사용할 수 있습니다.",
+        )
+
+        if st.session_state["input_mode_ko"] == "간편 단계":
+            st.session_state["external_ko"] = st.select_slider(
+                "☀️ 외부 열환경", options=["낮음", "보통", "높음"],
+                value=st.session_state["external_ko"], key="external_widget",
+            )
+            st.session_state["meeting_ko"] = st.select_slider(
+                "👥 회의공간 사용", options=["낮음", "보통", "높음"],
+                value=st.session_state["meeting_ko"], key="meeting_widget",
+            )
+            st.session_state["server_ko"] = st.select_slider(
+                "🖥️ 서버·기기 발열", options=["낮음", "보통", "높음"],
+                value=st.session_state["server_ko"], key="server_widget",
+            )
+            st.session_state["working_ko"] = st.select_slider(
+                "💼 업무공간 사용", options=["낮음", "보통", "높음"],
+                value=st.session_state["working_ko"], key="working_widget",
+            )
         else:
-            st.warning("sensor_reconstruction_basis.npz를 연결해야 실제 센서 기반 현재 상태 복원을 사용할 수 있습니다.")
+            st.caption("CFD 관측 범위 안의 중간값도 입력할 수 있습니다. 범위를 벗어나면 결과 화면에 경고가 표시됩니다.")
+            bounds = None
+            if st.session_state.get("case_info_path"):
+                try:
+                    bounds, _observed = load_input_metadata(st.session_state["case_info_path"])
+                except Exception:
+                    bounds = None
 
-    st.session_state["policy_ko"] = st.radio(
-        "🎯 운전 목표",
-        ["⚖️ 균형", "🛋️ 쾌적 우선", "🍃 절약 우선"],
-        horizontal=False,
-        index=["⚖️ 균형", "🛋️ 쾌적 우선", "🍃 절약 우선"].index(
-            st.session_state["policy_ko"]
-        ),
-        key="policy_widget",
-    )
+            def _range_text(key: str) -> str:
+                if not bounds:
+                    return ""
+                lo, hi = bounds[key]
+                return f"관측 CFD 범위: {lo:.0f}~{hi:.0f} W"
 
+            st.session_state["external_w"] = st.number_input(
+                "☀️ 외부 열부하 (W)", min_value=0.0, value=float(st.session_state["external_w"]),
+                step=50.0, help=_range_text("external"), key="external_w_widget",
+            )
+            st.session_state["meeting_w"] = st.number_input(
+                "👥 회의공간 열부하 (W)", min_value=0.0, value=float(st.session_state["meeting_w"]),
+                step=50.0, help=_range_text("meeting"), key="meeting_w_widget",
+            )
+            st.session_state["server_w"] = st.number_input(
+                "🖥️ 서버·기기 열부하 (W)", min_value=0.0, value=float(st.session_state["server_w"]),
+                step=50.0, help=_range_text("server"), key="server_w_widget",
+            )
+            st.session_state["working_w"] = st.number_input(
+                "💼 업무공간 열부하 (W)", min_value=0.0, value=float(st.session_state["working_w"]),
+                step=50.0, help=_range_text("working"), key="working_w_widget",
+            )
+
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+
+    # ---- Card 3: 실측 센서 (선택) ----
+    with st.container(border=True):
+        st.markdown('<div class="pf-section-title">🌡️ 실측 센서 <span style="font-weight:400;font-size:13px;color:var(--pf-muted)">(선택)</span></div>', unsafe_allow_html=True)
+
+        st.session_state["use_sensor_current"] = st.toggle(
+            "실제 센서 온도로 현재 공간 상태 복원",
+            value=bool(st.session_state.get("use_sensor_current", False)),
+            help="현재 온도장은 PCA+QR로 선정된 센서들의 실제 측정값에서 복원됩니다.",
+            key="use_sensor_current_widget",
+        )
+
+        sensor_values_c = None
+        if st.session_state["use_sensor_current"]:
+            basis_path = st.session_state.get("sensor_basis_path")
+            ckpt_path = st.session_state.get("checkpoint_path")
+            case_path = st.session_state.get("case_info_path")
+            if basis_path and ckpt_path and case_path:
+                try:
+                    _ckpt_s, _model_s, _scalers_s, coords_s, _coords_norm_s, _case_s, _levels_s, _device_s = load_runtime(
+                        ckpt_path, case_path, st.session_state.get("force_cpu", False)
+                    )
+                    sensor_assets = hvac.load_sensor_reconstruction_basis(basis_path, coords=coords_s)
+                    sensor_idx = np.asarray(sensor_assets["selected_sensor_idx"], dtype=int)
+                    st.caption(
+                        f"선정된 {len(sensor_idx)}개 센서의 실제 온도를 입력하세요. "
+                        "이 값으로 현재 전체 온도장을 복원합니다."
+                    )
+                    sensor_values_c = []
+                    for j, node_idx in enumerate(sensor_idx.tolist(), 1):
+                        state_key = f"sensor_temp_{j}"
+                        if state_key not in st.session_state:
+                            st.session_state[state_key] = 24.0
+                        value = st.number_input(
+                            f"Sensor {j} · Node {node_idx} · XYZ "
+                            f"({coords_s[node_idx,0]:.2f}, {coords_s[node_idx,1]:.2f}, {coords_s[node_idx,2]:.2f}) m · 온도 (℃)",
+                            min_value=10.0, max_value=40.0,
+                            value=float(st.session_state[state_key]), step=0.1, format="%.1f",
+                            key=f"sensor_temp_widget_{j}",
+                        )
+                        st.session_state[state_key] = float(value)
+                        sensor_values_c.append(float(value))
+                except Exception as exc:
+                    st.warning(f"센서 basis를 읽지 못했습니다: {exc}")
+                    sensor_values_c = None
+            else:
+                st.warning("sensor_reconstruction_basis.npz를 연결해야 실제 센서 기반 현재 상태 복원을 사용할 수 있습니다.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # ---- Model connection (unchanged) ----
     with st.expander(
         "⚙️ 모델 연결",
         expanded=not (
@@ -1053,7 +1115,6 @@ elif st.session_state["page"] == "setup":
 
     bottom_nav("setup")
 
-
 # ============================================================
 # AI RESULT
 # ============================================================
@@ -1073,6 +1134,37 @@ elif st.session_state["page"] == "result":
         rec = result["recommendation"]
 
         status_box(result["status"], target_for_result)
+
+        # If the requested policy wasn't achievable, tell the user plainly.
+        if result.get("policy_used") != result.get("policy"):
+            st.markdown(
+                """
+                <div class="pf-shell" style="padding-top:0;padding-bottom:0">
+                  <div class="pf-note" style="background:#fff7e5;border:1px solid #f3d68b;
+                       border-radius:14px;padding:10px 14px;">
+                    ⚠️ 선택하신 운전 목표로는 모든 조건을 만족하는 운전안을 찾지 못해,
+                    가장 가까운 대안(best_achievable)을 대신 보여드립니다.
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        # Plain-language action summary — what to actually set, in one line.
+        action_line = (
+            f"→ 풍향 {direction_text(rec)} · 풍량 {float(rec['CMM']):.0f} CMM · "
+            f"토출온도 {float(rec['AirTemp_C']):.0f}℃로 설정하세요"
+        )
+        st.markdown(
+            f"""
+            <div class="pf-shell" style="padding-top:0;padding-bottom:0">
+              <div class="pf-card" style="background:var(--pf-primary-soft);border:none;">
+                <div style="font-size:16px;font-weight:800;color:var(--pf-primary)">{action_line}</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         st.markdown(
             f"""
@@ -1107,11 +1199,9 @@ elif st.session_state["page"] == "result":
         priority_stagnant = 100.0 * float(rec.get("priority_stagnant_fraction", float("nan")))
         airflow_region = str(rec.get("airflow_priority_region", "thermal_priority_region"))
 
-        st.markdown(
-            f"""
-            <div class="pf-shell" style="padding-top:0;padding-bottom:0">
-              <div class="pf-card">
-                <div class="pf-section-title">💨 풍향 선택 근거</div>
+        with st.expander("💨 풍향 선택 근거 더 보기"):
+            st.markdown(
+                f"""
                 <div class="pf-note" style="margin-bottom:10px">
                   온도만 비교하지 않고, 현재 고온 우선영역에 실제로 바람이 도달하는지와
                   그 영역의 예상 냉각 효과를 함께 반영해 L/M/R 방향을 선택합니다.
@@ -1134,11 +1224,9 @@ elif st.session_state["page"] == "result":
                     <div class="pf-metric-value" style="font-size:14px">Airflow-aware</div>
                   </div>
                 </div>
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                """,
+                unsafe_allow_html=True,
+            )
 
         spatial = result["spatial_change"]
         hottest = spatial["hottest_current_location"]
