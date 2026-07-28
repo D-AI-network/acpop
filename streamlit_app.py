@@ -401,11 +401,11 @@ div[data-testid="stDataFrame"] {
 [data-testid="stSelectSlider"],
 [data-testid="stRadio"] {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(11, 27, 43, 0.10);
   border-radius: 16px;
   padding: 14px 16px 10px 16px;
   margin-bottom: 10px;
-  box-shadow: 0 1px 2px rgba(11, 27, 43, 0.10);
+  box-shadow: 0 2px 5px rgba(11, 27, 43, 0.05);
 }
 
 [data-testid="stWidgetLabel"] {
