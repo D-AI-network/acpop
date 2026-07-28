@@ -1226,7 +1226,7 @@ elif st.session_state["page"] == "setup":
     if "setup_step" not in st.session_state:
         st.session_state["setup_step"] = 1
 
-    STEP_LABELS = ["🎯 목표", "🔥 열부하", "⚙️ 연결", "✅ 시작"]
+    STEP_LABELS = ["목표", "열부하", "⚙️ 연결", "시작"]
     TOTAL_STEPS = len(STEP_LABELS)
     step = int(st.session_state["setup_step"])
 
