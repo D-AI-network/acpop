@@ -600,18 +600,6 @@ div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bo
   color: #ffffff !important;
   filter: grayscale(1) brightness(0) invert(1);
 }
-
-/* Gentle entrance for cards — respects reduced-motion preference */
-@keyframes pf-fade-up {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.pf-card, .pf-status, .pf-metric, .pf-twin {
-  animation: pf-fade-up 0.32s ease both;
-}
-@media (prefers-reduced-motion: reduce) {
-  .pf-card, .pf-status, .pf-metric, .pf-twin { animation: none; }
-}
 </style>
 
 """,
