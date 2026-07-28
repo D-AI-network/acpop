@@ -1516,7 +1516,7 @@ elif st.session_state["page"] == "setup":
         st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
         if st.button(
-            "✨ AI 분석 시작",
+            "AI 분석 시작",
             type="primary",
             disabled=not ready,
             use_container_width=True,
