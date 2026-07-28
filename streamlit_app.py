@@ -469,11 +469,19 @@ div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer
    REAL FIX: the marker div (.pf-bottom) never wraps the st.columns()
    row that follows it — Streamlit renders each st.markdown() call in
    its own isolated stElementContainer, as a plain sibling of the
-   stLayoutWrapper that holds the columns, not a parent of it. So
-   every rule here reaches across with :has() from the marker's
-   container to that sibling instead of relying on nesting. */
+   column layout, not a parent of it. Every rule reaches across with
+   :has() from the marker's container to that sibling instead of
+   relying on nesting.
+   VERSION NOTE: which element sits immediately next to the marker
+   differs by Streamlit version — stLayoutWrapper wraps the columns
+   in newer releases (verified on 1.60), while older releases
+   (verified on 1.41) put stHorizontalBlock there directly with no
+   wrapper. Every selector below is duplicated for both shapes so
+   the same stylesheet works across versions. */
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] {
+  + div[data-testid="stLayoutWrapper"],
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] {
   background: var(--surface);
   border-top: 1px solid var(--line);
   box-shadow: 0 -6px 18px rgba(11, 27, 43, 0.05);
@@ -482,6 +490,9 @@ div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bo
   position: sticky;
   bottom: 0;
   z-index: 10;
+  display: flex !important;
+  gap: 6px !important;
+  justify-content: center !important;
 }
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
   + div[data-testid="stLayoutWrapper"] div[data-testid="stHorizontalBlock"] {
@@ -490,7 +501,9 @@ div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bo
   justify-content: center !important;
 }
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stColumn"]:nth-of-type(1) {
+  + div[data-testid="stLayoutWrapper"] div[data-testid="stColumn"]:nth-of-type(1),
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"]:nth-of-type(1) {
   width: 96px !important;
   flex: 0 0 96px !important;
   min-width: 96px !important;
@@ -499,14 +512,20 @@ div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bo
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
   + div[data-testid="stLayoutWrapper"] div[data-testid="stColumn"]:nth-of-type(2),
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stColumn"]:nth-of-type(3) {
+  + div[data-testid="stLayoutWrapper"] div[data-testid="stColumn"]:nth-of-type(3),
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"]:nth-of-type(2),
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"]:nth-of-type(3) {
   width: 140px !important;
   flex: 0 0 140px !important;
   min-width: 140px !important;
   max-width: 140px !important;
 }
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button {
+  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button,
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button {
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
@@ -518,7 +537,7 @@ div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bo
   border: 1px solid var(--cool) !important;
   color: #ffffff !important;
   min-height: 42px !important;
-  border-radius: 999px !important;
+  border-radius: 14px !important;
   font-weight: 700 !important;
   font-size: 12.5px !important;
   letter-spacing: 0;
@@ -531,7 +550,9 @@ div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bo
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button p {
+  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button p,
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button p {
   color: #ffffff !important;
   filter: grayscale(1) brightness(0) invert(1);
   white-space: nowrap !important;
@@ -545,7 +566,15 @@ div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bo
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
   + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:focus-visible,
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:active {
+  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:active,
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover,
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus,
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus-visible,
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:active {
   background: var(--cool-deep) !important;
   border-color: var(--cool-deep) !important;
   color: #ffffff !important;
@@ -559,7 +588,15 @@ div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bo
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
   + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:focus-visible p,
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:active p {
+  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:active p,
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover p,
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus p,
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus-visible p,
+div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
+  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:active p {
   color: #ffffff !important;
   filter: grayscale(1) brightness(0) invert(1);
 }
@@ -1136,18 +1173,18 @@ def bottom_nav(active: str):
     st.markdown('<div class="pf-bottom">', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("Home", key=f"nav_home_{active}", use_container_width=False):
+        if st.button("🏠 Home", key=f"nav_home_{active}", use_container_width=False):
             go("home")
     with c2:
-        if st.button("Settings", key=f"nav_settings_{active}", use_container_width=False):
-            go("setup")
-
-    with c3:
-        if st.button("Analysis", key=f"nav_analysis_{active}", use_container_width=False):
+        if st.button("📈 Analysis", key=f"nav_analysis_{active}", use_container_width=False):
             if "last_result" in st.session_state:
                 go("result")
             else:
                 go("setup")
+    with c3:
+        if st.button("🎛️ Settings", key=f"nav_settings_{active}", use_container_width=False):
+            go("setup")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ============================================================
@@ -1201,7 +1238,7 @@ elif st.session_state["page"] == "setup":
     if "setup_step" not in st.session_state:
         st.session_state["setup_step"] = 1
 
-    STEP_LABELS = ["목표", "열부하", "연결", "시작"]
+    STEP_LABELS = ["🎯 목표", "🔥 열부하", "⚙️ 연결", "✅ 시작"]
     TOTAL_STEPS = len(STEP_LABELS)
     step = int(st.session_state["setup_step"])
 
