@@ -405,7 +405,7 @@ div[data-testid="stDataFrame"] {
   border-radius: 16px;
   padding: 14px 16px 10px 16px;
   margin-bottom: 10px;
-  box-shadow: 0 1px 2px rgba(11, 27, 43, 0.03);
+  box-shadow: 0 1px 2px rgba(11, 27, 43, 0.10);
 }
 
 [data-testid="stWidgetLabel"] {
