@@ -96,7 +96,7 @@ html, body, [class*="css"] {
 }
 
 .block-container {
-  max-width: 400px !important;
+  max-width: 420px !important;
   padding: 0 !important;
   margin: 0 auto !important;
   min-height: 100vh;
