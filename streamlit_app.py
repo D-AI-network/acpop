@@ -624,9 +624,9 @@ div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bo
 # ============================================================
 LEVEL_KO_TO_KEY = {"낮음": "low", "보통": "medium", "높음": "high"}
 POLICY_KO_TO_KEY = {
-    "균형": "balanced",
-    "쾌적 우선": "comfort_first",
-    "절약 우선": "eco_first",
+    "⚖️ 균형": "balanced",
+    "🛋️ 쾌적 우선": "comfort_first",
+    "🍃 절약 우선": "eco_first",
 }
 
 
