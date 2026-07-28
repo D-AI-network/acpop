@@ -1182,7 +1182,7 @@ def bottom_nav(active: str):
             else:
                 go("setup")
     with c3:
-        if st.button("🎛️ Settings", key=f"nav_settings_{active}", use_container_width=False):
+        if st.button("⚙️ Settings", key=f"nav_settings_{active}", use_container_width=False):
             go("setup")
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1238,7 +1238,7 @@ elif st.session_state["page"] == "setup":
     if "setup_step" not in st.session_state:
         st.session_state["setup_step"] = 1
 
-    STEP_LABELS = ["🎯 목표", "🔥 열부하", "⚙️ 연결", "✅ 시작"]
+    STEP_LABELS = ["목표", "열부하", "연결", "시작"]
     TOTAL_STEPS = len(STEP_LABELS)
     step = int(st.session_state["setup_step"])
 
