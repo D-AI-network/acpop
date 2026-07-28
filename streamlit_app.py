@@ -161,13 +161,16 @@ html, body, [class*="css"] {
   margin: 0 0 16px 0;
 }
 
+/* Cards: strengthened border + shadow so they visibly separate from the
+   frost page background, matching how the nav bar reads as a distinct
+   white panel instead of blending in. */
 .pf-card {
   background: var(--surface);
   border-radius: 20px;
   padding: 18px;
   margin: 0 0 16px 0;
-  border: 1px solid var(--line);
-  box-shadow: 0 1px 2px rgba(11, 27, 43, 0.05), 0 8px 20px rgba(11, 27, 43, 0.03);
+  border: 1px solid rgba(11, 27, 43, 0.10);
+  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.07), 0 10px 24px rgba(11, 27, 43, 0.06);
 }
 
 .pf-label {
@@ -254,9 +257,9 @@ html, body, [class*="css"] {
   padding: 16px 18px;
   margin: 0 0 16px 0;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(11, 27, 43, 0.10);
   border-left: 4px solid var(--mist);
-  box-shadow: 0 1px 2px rgba(11, 27, 43, 0.05);
+  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.07), 0 10px 24px rgba(11, 27, 43, 0.06);
 }
 .pf-ok {
   border-left-color: var(--leaf);
@@ -285,10 +288,10 @@ html, body, [class*="css"] {
 }
 .pf-metric {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(11, 27, 43, 0.10);
   border-radius: 16px;
   padding: 14px;
-  box-shadow: 0 1px 2px rgba(11, 27, 43, 0.04);
+  box-shadow: 0 2px 5px rgba(11, 27, 43, 0.06), 0 6px 16px rgba(11, 27, 43, 0.05);
 }
 .pf-metric-label {
   color: var(--mist);
@@ -346,6 +349,7 @@ div[data-testid="stButton"] > button:not([kind="primary"]) {
   background: #ffffff !important;
   border: 1.5px solid var(--cool) !important;
   color: var(--cool) !important;
+  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.06);
 }
 div[data-testid="stButton"] > button:not([kind="primary"]) p {
   color: var(--cool) !important;
@@ -371,6 +375,7 @@ div[data-testid="stDownloadButton"] > button {
   border: 1.5px solid var(--cool) !important;
   color: var(--cool) !important;
   font-weight: 700;
+  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.06);
   transition: background 0.15s ease;
 }
 div[data-testid="stDownloadButton"] > button p {
@@ -382,10 +387,10 @@ div[data-testid="stDownloadButton"] > button:hover {
 
 div[data-testid="stMetric"] {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(11, 27, 43, 0.10);
   padding: 12px;
   border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(11, 27, 43, 0.04);
+  box-shadow: 0 2px 5px rgba(11, 27, 43, 0.06), 0 6px 16px rgba(11, 27, 43, 0.05);
 }
 div[data-testid="stMetricValue"] {
   font-family: 'JetBrains Mono', 'Inter', monospace !important;
@@ -394,18 +399,19 @@ div[data-testid="stMetricValue"] {
 div[data-testid="stDataFrame"] {
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(11, 27, 43, 0.10);
+  box-shadow: 0 2px 5px rgba(11, 27, 43, 0.05);
 }
 
 [data-testid="stSlider"],
 [data-testid="stSelectSlider"],
 [data-testid="stRadio"] {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(11, 27, 43, 0.10);
   border-radius: 16px;
   padding: 14px 16px 10px 16px;
   margin-bottom: 10px;
-  box-shadow: 0 1px 2px rgba(11, 27, 43, 0.03);
+  box-shadow: 0 2px 5px rgba(11, 27, 43, 0.05);
 }
 
 [data-testid="stWidgetLabel"] {
@@ -444,13 +450,16 @@ div[data-testid="stProgress"] > div > div > div {
   .block-container { max-width: 100% !important; }
 }
 
+/* Setup wizard step containers (st.container(border=True)) — same
+   white-panel treatment as everything else, so nothing on the page
+   reads as "flat" against the frost background. */
 div[data-testid="stVerticalBlockBorderWrapper"] {
   border-radius: 18px !important;
-  border-color: var(--line) !important;
+  border-color: rgba(11, 27, 43, 0.10) !important;
   background: var(--surface) !important;
   padding: 6px 12px !important;
   color: #000000 !important;
-  box-shadow: 0 1px 2px rgba(11, 27, 43, 0.04);
+  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.07), 0 10px 24px rgba(11, 27, 43, 0.05);
 }
 
 div[data-testid="stVerticalBlockBorderWrapper"] p,
@@ -462,6 +471,24 @@ div[data-testid="stVerticalBlockBorderWrapper"] div {
 
 div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"] {
   color: var(--mist) !important;
+}
+
+/* Expanders ("더 자세히 보기", "기술 세부사항") had no custom styling at
+   all before — they inherited Streamlit's own faint default border,
+   which barely separates from the frost background. Give them the
+   same visible white-panel treatment as cards/nav. */
+div[data-testid="stExpander"] {
+  background: var(--surface) !important;
+  border: 1px solid rgba(11, 27, 43, 0.10) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.06), 0 8px 20px rgba(11, 27, 43, 0.05);
+  overflow: hidden;
+}
+div[data-testid="stExpander"] summary {
+  background: var(--surface) !important;
+}
+div[data-testid="stExpander"] details {
+  background: var(--surface) !important;
 }
 
 /* Bottom nav bar — pill-shaped, solid blue in every state, so clicking
@@ -1516,7 +1543,7 @@ elif st.session_state["page"] == "setup":
         st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
         if st.button(
-            "AI 분석 시작",
+            "✨ AI 분석 시작",
             type="primary",
             disabled=not ready,
             use_container_width=True,
