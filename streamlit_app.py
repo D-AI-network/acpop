@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import Dict
 
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -1042,6 +1043,287 @@ def temperature_map(
     return fig
 
 
+# ============================================================
+# Interactive 3D digital-twin visualization
+# ============================================================
+PLOTLY_CONFIG = {
+    "displaylogo": False,
+    "scrollZoom": True,
+    "responsive": True,
+    "modeBarButtonsToRemove": ["select3d", "lasso3d"],
+}
+
+
+def _plotly_scene(title: str):
+    return dict(
+        xaxis=dict(title="X (m)", backgroundcolor="rgb(248,250,252)", gridcolor="rgb(226,232,240)"),
+        yaxis=dict(title="Y (m)", backgroundcolor="rgb(248,250,252)", gridcolor="rgb(226,232,240)"),
+        zaxis=dict(title="Z (m)", backgroundcolor="rgb(248,250,252)", gridcolor="rgb(226,232,240)"),
+        aspectmode="data",
+        camera=dict(eye=dict(x=1.55, y=1.55, z=1.15)),
+    )
+
+
+def _sensor_overlay_trace(sensor_info: Dict | None):
+    if not sensor_info:
+        return None
+    locs = sensor_info.get("sensor_locations") or []
+    if not locs:
+        return None
+    return go.Scatter3d(
+        x=[float(x["x_m"]) for x in locs],
+        y=[float(x["y_m"]) for x in locs],
+        z=[float(x["z_m"]) for x in locs],
+        mode="markers+text",
+        marker=dict(size=7, symbol="diamond", color="#111827", line=dict(color="white", width=1.2)),
+        text=[f"S{int(x['sensor_order'])}" for x in locs],
+        textposition="top center",
+        textfont=dict(size=9, color="#111827"),
+        customdata=[[int(x["node_index"]), float(x.get("temperature_C", float("nan")))] for x in locs],
+        hovertemplate="Sensor %{text}<br>Node %{customdata[0]}<br>Measured T=%{customdata[1]:.2f}°C<extra></extra>",
+        name="Selected sensors",
+    )
+
+
+def _temperature_trace(df: pd.DataFrame, temp_col: str, vmin: float, vmax: float, opacity: float = 0.78):
+    return go.Scatter3d(
+        x=df["x_m"], y=df["y_m"], z=df["z_m"],
+        mode="markers",
+        marker=dict(
+            size=4,
+            color=df[temp_col],
+            colorscale="Turbo",
+            cmin=float(vmin), cmax=float(vmax),
+            opacity=float(opacity),
+            colorbar=dict(title="Temp (°C)", thickness=13, len=0.72),
+        ),
+        customdata=np.column_stack([
+            df["node_index"].to_numpy(),
+            df[temp_col].to_numpy(float),
+        ]),
+        hovertemplate=(
+            "Node %{customdata[0]:.0f}<br>"
+            "T=%{customdata[1]:.2f}°C<br>"
+            "XYZ=(%{x:.2f}, %{y:.2f}, %{z:.2f}) m<extra></extra>"
+        ),
+        name="Temperature",
+    )
+
+
+def _hottest_trace(df: pd.DataFrame, temp_col: str):
+    if df.empty:
+        return None
+    row = df.loc[df[temp_col].astype(float).idxmax()]
+    return go.Scatter3d(
+        x=[float(row["x_m"])], y=[float(row["y_m"])], z=[float(row["z_m"])],
+        mode="markers+text",
+        marker=dict(size=10, symbol="diamond", color="#ffffff", line=dict(color="#111827", width=3)),
+        text=[f"Max {float(row[temp_col]):.1f}°C"],
+        textposition="top center",
+        textfont=dict(size=10, color="#111827"),
+        hovertemplate=f"Hottest node {int(row['node_index'])}<br>T={float(row[temp_col]):.2f}°C<extra></extra>",
+        name="Hottest point",
+    )
+
+
+def temperature_cloud_3d(
+    df: pd.DataFrame,
+    temp_col: str,
+    title: str,
+    vmin: float,
+    vmax: float,
+    sensor_info: Dict | None = None,
+):
+    fig = go.Figure()
+    fig.add_trace(_temperature_trace(df, temp_col, vmin, vmax, opacity=0.82))
+    hot = _hottest_trace(df, temp_col)
+    if hot is not None:
+        fig.add_trace(hot)
+    sensors = _sensor_overlay_trace(sensor_info)
+    if sensors is not None:
+        fig.add_trace(sensors)
+    fig.update_layout(
+        title=dict(text=title, x=0.02, xanchor="left"),
+        height=610,
+        margin=dict(l=0, r=0, t=50, b=0),
+        scene=_plotly_scene(title),
+        legend=dict(orientation="h", y=1.02, x=0),
+    )
+    return fig
+
+
+def _downsample_vectors(df: pd.DataFrame, max_vectors: int = 150) -> pd.DataFrame:
+    """Deterministic spatially broad subset for readable 3D cones."""
+    if len(df) <= max_vectors:
+        return df.copy()
+    # Sort by coordinates first, then take evenly spaced rows. This avoids showing
+    # only high-speed nodes from one local region.
+    ordered = df.sort_values(["z_m", "y_m", "x_m"]).reset_index(drop=True)
+    idx = np.linspace(0, len(ordered) - 1, int(max_vectors), dtype=int)
+    return ordered.iloc[np.unique(idx)].copy()
+
+
+def airflow_cone_3d(
+    df: pd.DataFrame,
+    u_col: str,
+    v_col: str,
+    w_col: str,
+    title: str,
+    temp_col: str | None = None,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    sensor_info: Dict | None = None,
+    max_vectors: int = 150,
+):
+    d = _downsample_vectors(df, max_vectors=max_vectors)
+    speed = np.sqrt(
+        d[u_col].to_numpy(float) ** 2
+        + d[v_col].to_numpy(float) ** 2
+        + d[w_col].to_numpy(float) ** 2
+    )
+    fig = go.Figure()
+    if temp_col is not None and vmin is not None and vmax is not None:
+        fig.add_trace(_temperature_trace(df, temp_col, float(vmin), float(vmax), opacity=0.30))
+    else:
+        fig.add_trace(go.Scatter3d(
+            x=df["x_m"], y=df["y_m"], z=df["z_m"], mode="markers",
+            marker=dict(size=2, color="#94a3b8", opacity=0.22),
+            hoverinfo="skip", name="CFD nodes",
+        ))
+    fig.add_trace(go.Cone(
+        x=d["x_m"], y=d["y_m"], z=d["z_m"],
+        u=d[u_col], v=d[v_col], w=d[w_col],
+        colorscale="Viridis",
+        cmin=float(np.nanmin(speed)) if len(speed) else 0.0,
+        cmax=float(np.nanmax(speed)) if len(speed) else 1.0,
+        sizemode="scaled",
+        sizeref=0.55,
+        anchor="tail",
+        showscale=True,
+        colorbar=dict(title="Air speed", thickness=13, len=0.62, x=1.08),
+        opacity=0.78,
+        name="Airflow vectors",
+        hovertemplate="u=%{u:.3f}<br>v=%{v:.3f}<br>w=%{w:.3f}<extra></extra>",
+    ))
+    sensors = _sensor_overlay_trace(sensor_info)
+    if sensors is not None:
+        fig.add_trace(sensors)
+    fig.update_layout(
+        title=dict(text=title, x=0.02, xanchor="left"),
+        height=630,
+        margin=dict(l=0, r=8, t=50, b=0),
+        scene=_plotly_scene(title),
+        legend=dict(orientation="h", y=1.02, x=0),
+    )
+    return fig
+
+
+def airflow_particle_animation(
+    df: pd.DataFrame,
+    u_col: str,
+    v_col: str,
+    w_col: str,
+    speed_col: str,
+    title: str,
+    n_particles: int = 34,
+    n_frames: int = 26,
+):
+    """Pseudo-time streamline visualization of a steady-state vector field.
+
+    Particle motion is only a display aid. It follows nearest-node velocity direction
+    and relative speed; frame index is NOT physical CFD time.
+    """
+    from scipy.spatial import cKDTree
+
+    xyz = df[["x_m", "y_m", "z_m"]].to_numpy(float)
+    vel = df[[u_col, v_col, w_col]].to_numpy(float)
+    speed = np.linalg.norm(vel, axis=1)
+    finite = np.isfinite(xyz).all(axis=1) & np.isfinite(vel).all(axis=1)
+    xyz, vel, speed = xyz[finite], vel[finite], speed[finite]
+    if len(xyz) == 0:
+        return go.Figure()
+
+    # Seeds: deterministic broad sample among nodes with non-negligible airflow.
+    threshold = float(np.nanpercentile(speed, 35)) if len(speed) > 5 else 0.0
+    candidates = np.where(speed >= threshold)[0]
+    if len(candidates) < n_particles:
+        candidates = np.arange(len(xyz))
+    order = candidates[np.argsort(xyz[candidates, 0] + 0.37 * xyz[candidates, 1] + 0.11 * xyz[candidates, 2])]
+    seed_idx = order[np.linspace(0, len(order) - 1, min(n_particles, len(order)), dtype=int)]
+    seeds = xyz[seed_idx].copy()
+    pos = seeds.copy()
+
+    tree = cKDTree(xyz)
+    lo, hi = xyz.min(axis=0), xyz.max(axis=0)
+    diag = max(float(np.linalg.norm(hi - lo)), 1e-6)
+    p90 = max(float(np.nanpercentile(speed, 90)), 1e-6)
+    base_step = 0.018 * diag
+
+    positions = [pos.copy()]
+    particle_speeds = []
+    for _ in range(n_frames - 1):
+        _, nn = tree.query(pos, k=1)
+        vv = vel[nn]
+        ss = np.linalg.norm(vv, axis=1)
+        particle_speeds.append(ss.copy())
+        direction = vv / np.maximum(ss[:, None], 1e-8)
+        relative = np.clip(ss / p90, 0.18, 1.45)
+        pos = pos + direction * (base_step * relative[:, None])
+        outside = np.any((pos < lo[None, :]) | (pos > hi[None, :]), axis=1)
+        if np.any(outside):
+            pos[outside] = seeds[outside]
+        positions.append(pos.copy())
+    if not particle_speeds:
+        particle_speeds = [np.zeros(len(pos))]
+    particle_speeds.append(particle_speeds[-1].copy())
+
+    bg = go.Scatter3d(
+        x=xyz[:, 0], y=xyz[:, 1], z=xyz[:, 2], mode="markers",
+        marker=dict(size=2, color="#94a3b8", opacity=0.12),
+        hoverinfo="skip", name="CFD nodes",
+    )
+    p0 = positions[0]
+    particles = go.Scatter3d(
+        x=p0[:, 0], y=p0[:, 1], z=p0[:, 2], mode="markers",
+        marker=dict(size=6, color=speed[seed_idx], colorscale="Viridis", opacity=0.95,
+                    colorbar=dict(title="Relative airflow", thickness=12, len=0.55)),
+        hovertemplate="Flow particle<extra></extra>", name="Flow particles",
+    )
+    fig = go.Figure(data=[bg, particles])
+    fig.frames = [
+        go.Frame(
+            name=str(i),
+            data=[go.Scatter3d(
+                x=p[:, 0], y=p[:, 1], z=p[:, 2], mode="markers",
+                marker=dict(size=6, color=particle_speeds[min(i, len(particle_speeds)-1)],
+                            colorscale="Viridis", cmin=0.0, cmax=max(p90, 1e-6), opacity=0.95),
+            )],
+            traces=[1],
+        )
+        for i, p in enumerate(positions)
+    ]
+    fig.update_layout(
+        title=dict(text=title, x=0.02, xanchor="left"),
+        height=620,
+        margin=dict(l=0, r=0, t=50, b=0),
+        scene=_plotly_scene(title),
+        updatemenus=[dict(
+            type="buttons", direction="left", x=0.0, y=1.08,
+            buttons=[
+                dict(label="▶ Play", method="animate", args=[None, {"frame": {"duration": 90, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}}]),
+                dict(label="⏸ Pause", method="animate", args=[[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}]),
+            ],
+        )],
+        sliders=[dict(
+            active=0, y=0.0, x=0.05, len=0.9,
+            currentvalue=dict(prefix="Display frame "),
+            steps=[dict(label=str(i), method="animate", args=[[str(i)], {"mode":"immediate", "frame":{"duration":0,"redraw":True}, "transition":{"duration":0}}]) for i in range(len(positions))],
+        )],
+        showlegend=False,
+    )
+    return fig
+
+
 def input_range_rows(diag: Dict[str, Dict[str, object]]) -> pd.DataFrame:
     labels = {
         "external": "외부 열환경",
@@ -1677,6 +1959,73 @@ elif st.session_state["page"] == "result":
             st.pyplot(fig, use_container_width=True)
             plt.close(fig)
         st.markdown("</div>", unsafe_allow_html=True)
+
+        # Interactive 3D view: temperature cloud, u/v/w cones, and steady-field flow particles.
+        required_3d_cols = {
+            "current_velocity_u", "current_velocity_v", "current_velocity_w",
+            "recommended_velocity_u", "recommended_velocity_v", "recommended_velocity_w",
+        }
+        if required_3d_cols.issubset(comp.columns):
+            st.markdown('<div class="pf-shell" style="padding-top:0;padding-bottom:0">', unsafe_allow_html=True)
+            st.markdown('<div class="pf-section-title">Interactive 3D Digital Twin</div>', unsafe_allow_html=True)
+            state_label = st.radio(
+                "3D 표시 상태",
+                [before_label, "추천 적용 후"],
+                horizontal=True,
+                key="digital_twin_3d_state",
+            )
+            is_current = state_label == before_label
+            if is_current:
+                temp_col = "current_estimated_temp_C"
+                u_col, v_col, w_col = "current_velocity_u", "current_velocity_v", "current_velocity_w"
+                speed_col = "current_air_speed_mps"
+                state_title = "Current steady-state estimate"
+            else:
+                temp_col = "recommended_pred_temp_C"
+                u_col, v_col, w_col = "recommended_velocity_u", "recommended_velocity_v", "recommended_velocity_w"
+                speed_col = "recommended_air_speed_mps"
+                state_title = "Recommended steady-state estimate"
+
+            viz_temp, viz_combo, viz_air, viz_anim = st.tabs([
+                "🌡️ 3D 온도", "🧊 온도+기류", "💨 u/v/w", "▶ Flow",
+            ])
+            with viz_temp:
+                fig3 = temperature_cloud_3d(
+                    comp, temp_col=temp_col, title=f"{state_title} · Temperature",
+                    vmin=vmin, vmax=vmax, sensor_info=result.get("sensor_info"),
+                )
+                st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
+                st.caption("마우스/터치로 회전·확대할 수 있습니다. ◆ 표시는 선택된 센서/최고온도 위치입니다.")
+            with viz_combo:
+                fig3 = airflow_cone_3d(
+                    comp, u_col=u_col, v_col=v_col, w_col=w_col,
+                    temp_col=temp_col, vmin=vmin, vmax=vmax,
+                    title=f"{state_title} · Temperature + Airflow",
+                    sensor_info=result.get("sensor_info"), max_vectors=140,
+                )
+                st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
+                st.caption("점의 색은 온도, cone의 방향은 모델이 예측한 u/v/w 정상상태 기류입니다.")
+            with viz_air:
+                fig3 = airflow_cone_3d(
+                    comp, u_col=u_col, v_col=v_col, w_col=w_col,
+                    title=f"{state_title} · Airflow vectors",
+                    sensor_info=result.get("sensor_info"), max_vectors=190,
+                )
+                st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
+                st.caption("가독성을 위해 1,270개 노드 중 공간적으로 고르게 샘플링한 벡터를 표시합니다.")
+            with viz_anim:
+                fig3 = airflow_particle_animation(
+                    comp, u_col=u_col, v_col=v_col, w_col=w_col, speed_col=speed_col,
+                    title=f"{state_title} · Steady-field flow visualization",
+                )
+                st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
+                st.caption(
+                    "이 애니메이션은 정상상태(steady-state) u/v/w장을 따라 흐름을 보여주는 시각화입니다. "
+                    "프레임은 실제 시간축이나 transient CFD 시뮬레이션을 의미하지 않습니다."
+                )
+            st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.info("3D airflow 표시를 위해 새 backend가 내보내는 current/recommended velocity 열이 필요합니다.")
 
         # Core recommendation numbers, kept short.
         st.markdown(
