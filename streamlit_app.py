@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# HOME_REFINED_BUILD = 2026-09-03-v10
+# MAP_SENSOR_REFINED_BUILD = 2026-09-03-v11
 
 import base64
 import os
@@ -14,6 +14,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from scipy.interpolate import griddata
 import torch
+
+SENSOR_ICON_B64 = "iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAABR0lEQVR42u2ZSw6DMAwFcc7QK1Vdc1LWVa/UO9BVpYqKqgSHZ4eZLR8lo5dA7GEAAAAAgDNiEQd1f87z2rXbxQyBFeKiirSo8sbr+HXP9JjCSbQM4iKLDCPwH3FrIpUCS1Z5n89t2Tu7Eeg9aZXEol7Ctenzej6lwFZpUaSwZE5fhBTKl3B2EIhABCKwluWRTP2eNAJbHb0URzr5Et6bHmX6pAK906IqKEgT+J50bYoiVGOoB2YXuEUkFWnHYgA9kUqR0bpyAAAA0OVvjLJfe9Tvj/Us7QiZ1lKeumd7xDHQehfXWqR5yoss7pfIPRLd6oGZ5HmOt3ikL5u8pcQ9H77isXR7oHY+5WxL13v8NNYVe2D2vc9zLySByq8wIBCBCEQgAgGBCEQgAgGBCExIVS+gt2LqJ1v7IyQQAAAAAAAAAAAAAI7hBUCwm17HDkU2AAAAAElFTkSuQmCC"
 
 # MERGED_HOME_BUILD = 2026-09-03-v8_HOME_CONTROL_COMBINED
 
@@ -30,7 +32,7 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
 
 :root {
   --navy-bg: #102a43;
@@ -49,7 +51,7 @@ st.markdown(
 }
 
 html, body, [class*="css"] {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: 'Noto Sans KR', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .stApp {
@@ -148,8 +150,8 @@ html, body, [class*="css"] {
 .home-field-title {
   font-family: 'Outfit', 'Inter', sans-serif;
   color: #f3fbff;
-  font-size: 31px;
-  font-weight: 800;
+  font-size: 29px;
+  font-weight: 600;
   letter-spacing: -0.9px;
   line-height: 1.02;
   margin: 0;
@@ -214,6 +216,36 @@ html, body, [class*="css"] {
 }
 .target-input-wrap button {
   color: #d9f5ff !important;
+}
+
+
+/* Dark target-temperature input, visually aligned with the average-temperature card */
+div[data-testid="stNumberInput"] div[data-baseweb="input"] {
+  background: rgba(11, 39, 63, 0.68) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+div[data-testid="stNumberInput"] input {
+  background: transparent !important;
+  color: #eefaff !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+}
+div[data-testid="stNumberInput"] button {
+  background: transparent !important;
+  color: #d9f5ff !important;
+  border: none !important;
+}
+div[data-testid="stNumberInput"] button:hover {
+  background: rgba(126, 215, 255, 0.08) !important;
+}
+
+/* Give the spatial map more visual weight */
+div[data-testid="stPlotlyChart"] {
+  margin-top: 2px !important;
+  margin-bottom: 18px !important;
 }
 
 /* Kept for result cards and diagnostics */
@@ -370,7 +402,7 @@ div.stButton > button[kind="primary"] {
   background: linear-gradient(90deg, #84dcff 0%, #b8efff 100%) !important;
   color: #0b2a43 !important;
   border-radius: 13px !important;
-  font-family: 'Outfit', 'Inter', sans-serif !important;
+  font-family: 'Noto Sans KR', 'Outfit', 'Inter', sans-serif !important;
   font-size: 15px !important;
   font-weight: 700 !important;
   padding: 12px 18px !important;
@@ -642,7 +674,7 @@ for nid, meta in ROA_NODES_META.items():
     sensor_readings[nid] = float(field_current_grid[idx])
 
 
-def make_mobile_heatmap(grid_data, height=225):
+def make_mobile_heatmap(grid_data, height=310):
     fig = go.Figure(
         data=go.Heatmap(
             z=grid_data,
@@ -655,11 +687,11 @@ def make_mobile_heatmap(grid_data, height=225):
         )
     )
 
-    # Sensor markers styled as compact navy sensor chips for a cleaner map.
+    # Invisible hover targets plus custom navy sensor-shaped icons.
     sx_plot = [meta["x_plot"] for meta in ROA_NODES_META.values()]
     sy_plot = [meta["y_plot"] for meta in ROA_NODES_META.values()]
     hover_texts = [
-        f"<b>{meta['code']}: {meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: (L={meta['x_plot']:.2f}, W={meta['y_plot']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
+        f"<b>{meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: (L={meta['x_plot']:.2f}, W={meta['y_plot']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
         for nid, meta in ROA_NODES_META.items()
     ]
 
@@ -668,29 +700,38 @@ def make_mobile_heatmap(grid_data, height=225):
             x=sx_plot,
             y=sy_plot,
             mode="markers",
-            marker=dict(size=18, color="#103557", line=dict(color="#c3efff", width=1.6), symbol="square"),
+            marker=dict(size=24, color="rgba(0,0,0,0)", line=dict(width=0)),
             hovertext=hover_texts,
             hoverinfo="text",
             showlegend=False,
         )
     )
-    fig.add_trace(
-        go.Scatter(
-            x=sx_plot,
-            y=sy_plot,
-            mode="markers",
-            marker=dict(size=5.5, color="#8edfff", symbol="circle"),
-            hoverinfo="skip",
-            showlegend=False,
+
+    sensor_icon_uri = f"data:image/png;base64,{SENSOR_ICON_B64}"
+    for x_pos, y_pos in zip(sx_plot, sy_plot):
+        fig.add_layout_image(
+            dict(
+                source=sensor_icon_uri,
+                x=x_pos,
+                y=y_pos,
+                xref="x",
+                yref="y",
+                sizex=0.46,
+                sizey=0.38,
+                xanchor="center",
+                yanchor="middle",
+                sizing="contain",
+                opacity=1.0,
+                layer="above",
+            )
         )
-    )
 
     fig.update_layout(
         title=dict(text="", font=dict(size=1)),
         showlegend=False,
         xaxis=dict(range=[0.0, 9.0], showgrid=False, zeroline=False, showticklabels=False),
         yaxis=dict(range=[0.0, 4.0], showgrid=False, zeroline=False, showticklabels=False),
-        margin=dict(l=0, r=0, t=4, b=0),
+        margin=dict(l=0, r=6, t=0, b=0),
         height=height,
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
@@ -744,10 +785,6 @@ if st.session_state.app_view == "INTRO":
 elif st.session_state.app_view == "HOME":
     st.markdown(
         f"""
-        <div class="home-field-head">
-            <div class="home-field-title">Current Field</div>
-        </div>
-
         <div class="avg-temp-card">
             <div class="avg-temp-label">현재 공간 평균 온도</div>
             <div class="avg-temp-value">{avg_room_temp:.1f} °C</div>
@@ -756,7 +793,6 @@ elif st.session_state.app_view == "HOME":
         unsafe_allow_html=True,
     )
 
-    st.markdown("<div class='target-input-wrap'>", unsafe_allow_html=True)
     new_target = st.number_input(
         "목표 온도 (°C)",
         min_value=22.0,
@@ -766,19 +802,25 @@ elif st.session_state.app_view == "HOME":
         format="%.1f",
         key="home_target_temp_input",
     )
-    st.markdown("</div>", unsafe_allow_html=True)
 
     if float(new_target) != float(st.session_state.target_temp):
         st.session_state.target_temp = float(new_target)
         st.rerun()
 
-    st.markdown("<div class='field-panel'>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="home-field-head" style="margin-top:18px; margin-bottom:8px;">
+            <div class="home-field-title">Current Field</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.plotly_chart(
-        make_mobile_heatmap(field_current_grid),
+        make_mobile_heatmap(field_current_grid, height=310),
         use_container_width=True,
         config={"displayModeBar": False},
     )
-    st.markdown("</div>", unsafe_allow_html=True)
 
     if st.button("냉방 최적화", type="primary", use_container_width=True, key="btn_home_to_heat"):
         st.session_state.app_view = "HEAT_LOAD"
