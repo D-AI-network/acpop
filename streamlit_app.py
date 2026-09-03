@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v33
+# FACTOR_UI_BUILD = 2026-09-03-v34
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -543,6 +543,16 @@ div[class*="st-key-current_field_card"] .js-plotly-plot {
   font-weight: 800;
   color: #f1fbff;
   margin-top: 2px;
+}
+
+.metric-cell .metric-help {
+  color: #88aec6;
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.25;
+  margin-top: 2px;
+  margin-bottom: 3px;
+  text-transform: none;
 }
 
 /* Form Controls */
@@ -1965,21 +1975,53 @@ def make_mobile_heatmap(grid_data, height=340):
         for nid, meta in sensor_plot_meta.items()
     ]
 
+    # Sensor glyph: red top bar + red circular body + white center.
+    # Plotly Scatter3d cannot use arbitrary PNG/SVG marker images, so this
+    # composite gives the same visual silhouette while preserving 3D rotation.
     fig.add_trace(
         go.Scatter3d(
             x=sx_plot,
             y=sy_plot,
-            z=sz_plot,
+            z=[z + 0.30 for z in sz_plot],
+            mode="text",
+            text=["▬"] * len(sx_plot),
+            textfont=dict(size=16, color="#e74c3c"),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter3d(
+            x=sx_plot,
+            y=sy_plot,
+            z=[z + 0.12 for z in sz_plot],
             mode="markers",
             marker=dict(
-                size=6,
-                color="#ff575f",
-                line=dict(color="#ffd2d6", width=1.3),
+                size=8,
+                color="#e74c3c",
+                line=dict(color="#ffb8b2", width=1.1),
                 symbol="circle",
-                opacity=0.98,
+                opacity=1.0,
             ),
             hovertext=hover_texts,
             hoverinfo="text",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter3d(
+            x=sx_plot,
+            y=sy_plot,
+            z=[z + 0.12 for z in sz_plot],
+            mode="markers",
+            marker=dict(
+                size=2.4,
+                color="#ffffff",
+                line=dict(width=0),
+                symbol="circle",
+                opacity=1.0,
+            ),
+            hoverinfo="skip",
             showlegend=False,
         )
     )
@@ -2521,33 +2563,33 @@ elif st.session_state.app_view == "RESULTS":
             <div class="dispatch-row">💨 <b>바람 방향:</b> {vane_display}</div>
             <div class="dispatch-row">🌀 <b>풍량:</b> {res['flow']}</div>
             <div class="dispatch-row">❄️ <b>공급 공기 온도:</b> {res['temp']}</div>
-            <div class="dispatch-row">⚙️ <b>냉방 출력 추정치:</b> {float(res['q_proxy']):.2f} kW</div>
+            <div class="dispatch-row">⚡ <b>냉방 출력 추정치:</b> {float(res['q_proxy']):.2f} kW</div>
         </div>
         """,
             unsafe_allow_html=True,
         )
 
 
-        st.markdown('<div class="section-title">공간 쾌적성 및 편차 지표 (Diagnostics)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">공간 온도 균형 지표</div>', unsafe_allow_html=True)
         st.markdown(
             f"""
         <div class="metric-grid">
             <div class="metric-cell">
-                <div class="lbl">평균 온도 (Mean Temp)</div>
+                <div class="lbl">예측 평균 온도</div><div class="metric-help">제어 후 공간 전체 평균</div>
                 <div class="val">{res['mean_temp']:.2f} °C</div>
             </div>
             <div class="metric-cell">
-                <div class="lbl">P95 고온 영역</div>
+                <div class="lbl">상위 5% 고온 기준</div><div class="metric-help">가장 뜨거운 영역의 기준 온도</div>
                 <div class="val">{res['p95_temp']:.2f} °C</div>
             </div>
         </div>
         <div class="metric-grid">
             <div class="metric-cell">
-                <div class="lbl">Zone Spread (ΔT)</div>
+                <div class="lbl">공간 온도 편차 (ΔT)</div><div class="metric-help">공간 내 온도 불균형 정도</div>
                 <div class="val">{res['zone_spread']:.2f} °C</div>
             </div>
             <div class="metric-cell">
-                <div class="lbl">Hotspot / Coldspot</div>
+                <div class="lbl">과열 / 과냉 영역</div><div class="metric-help">모델 기준 고온·저온 영역 비율</div>
                 <div class="val">{res['hot_fraction']:.1f}% / {res['cold_fraction']:.1f}%</div>
             </div>
         </div>
@@ -2597,12 +2639,12 @@ if st.session_state.app_view != "INTRO":
 
     with b_col2:
         btn_settings_kind = "primary" if st.session_state.app_view == "HEAT_LOAD" else "secondary"
-        if st.button("❄️ Load", type=btn_settings_kind, use_container_width=True, key="btn_nav_settings"):
+        if st.button("Load", type=btn_settings_kind, use_container_width=True, key="btn_nav_settings"):
             st.session_state.app_view = "HEAT_LOAD"
             st.rerun()
 
     with b_col3:
         btn_analysis_kind = "primary" if st.session_state.app_view == "RESULTS" else "secondary"
-        if st.button("◰ Analysis", type=btn_analysis_kind, use_container_width=True, key="btn_nav_analysis"):
+        if st.button("📈 Analysis", type=btn_analysis_kind, use_container_width=True, key="btn_nav_analysis"):
             st.session_state.app_view = "RESULTS"
             st.rerun()
