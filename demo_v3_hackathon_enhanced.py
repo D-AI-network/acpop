@@ -1,5 +1,6 @@
 """
 PopField HVAC Digital Twin v5 — 3-stage user demo
+Deployment backend: Fourier XYZ + MultiField PopField + 3D T/u/v/w export
 ============================
 Adapted from the user's graph-free DR-SWM / PopField idea for the K-DATA HVAC hackathon.
 
@@ -28,6 +29,8 @@ What this single script does (including complete console reporting)
 11) Demo reports WHERE the current predicted hotspots are and HOW MUCH each location is expected to change after the recommended HVAC action.
 12) Supports exact continuous heat-load queries with interpolation/extrapolation warnings.
 13) Optional local-consistency augmentation improves smoothness between sparse CFD design points without inventing pseudo CFD labels.
+14) CONTROL_TEST mode performs leakage-safe HVAC-selection validation: entire repeated heat-load groups are held out,
+    PopField selects the most uniform observed HVAC action, and that choice is checked against the held-out CFD ground truth.
 
 Important
 ---------
@@ -51,7 +54,9 @@ Colab examples
   --case_info "/content/Case Info 200 DesignPoints - 최종본.xlsx" \
   --field_zip "/content/Field data.zip" \
   --save_dir "/content/popfield_hvac_runs" \
-  --epochs 200 --batch_size 8 --d_model 64 --num_layers 2 \
+  --epochs 300 --batch_size 8 --d_model 128 --num_layers 4 \
+  --num_fields 8 --fourier_bands 6 \
+  --sensor_counts "5,10,20,30,40,60,80,100,150,200" \
   --optimize_after_train
 
 # Optimize a new heat-load scenario using a trained checkpoint
@@ -62,6 +67,16 @@ Colab examples
   --checkpoint "/content/popfield_hvac_runs/best.pt" \
   --save_dir "/content/popfield_hvac_runs" \
   --external 500 --meeting 3000 --server 5000 --working 2000
+
+# Direct HVAC-control validation against held-out CFD ground truth.
+# This trains a dedicated group-holdout model because the ordinary random test split
+# may not contain two HVAC actions under the same heat-load condition.
+!python -u PopField_HVAC_DigitalTwin_CONTROL_TEST.py \
+  --mode control_test \
+  --case_info "/content/Case Info 200 DesignPoints - 최종본.xlsx" \
+  --field_zip "/content/Field data.zip" \
+  --save_dir "/content/popfield_control_test" \
+  --epochs 200 --batch_size 8 --control_test_groups 12
 """
 
 from __future__ import annotations
@@ -157,11 +172,15 @@ FIELD_NAMES = ["temperature_c", "velocity_u", "velocity_v", "velocity_w"]
 @dataclass
 class TrainConfig:
     seed: int = 42
+    split_seed: int = 42
     train_ratio: float = 0.70
     val_ratio: float = 0.15
     batch_size: int = 8
-    d_model: int = 64
-    num_layers: int = 2
+    d_model: int = 128
+    num_layers: int = 4
+    num_fields: int = 8
+    use_fourier_coordinates: bool = True
+    fourier_bands: int = 6
     dropout: float = 0.10
     epochs: int = 200
     patience: int = 30
@@ -446,11 +465,64 @@ class ConditionEncoder(nn.Module):
         return self.net(c)
 
 
-class CoordinateEncoder(nn.Module):
-    def __init__(self, d_model: int, dropout: float) -> None:
+class FourierCoordinateFeatures(nn.Module):
+    """Deterministic multi-frequency encoding for normalized XYZ coordinates.
+
+    The raw normalized XYZ values are retained and augmented with sin/cos features.
+    Frequencies are fixed (not learned), so this adds spatial expressiveness without
+    introducing a large parameter cost. `persistent=False` keeps old checkpoints clean.
+    """
+
+    def __init__(self, num_bands: int = 6) -> None:
         super().__init__()
+        self.num_bands = max(0, int(num_bands))
+        if self.num_bands > 0:
+            freq = (2.0 ** torch.arange(self.num_bands, dtype=torch.float32)) * math.pi
+        else:
+            freq = torch.empty(0, dtype=torch.float32)
+        self.register_buffer("frequencies", freq, persistent=False)
+
+    @property
+    def out_dim(self) -> int:
+        return 3 * (1 + 2 * self.num_bands)
+
+    def forward(self, xyz: torch.Tensor) -> torch.Tensor:
+        if self.num_bands <= 0:
+            return xyz
+        # [..., 3, F]
+        phase = xyz.unsqueeze(-1) * self.frequencies
+        sin_feat = torch.sin(phase).flatten(start_dim=-2)
+        cos_feat = torch.cos(phase).flatten(start_dim=-2)
+        return torch.cat([xyz, sin_feat, cos_feat], dim=-1)
+
+
+class CoordinateEncoder(nn.Module):
+    """XYZ encoder with an optional Fourier spatial basis.
+
+    `use_fourier=False` reproduces the original 3->D encoder exactly. This is important
+    for loading legacy best.pt checkpoints created before the feedback-driven upgrade.
+    New training defaults to Fourier coordinates via the CLI.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        dropout: float,
+        use_fourier: bool = False,
+        fourier_bands: int = 6,
+    ) -> None:
+        super().__init__()
+        self.use_fourier = bool(use_fourier)
+        self.fourier_bands = int(fourier_bands)
+        if self.use_fourier:
+            self.fourier = FourierCoordinateFeatures(self.fourier_bands)
+            in_dim = self.fourier.out_dim
+        else:
+            self.fourier = None
+            in_dim = 3
+
         self.net = nn.Sequential(
-            nn.Linear(3, d_model),
+            nn.Linear(in_dim, d_model),
             nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(d_model, d_model),
@@ -458,6 +530,8 @@ class CoordinateEncoder(nn.Module):
         )
 
     def forward(self, xyz: torch.Tensor) -> torch.Tensor:
+        if self.fourier is not None:
+            xyz = self.fourier(xyz)
         return self.net(xyz)
 
 
@@ -477,28 +551,73 @@ class FFNFusionLayer(nn.Module):
 
 
 class HVACMeanFieldMixer(nn.Module):
+    """Graph-free population-field interaction for HVAC/CFD surrogate modeling.
+
+    Legacy mode (num_fields=1)
+    --------------------------
+    Exactly preserves the original single global-mean PopField parameterization so
+    checkpoints created by the previous code remain loadable.
+
+    Multi-field mode (num_fields>1)
+    --------------------------------
+    Instead of compressing all spatial nodes into only one global mean, K latent fields
+    are learned. Each field uses condition-aware soft assignment over nodes, then each
+    node routes the K field contexts back to itself with a node-specific mixture.
+
+        node states -> K condition-aware population fields -> node-specific routing
+
+    This keeps the graph-free O(N*K) character while removing the strongest bottleneck
+    of a single global mean. K is intentionally small (default 8 for new training).
     """
-    Graph-free population-field interaction.
 
-    Key idea kept from PopField:
-      1) all nodes contribute to one shared latent population field z_global,
-      2) a sample-specific gate scales that shared field,
-      3) each node responds differently through a node-conditioned output gate.
-
-    Difference from the traffic model:
-      - no time-window statistics;
-      - the field gate is driven by HVAC + heat-load conditions.
-    """
-
-    def __init__(self, cond_dim: int, d_model: int, dropout: float) -> None:
+    def __init__(
+        self,
+        cond_dim: int,
+        d_model: int,
+        dropout: float,
+        num_fields: int = 1,
+    ) -> None:
         super().__init__()
-        self.field_gate = nn.Sequential(
-            nn.Linear(cond_dim, d_model // 2),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(d_model // 2, 1),
-            nn.Sigmoid(),
-        )
+        self.num_fields = max(1, int(num_fields))
+        self.d_model = int(d_model)
+
+        # Keep the exact legacy modules/shapes when K=1.
+        if self.num_fields == 1:
+            self.field_gate = nn.Sequential(
+                nn.Linear(cond_dim, d_model // 2),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(d_model // 2, 1),
+                nn.Sigmoid(),
+            )
+            self.field_assign = None
+            self.field_condition_bias = None
+            self.node_field_router = None
+        else:
+            # One gate per latent field.
+            self.field_gate = nn.Sequential(
+                nn.Linear(cond_dim, d_model),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(d_model, self.num_fields),
+                nn.Sigmoid(),
+            )
+            # Condition-aware node -> field aggregation.
+            self.field_assign = nn.Sequential(
+                nn.Linear(d_model, d_model),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(d_model, self.num_fields),
+            )
+            self.field_condition_bias = nn.Linear(cond_dim, self.num_fields, bias=False)
+            # Node-specific field redistribution. h and condition latent are both used.
+            self.node_field_router = nn.Sequential(
+                nn.Linear(d_model * 2, d_model),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(d_model, self.num_fields),
+            )
+
         self.context_norm = nn.LayerNorm(d_model)
         self.context_mlp = nn.Sequential(
             nn.Linear(d_model, d_model * 2),
@@ -518,12 +637,12 @@ class HVACMeanFieldMixer(nn.Module):
         )
         self.norm = nn.LayerNorm(d_model)
 
-    def forward(
+    def _forward_legacy(
         self,
         h: torch.Tensor,
         cond_norm: torch.Tensor,
         cond_latent: torch.Tensor,
-        return_diag: bool = False,
+        return_diag: bool,
     ):
         b, n, d = h.shape
         z_global = h.mean(dim=1)
@@ -541,7 +660,6 @@ class HVACMeanFieldMixer(nn.Module):
 
         if not return_diag:
             return out, None
-
         diag = {
             "field_gate_mean": float(field_gate.mean().detach().cpu()),
             "field_gate_std": float(field_gate.std(unbiased=False).detach().cpu()),
@@ -549,6 +667,65 @@ class HVACMeanFieldMixer(nn.Module):
             "out_gate_std": float(alpha.std(unbiased=False).detach().cpu()),
             "z_global_norm": float(z_global.norm(dim=-1).mean().detach().cpu()),
             "context_norm": float(context.norm(dim=-1).mean().detach().cpu()),
+            "spatial_update_norm": float(h_sp.norm(dim=-1).mean().detach().cpu()),
+        }
+        return out, diag
+
+    def forward(
+        self,
+        h: torch.Tensor,
+        cond_norm: torch.Tensor,
+        cond_latent: torch.Tensor,
+        return_diag: bool = False,
+    ):
+        if self.num_fields == 1:
+            return self._forward_legacy(h, cond_norm, cond_latent, return_diag)
+
+        b, n, d = h.shape
+        assert self.field_assign is not None
+        assert self.field_condition_bias is not None
+        assert self.node_field_router is not None
+
+        # [B,N,K]: each latent field receives a normalized weighted population of nodes.
+        assign_logits = self.field_assign(h)
+        assign_logits = assign_logits + self.field_condition_bias(cond_norm)[:, None, :]
+        assign = torch.softmax(assign_logits, dim=1)
+        z_fields = torch.einsum("bnk,bnd->bkd", assign, h)            # [B,K,D]
+
+        # Condition-dependent activation of each field.
+        field_gate = self.field_gate(cond_norm)                       # [B,K]
+        context_raw = self.context_mlp(self.context_norm(z_fields))   # [B,K,D]
+        field_context = context_raw * field_gate[:, :, None]
+
+        # Each node chooses a different mixture of the K fields.
+        cnd = cond_latent[:, None, :].expand(-1, n, -1)
+        route_logits = self.node_field_router(torch.cat([h, cnd], dim=-1))
+        route = torch.softmax(route_logits, dim=-1)                   # [B,N,K]
+        ctx = torch.einsum("bnk,bkd->bnd", route, field_context)     # [B,N,D]
+
+        node_context = torch.cat([h, ctx, cnd], dim=-1)
+        update = self.node_update(node_context)
+        alpha = self.out_gate(node_context)
+        h_sp = alpha * update
+        out = self.norm(h + h_sp)
+
+        if not return_diag:
+            return out, None
+
+        # Entropies are useful diagnostics: collapse toward one field is visible immediately.
+        eps = 1e-8
+        assign_entropy = -(assign.clamp_min(eps) * assign.clamp_min(eps).log()).sum(dim=1).mean()
+        route_entropy = -(route.clamp_min(eps) * route.clamp_min(eps).log()).sum(dim=-1).mean()
+        diag = {
+            "num_fields": float(self.num_fields),
+            "field_gate_mean": float(field_gate.mean().detach().cpu()),
+            "field_gate_std": float(field_gate.std(unbiased=False).detach().cpu()),
+            "field_bank_norm": float(z_fields.norm(dim=-1).mean().detach().cpu()),
+            "field_assignment_entropy": float(assign_entropy.detach().cpu()),
+            "node_route_entropy": float(route_entropy.detach().cpu()),
+            "out_gate_mean": float(alpha.mean().detach().cpu()),
+            "out_gate_std": float(alpha.std(unbiased=False).detach().cpu()),
+            "context_norm": float(ctx.norm(dim=-1).mean().detach().cpu()),
             "spatial_update_norm": float(h_sp.norm(dim=-1).mean().detach().cpu()),
         }
         return out, diag
@@ -564,6 +741,9 @@ class PopFieldHVACTwin(nn.Module):
         dropout: float = 0.1,
         use_node_embedding: bool = True,
         stable_init: bool = False,
+        num_fields: int = 1,
+        use_fourier_coordinates: bool = False,
+        fourier_bands: int = 6,
     ) -> None:
         super().__init__()
         self.num_nodes = int(num_nodes)
@@ -571,9 +751,17 @@ class PopFieldHVACTwin(nn.Module):
         self.d_model = int(d_model)
         self.num_layers = int(num_layers)
         self.use_node_embedding = bool(use_node_embedding)
+        self.num_fields = max(1, int(num_fields))
+        self.use_fourier_coordinates = bool(use_fourier_coordinates)
+        self.fourier_bands = max(0, int(fourier_bands))
 
         self.condition_encoder = ConditionEncoder(cond_dim, d_model, dropout)
-        self.coordinate_encoder = CoordinateEncoder(d_model, dropout)
+        self.coordinate_encoder = CoordinateEncoder(
+            d_model,
+            dropout,
+            use_fourier=self.use_fourier_coordinates,
+            fourier_bands=self.fourier_bands,
+        )
         self.condition_to_nodes = nn.Linear(d_model, d_model)
 
         if self.use_node_embedding:
@@ -584,8 +772,11 @@ class PopFieldHVACTwin(nn.Module):
         self.input_norm = nn.LayerNorm(d_model)
         self.layers = nn.ModuleList([FFNFusionLayer(d_model, dropout) for _ in range(num_layers)])
 
-        # Shared across layer positions, matching the user's original PopField implementation.
-        self.spatial_mixer = HVACMeanFieldMixer(cond_dim, d_model, dropout)
+        # Shared across layer positions, matching the original PopField implementation.
+        # num_fields=1 is the exact legacy single-mean mixer; K>1 enables the upgraded field bank.
+        self.spatial_mixer = HVACMeanFieldMixer(
+            cond_dim, d_model, dropout, num_fields=self.num_fields
+        )
 
         self.field_decoder = nn.Sequential(
             nn.Linear(d_model, d_model),
@@ -1340,8 +1531,8 @@ def run_sensor_study(
     test_pred_temp: np.ndarray,
     coords: np.ndarray,
     save_dir: Path,
-    sensor_counts: Sequence[int] = (3, 5, 8, 10, 15, 20),
-    pca_rank: int = 20,
+    sensor_counts: Sequence[int] = (5, 10, 20, 30, 40, 60, 80, 100, 150, 200),
+    pca_rank: int = 64,
     target_reconstruction_mae: float = 1.0,
     ridge: float = 1e-3,
 ) -> Dict:
@@ -1358,8 +1549,16 @@ def run_sensor_study(
 
     rows: List[Dict] = []
     plans: Dict[int, np.ndarray] = {}
-    for k in sensor_counts:
-        k = int(k)
+
+    # Sensor-location optimization itself is unchanged (PCA + pivoted QR), but the
+    # candidate range is now allowed to grow aggressively. Counts larger than the
+    # available node population are clipped and duplicates are removed deterministically.
+    max_nodes = int(train_temp.shape[1])
+    candidate_counts = sorted({min(max_nodes, int(k)) for k in sensor_counts if int(k) > 0})
+    if not candidate_counts:
+        raise ValueError("sensor_counts must contain at least one positive value")
+
+    for k in candidate_counts:
         idx = select_sensors(temp_basis, k)
         val_recon = reconstruct_from_sparse(
             val_temp[:, idx], idx, mean_temp, temp_basis, ridge=ridge
@@ -2425,6 +2624,9 @@ def save_checkpoint(
             "dropout": cfg.dropout,
             "use_node_embedding": cfg.use_node_embedding,
             "stable_init": False,
+            "num_fields": model.num_fields,
+            "use_fourier_coordinates": model.use_fourier_coordinates,
+            "fourier_bands": model.fourier_bands,
         },
         "train_config": asdict(cfg),
         "cond_scaler": cond_scaler.state(),
@@ -2489,11 +2691,15 @@ def run_train_deploy(args) -> None:
     deploy_epochs = int(args.deploy_epochs)
     cfg = TrainConfig(
         seed=args.seed,
+        split_seed=args.split_seed,
         train_ratio=1.0,
         val_ratio=0.0,
         batch_size=args.batch_size,
         d_model=args.d_model,
         num_layers=args.num_layers,
+        num_fields=args.num_fields,
+        use_fourier_coordinates=not args.no_fourier_coordinates,
+        fourier_bands=args.fourier_bands,
         dropout=args.dropout,
         epochs=deploy_epochs,
         patience=0,
@@ -2532,6 +2738,9 @@ def run_train_deploy(args) -> None:
         dropout=cfg.dropout,
         use_node_embedding=cfg.use_node_embedding,
         stable_init=cfg.stable_init,
+        num_fields=cfg.num_fields,
+        use_fourier_coordinates=cfg.use_fourier_coordinates,
+        fourier_bands=cfg.fourier_bands,
     ).to(device)
 
     lr_schedule = None
@@ -2650,7 +2859,7 @@ def run_train(args) -> None:
     ra = data["ra_temp_c"]
 
     n_cases, n_nodes = fields.shape[:2]
-    tr, va, te = scenario_split(n_cases, args.train_ratio, args.val_ratio, args.seed)
+    tr, va, te = scenario_split(n_cases, args.train_ratio, args.val_ratio, args.split_seed)
 
     cond_scaler = Standardizer.fit(conditions[tr], axis=0)
     coord_scaler = Standardizer.fit(coords, axis=0)
@@ -2659,11 +2868,15 @@ def run_train(args) -> None:
 
     cfg = TrainConfig(
         seed=args.seed,
+        split_seed=args.split_seed,
         train_ratio=args.train_ratio,
         val_ratio=args.val_ratio,
         batch_size=args.batch_size,
         d_model=args.d_model,
         num_layers=args.num_layers,
+        num_fields=args.num_fields,
+        use_fourier_coordinates=not args.no_fourier_coordinates,
+        fourier_bands=args.fourier_bands,
         dropout=args.dropout,
         epochs=args.epochs,
         patience=args.patience,
@@ -2701,13 +2914,20 @@ def run_train(args) -> None:
         dropout=cfg.dropout,
         use_node_embedding=cfg.use_node_embedding,
         stable_init=cfg.stable_init,
+        num_fields=cfg.num_fields,
+        use_fourier_coordinates=cfg.use_fourier_coordinates,
+        fourier_bands=cfg.fourier_bands,
     ).to(device)
 
     hr()
     print("PopField HVAC Digital Twin")
     print(f"Device={device} | cases={n_cases} | nodes={n_nodes} | params={count_params(model):,}")
     print(f"Split train/val/test={len(tr)}/{len(va)}/{len(te)} (scenario-level)")
-    print("Model: ConditionEncoder + XYZ + NodeEmbedding + [FFN + shared PopField] x L + Field/RA decoders")
+    coord_name = f"FourierXYZ({cfg.fourier_bands} bands)" if cfg.use_fourier_coordinates else "XYZ"
+    print(
+        f"Model: ConditionEncoder + {coord_name} + NodeEmbedding + "
+        f"[FFN + shared MultiFieldPopField(K={cfg.num_fields})] x {cfg.num_layers} + Field/RA decoders"
+    )
     if float(cfg.consistency_weight) > 0:
         print(f"Local consistency augmentation: ON | weight={cfg.consistency_weight:g} | noise_std={cfg.consistency_noise_std:g}")
     else:
@@ -4530,11 +4750,24 @@ def build_demo_spatial_change_report(
     max_cooling_idx = int(np.argmax(cooling))
     remaining_hottest_idx = int(np.argmax(new_temp))
 
+    # Export both temperature and airflow for the Streamlit 3D digital twin.
+    # When sparse temperature sensors are used, only CURRENT temperature is sensor-reconstructed;
+    # airflow remains the PopField steady-state estimate for the current/recommended HVAC action.
+    cur_velocity = cur_field[:, 1:4]
+    new_velocity = new_field[:, 1:4]
     all_nodes = pd.DataFrame({
         "node_index": np.arange(len(coords), dtype=int),
         "x_m": coords[:, 0], "y_m": coords[:, 1], "z_m": coords[:, 2],
         "current_estimated_temp_C": cur_temp,
         "recommended_pred_temp_C": new_temp,
+        "current_velocity_u": cur_velocity[:, 0],
+        "current_velocity_v": cur_velocity[:, 1],
+        "current_velocity_w": cur_velocity[:, 2],
+        "recommended_velocity_u": new_velocity[:, 0],
+        "recommended_velocity_v": new_velocity[:, 1],
+        "recommended_velocity_w": new_velocity[:, 2],
+        "current_air_speed_mps": np.linalg.norm(cur_velocity, axis=1),
+        "recommended_air_speed_mps": np.linalg.norm(new_velocity, axis=1),
         "temperature_change_C": delta,
         "expected_cooling_C": cooling,
         "current_hotspot": cur_temp > upper,
@@ -4894,6 +5127,524 @@ def run_demo(args) -> None:
     print("=" * 96)
 
 
+
+# ============================================================
+# 11-B. Leakage-safe HVAC selection validation against CFD GT
+# ============================================================
+
+
+def _control_load_key_from_values(values: Sequence[float]) -> Tuple[float, float, float, float]:
+    """Stable exact key for the four discrete heat-load factors in the supplied design table."""
+    return tuple(float(x) for x in values)  # type: ignore[return-value]
+
+
+def _control_action_from_condition(cond: np.ndarray) -> Tuple[int, int, int, float, float]:
+    cond = np.asarray(cond, dtype=np.float32)
+    return (
+        int(round(float(cond[0]))),
+        int(round(float(cond[1]))),
+        int(round(float(cond[2]))),
+        float(cond[7]),
+        float(cond[8]),
+    )
+
+
+def _control_group_holdout_split(
+    case_df: pd.DataFrame,
+    dp_ids: np.ndarray,
+    seed: int,
+    num_test_groups: int,
+    val_group_ratio: float,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, object]]:
+    """
+    Create a leakage-safe split for direct HVAC-selection validation.
+
+    Key rule:
+      - an entire heat-load group is assigned to exactly one split;
+      - TEST groups are chosen only from heat-load groups that have >=2 DISTINCT HVAC actions;
+      - the group containing DP 0 (Current), when repeat-tested in the supplied CFD table,
+        is forced into TEST for an intuitive before/after example.
+
+    This is stricter than the ordinary scenario-level random split because the model cannot see
+    another HVAC action from the same TEST heat-load combination during training.
+    """
+    dp_ids = np.asarray(dp_ids, dtype=np.int64)
+    aligned = case_df.set_index("dp_id").loc[dp_ids].copy()
+
+    group_to_indices: Dict[Tuple[float, float, float, float], List[int]] = {}
+    group_to_actions: Dict[Tuple[float, float, float, float], set] = {}
+    for local_idx, (_dp, row) in enumerate(aligned.iterrows()):
+        key = _control_load_key_from_values([row[c] for c in LOAD_COLS])
+        action = (
+            int(round(float(row["P80 - Inlet L"]))),
+            int(round(float(row["P81 - Inlet M"]))),
+            int(round(float(row["P82 - Inlet R"]))),
+            float(row["P87 - CMM"]),
+            float(row["P88 - AirTemp"]),
+        )
+        group_to_indices.setdefault(key, []).append(int(local_idx))
+        group_to_actions.setdefault(key, set()).add(action)
+
+    repeated_keys = [
+        key for key in group_to_indices
+        if len(group_to_indices[key]) >= 2 and len(group_to_actions[key]) >= 2
+    ]
+    if not repeated_keys:
+        raise RuntimeError("No heat-load group has two or more distinct observed HVAC actions.")
+
+    rng = np.random.default_rng(int(seed))
+    requested = int(num_test_groups)
+    if requested <= 0:
+        requested = max(1, int(round(0.20 * len(repeated_keys))))
+    n_test_groups = min(requested, len(repeated_keys))
+
+    # Force the actual Current/DP0 load group into test when it has an alternative HVAC CFD case.
+    current_row = find_current_case(case_df)
+    current_key = _control_load_key_from_values([current_row[c] for c in LOAD_COLS])
+    test_keys: List[Tuple[float, float, float, float]] = []
+    if current_key in repeated_keys:
+        test_keys.append(current_key)
+
+    remaining_repeated = [k for k in repeated_keys if k not in test_keys]
+    rng.shuffle(remaining_repeated)
+    need = max(0, n_test_groups - len(test_keys))
+    test_keys.extend(remaining_repeated[:need])
+    test_key_set = set(test_keys)
+
+    all_keys = list(group_to_indices.keys())
+    remaining_keys = [k for k in all_keys if k not in test_key_set]
+    rng.shuffle(remaining_keys)
+    val_ratio = float(np.clip(val_group_ratio, 0.01, 0.50))
+    n_val_groups = max(1, int(round(val_ratio * len(remaining_keys))))
+    # Always leave at least one load group for training.
+    n_val_groups = min(n_val_groups, max(1, len(remaining_keys) - 1))
+    val_keys = remaining_keys[:n_val_groups]
+    train_keys = remaining_keys[n_val_groups:]
+
+    def flatten(keys):
+        out: List[int] = []
+        for k in keys:
+            out.extend(group_to_indices[k])
+        return np.asarray(sorted(out), dtype=np.int64)
+
+    tr = flatten(train_keys)
+    va = flatten(val_keys)
+    te = flatten(test_keys)
+    if len(tr) == 0 or len(va) == 0 or len(te) == 0:
+        raise RuntimeError(f"Invalid control split sizes train/val/test={len(tr)}/{len(va)}/{len(te)}")
+
+    # Defensive no-overlap checks at the HEAT-LOAD-GROUP level.
+    if set(train_keys) & set(val_keys) or set(train_keys) & set(test_keys) or set(val_keys) & set(test_keys):
+        raise RuntimeError("Heat-load group leakage detected in control-test split")
+
+    meta: Dict[str, object] = {
+        "protocol": "complete_heat_load_group_holdout",
+        "seed": int(seed),
+        "num_total_cases": int(len(dp_ids)),
+        "num_unique_heat_load_groups": int(len(all_keys)),
+        "num_repeated_heat_load_groups_available": int(len(repeated_keys)),
+        "num_train_groups": int(len(train_keys)),
+        "num_val_groups": int(len(val_keys)),
+        "num_test_groups": int(len(test_keys)),
+        "num_train_cases": int(len(tr)),
+        "num_val_cases": int(len(va)),
+        "num_test_cases": int(len(te)),
+        "forced_current_group_into_test": bool(current_key in test_key_set),
+        "test_group_keys": [list(map(float, k)) for k in test_keys],
+        "test_group_case_counts": [int(len(group_to_indices[k])) for k in test_keys],
+    }
+    return tr, va, te, meta
+
+
+def _control_uniformity_key(metrics: Dict[str, float | bool]) -> Tuple[float, float, float, float, float]:
+    """Lexicographic ranking focused first on spatial temperature uniformity."""
+    return (
+        float(metrics["zone_range_C"]),
+        float(metrics["spatial_std_C"]),
+        float(metrics["comfort_band_violation_C"]),
+        float(metrics["hot_fraction"]) + float(metrics["cold_fraction"]),
+        float(metrics["estimated_sensible_cooling_kw"]),
+    )
+
+
+def _control_pairwise_order_accuracy(actual_values: np.ndarray, predicted_values: np.ndarray) -> float:
+    """Fraction of non-tied action pairs whose better/worse ordering is predicted correctly."""
+    actual_values = np.asarray(actual_values, dtype=float)
+    predicted_values = np.asarray(predicted_values, dtype=float)
+    correct = 0
+    total = 0
+    for i in range(len(actual_values)):
+        for j in range(i + 1, len(actual_values)):
+            da = actual_values[i] - actual_values[j]
+            if abs(da) <= 1e-10:
+                continue
+            dp = predicted_values[i] - predicted_values[j]
+            if abs(dp) <= 1e-10:
+                # Prediction tie while CFD has a preference: count as half-credit.
+                correct += 0.5
+                total += 1
+            else:
+                correct += float(np.sign(da) == np.sign(dp))
+                total += 1
+    return float(correct / total) if total else float("nan")
+
+
+def run_control_selection_test(args) -> None:
+    """
+    Directly test whether PopField selects a good HVAC action, not merely whether it predicts temperature well.
+
+    Protocol
+    --------
+    1) Find heat-load combinations that have >=2 actual CFD runs with different HVAC actions.
+    2) Hold out ENTIRE repeated heat-load groups as TEST, so none of their HVAC actions appear in TRAIN.
+    3) Train a dedicated PopField model on the remaining groups.
+    4) Within each held-out test group, predict every observed HVAC candidate.
+    5) Let PopField select the candidate with the smallest predicted spatial zone range.
+    6) Open the held-out CFD ground truth and check whether the selected candidate is actually best.
+
+    This avoids the circular "model recommends -> model grades itself" problem.
+    """
+    save_dir = ensure_dir(args.save_dir)
+    cache_path = save_dir / "control_test_cfd_cache.npz"
+    data = build_or_load_cache(args.case_info, args.field_zip, cache_path, args.force_rebuild_cache)
+    case_df = load_case_info(args.case_info)
+
+    dp_ids = np.asarray(data["dp_ids"], dtype=np.int64)
+    conditions = np.asarray(data["conditions"], dtype=np.float32)
+    coords = np.asarray(data["coords"], dtype=np.float32)
+    fields = np.asarray(data["fields"], dtype=np.float32)
+    ra = np.asarray(data["ra_temp_c"], dtype=np.float32)
+    n_cases, n_nodes = fields.shape[:2]
+
+    tr, va, te, split_meta = _control_group_holdout_split(
+        case_df=case_df,
+        dp_ids=dp_ids,
+        seed=int(args.split_seed),
+        num_test_groups=int(args.control_test_groups),
+        val_group_ratio=float(args.control_val_group_ratio),
+    )
+    (save_dir / "control_test_split.json").write_text(
+        json.dumps(split_meta, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    cond_scaler = Standardizer.fit(conditions[tr], axis=0)
+    coord_scaler = Standardizer.fit(coords, axis=0)
+    field_scaler = Standardizer.fit(fields[tr], axis=(0, 1))
+    ra_scaler = Standardizer.fit(ra[tr], axis=0)
+
+    cfg = TrainConfig(
+        seed=args.seed,
+        split_seed=args.split_seed,
+        train_ratio=float(len(tr) / n_cases),
+        val_ratio=float(len(va) / n_cases),
+        batch_size=args.batch_size,
+        d_model=args.d_model,
+        num_layers=args.num_layers,
+        num_fields=args.num_fields,
+        use_fourier_coordinates=not args.no_fourier_coordinates,
+        fourier_bands=args.fourier_bands,
+        dropout=args.dropout,
+        epochs=args.epochs,
+        patience=args.patience,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        clip_grad=args.clip_grad,
+        velocity_weight=args.velocity_weight,
+        ra_weight=args.ra_weight,
+        use_node_embedding=not args.no_node_embedding,
+        stable_init=args.stable_init,
+        num_workers=args.num_workers,
+        consistency_weight=float(args.consistency_weight),
+        consistency_noise_std=float(args.consistency_noise_std),
+    )
+
+    ds_tr = CFDDataset(conditions, fields, ra, tr, cond_scaler, field_scaler, ra_scaler)
+    ds_va = CFDDataset(conditions, fields, ra, va, cond_scaler, field_scaler, ra_scaler)
+    ds_te = CFDDataset(conditions, fields, ra, te, cond_scaler, field_scaler, ra_scaler)
+    dl_tr = DataLoader(ds_tr, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers)
+    dl_va = DataLoader(ds_va, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers)
+    dl_te = DataLoader(ds_te, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers)
+
+    device = "cuda" if torch.cuda.is_available() and not args.cpu else "cpu"
+    coords_norm = coord_scaler.transform(coords).astype(np.float32)
+    coords_norm_t = torch.from_numpy(coords_norm).to(device)
+    cond_norm_train = cond_scaler.transform(conditions[tr]).astype(np.float32)
+    cond_norm_min_t = torch.from_numpy(cond_norm_train.min(axis=0)).to(device)
+    cond_norm_max_t = torch.from_numpy(cond_norm_train.max(axis=0)).to(device)
+
+    model = PopFieldHVACTwin(
+        num_nodes=n_nodes,
+        cond_dim=len(COND_COLS),
+        d_model=cfg.d_model,
+        num_layers=cfg.num_layers,
+        dropout=cfg.dropout,
+        use_node_embedding=cfg.use_node_embedding,
+        stable_init=cfg.stable_init,
+        num_fields=cfg.num_fields,
+        use_fourier_coordinates=cfg.use_fourier_coordinates,
+        fourier_bands=cfg.fourier_bands,
+    ).to(device)
+
+    hr()
+    print("CONTROL-SELECTION TEST — held-out CFD ground-truth validation")
+    print(f"Device={device} | cases={n_cases} | nodes={n_nodes} | params={count_params(model):,}")
+    print(
+        f"Group-disjoint split train/val/test={len(tr)}/{len(va)}/{len(te)} cases | "
+        f"test repeated-load groups={split_meta['num_test_groups']}"
+    )
+    print("TEST guarantee: no HVAC case from the same held-out heat-load group is used in TRAIN or VAL.")
+    hr()
+
+    best_state, history = train_model(
+        model, dl_tr, dl_va, coords_norm_t, field_scaler, ra_scaler, cfg, device,
+        cond_norm_min=cond_norm_min_t, cond_norm_max=cond_norm_max_t,
+    )
+    model.load_state_dict(best_state)
+    pd.DataFrame(history).to_csv(save_dir / "control_test_training_history.csv", index=False)
+
+    test_pred, test_true, test_ra_pred, test_ra_true, test_idx = predict_loader(
+        model, dl_te, coords_norm_t, field_scaler, ra_scaler, device
+    )
+    test_metrics = metrics_from_arrays(test_pred, test_true, test_ra_pred, test_ra_true)
+
+    # Map global scenario index -> prediction position in test arrays.
+    pred_pos = {int(global_idx): int(pos) for pos, global_idx in enumerate(test_idx.tolist())}
+    zones = build_zone_masks(coords, args.zone_json)
+    p95_limit = float(args.max_p95_temp) if args.max_p95_temp is not None else float(args.target_temp + args.comfort_band)
+
+    # Align case table to cache order and discover held-out repeated groups.
+    aligned = case_df.set_index("dp_id").loc[dp_ids].copy()
+    test_groups: Dict[Tuple[float, float, float, float], List[int]] = {}
+    for idx in te.tolist():
+        row = aligned.iloc[int(idx)]
+        key = _control_load_key_from_values([row[c] for c in LOAD_COLS])
+        test_groups.setdefault(key, []).append(int(idx))
+
+    candidate_rows: List[Dict[str, object]] = []
+    group_rows: List[Dict[str, object]] = []
+    near_margin = float(args.control_near_optimal_margin)
+    current_dp = int(find_current_case(case_df)["dp_id"])
+
+    for group_id, (load_key, indices) in enumerate(test_groups.items()):
+        # TEST groups are designed to contain at least 2 distinct observed actions.
+        if len(indices) < 2:
+            continue
+
+        local_records: List[Dict[str, object]] = []
+        for idx in indices:
+            pos = pred_pos[int(idx)]
+            cond = conditions[int(idx)]
+            action = _control_action_from_condition(cond)
+            actual_cm = field_comfort_metrics(
+                test_true[pos, :, 0], test_true[pos, :, 1:], float(test_ra_true[pos]), action, zones,
+                args.target_temp, args.comfort_band, args.max_zone_range,
+                args.max_hot_fraction, args.max_cold_fraction, p95_limit,
+            )
+            pred_cm = field_comfort_metrics(
+                test_pred[pos, :, 0], test_pred[pos, :, 1:], float(test_ra_pred[pos]), action, zones,
+                args.target_temp, args.comfort_band, args.max_zone_range,
+                args.max_hot_fraction, args.max_cold_fraction, p95_limit,
+            )
+            rec: Dict[str, object] = {
+                "group_id": int(group_id),
+                "dp_id": int(dp_ids[int(idx)]),
+                "external_W": float(load_key[0]),
+                "meeting_W": float(load_key[1]),
+                "server_W": float(load_key[2]),
+                "working_W": float(load_key[3]),
+                "Inlet_L": int(action[0]),
+                "Inlet_M": int(action[1]),
+                "Inlet_R": int(action[2]),
+                "CMM": float(action[3]),
+                "AirTemp_C": float(action[4]),
+                "actual_zone_range_C": float(actual_cm["zone_range_C"]),
+                "pred_zone_range_C": float(pred_cm["zone_range_C"]),
+                "actual_spatial_std_C": float(actual_cm["spatial_std_C"]),
+                "pred_spatial_std_C": float(pred_cm["spatial_std_C"]),
+                "actual_hot_fraction": float(actual_cm["hot_fraction"]),
+                "pred_hot_fraction": float(pred_cm["hot_fraction"]),
+                "actual_cold_fraction": float(actual_cm["cold_fraction"]),
+                "pred_cold_fraction": float(pred_cm["cold_fraction"]),
+                "actual_p95_temp_C": float(actual_cm["p95_temp_C"]),
+                "pred_p95_temp_C": float(pred_cm["p95_temp_C"]),
+                "actual_comfort_constraint_met": bool(actual_cm["comfort_constraint_met"]),
+                "pred_comfort_constraint_met": bool(pred_cm["comfort_constraint_met"]),
+                "actual_uniformity_key": _control_uniformity_key(actual_cm),
+                "pred_uniformity_key": _control_uniformity_key(pred_cm),
+            }
+            local_records.append(rec)
+
+        pred_best_i = min(range(len(local_records)), key=lambda j: local_records[j]["pred_uniformity_key"])
+        actual_best_i = min(range(len(local_records)), key=lambda j: local_records[j]["actual_uniformity_key"])
+
+        actual_zr = np.asarray([float(r["actual_zone_range_C"]) for r in local_records], dtype=float)
+        pred_zr = np.asarray([float(r["pred_zone_range_C"]) for r in local_records], dtype=float)
+        actual_order = np.argsort(actual_zr, kind="stable")
+        actual_rank_of_pred = int(np.where(actual_order == pred_best_i)[0][0]) + 1
+        oracle = float(actual_zr[actual_best_i])
+        selected_actual = float(actual_zr[pred_best_i])
+        regret = float(selected_actual - oracle)
+        pair_acc = _control_pairwise_order_accuracy(actual_zr, pred_zr)
+
+        selected_dp = int(local_records[pred_best_i]["dp_id"])
+        oracle_dp = int(local_records[actual_best_i]["dp_id"])
+        top1 = bool(pred_best_i == actual_best_i)
+        top2 = bool(actual_rank_of_pred <= min(2, len(local_records)))
+        near_opt = bool(regret <= near_margin + 1e-12)
+
+        current_info = {
+            "contains_current_dp": False,
+            "current_dp_id": None,
+            "current_actual_zone_range_C": None,
+            "current_to_selected_zone_range_reduction_pct": None,
+        }
+        current_positions = [j for j, r in enumerate(local_records) if int(r["dp_id"]) == current_dp]
+        if current_positions:
+            cj = current_positions[0]
+            current_zr = float(actual_zr[cj])
+            current_info = {
+                "contains_current_dp": True,
+                "current_dp_id": int(current_dp),
+                "current_actual_zone_range_C": current_zr,
+                "current_to_selected_zone_range_reduction_pct": _pct_reduction(current_zr, selected_actual),
+            }
+
+        group_row: Dict[str, object] = {
+            "group_id": int(group_id),
+            "external_W": float(load_key[0]),
+            "meeting_W": float(load_key[1]),
+            "server_W": float(load_key[2]),
+            "working_W": float(load_key[3]),
+            "num_observed_hvac_candidates": int(len(local_records)),
+            "popfield_selected_dp": selected_dp,
+            "cfd_oracle_best_dp": oracle_dp,
+            "top1_exact_best": top1,
+            "top2": top2,
+            "selected_actual_rank": int(actual_rank_of_pred),
+            "near_optimal_within_margin": near_opt,
+            "near_optimal_margin_C": near_margin,
+            "selected_actual_zone_range_C": selected_actual,
+            "oracle_best_actual_zone_range_C": oracle,
+            "selection_regret_C": regret,
+            "pairwise_order_accuracy": pair_acc,
+            "zone_range_prediction_mae_C_within_group": float(np.mean(np.abs(pred_zr - actual_zr))),
+            **current_info,
+        }
+        group_rows.append(group_row)
+
+        for j, r in enumerate(local_records):
+            r = dict(r)
+            r.pop("actual_uniformity_key", None)
+            r.pop("pred_uniformity_key", None)
+            r["popfield_selected"] = bool(j == pred_best_i)
+            r["cfd_oracle_best"] = bool(j == actual_best_i)
+            r["actual_rank"] = int(np.where(actual_order == j)[0][0]) + 1
+            candidate_rows.append(r)
+
+    cand_df = pd.DataFrame(candidate_rows)
+    group_df = pd.DataFrame(group_rows)
+    if len(group_df) == 0:
+        raise RuntimeError("No repeated held-out test groups were available after splitting.")
+
+    cand_df.to_csv(save_dir / "control_test_candidates.csv", index=False)
+    group_df.to_csv(save_dir / "control_test_group_summary.csv", index=False)
+
+    pair_vals = group_df["pairwise_order_accuracy"].astype(float).to_numpy()
+    current_sub = group_df[group_df["contains_current_dp"] == True]  # noqa: E712
+    summary: Dict[str, object] = {
+        "what_is_tested": "Can PopField choose the most spatially uniform HVAC action among held-out CFD actions under the same heat-load condition?",
+        "protocol": split_meta,
+        "test_prediction_metrics": test_metrics,
+        "selection": {
+            "num_test_heat_load_groups": int(len(group_df)),
+            "num_test_cfd_actions": int(len(cand_df)),
+            "mean_candidates_per_group": float(group_df["num_observed_hvac_candidates"].mean()),
+            "top1_exact_best_rate_pct": float(100.0 * group_df["top1_exact_best"].astype(float).mean()),
+            "top2_rate_pct": float(100.0 * group_df["top2"].astype(float).mean()),
+            "near_optimal_rate_pct": float(100.0 * group_df["near_optimal_within_margin"].astype(float).mean()),
+            "near_optimal_margin_C": near_margin,
+            "mean_pairwise_order_accuracy_pct": float(100.0 * np.nanmean(pair_vals)),
+            "mean_selection_regret_C": float(group_df["selection_regret_C"].astype(float).mean()),
+            "median_selection_regret_C": float(group_df["selection_regret_C"].astype(float).median()),
+            "mean_selected_actual_zone_range_C": float(group_df["selected_actual_zone_range_C"].astype(float).mean()),
+            "mean_oracle_actual_zone_range_C": float(group_df["oracle_best_actual_zone_range_C"].astype(float).mean()),
+            "mean_zone_range_prediction_mae_C": float(group_df["zone_range_prediction_mae_C_within_group"].astype(float).mean()),
+        },
+        "current_group_demo": None,
+        "interpretation": [
+            "Top-1 asks whether PopField selected exactly the CFD-best observed HVAC action in each held-out load group.",
+            "Near-optimal counts a selection as successful when its actual CFD zone range is within the configured margin of the CFD oracle best.",
+            "Selection regret is actual CFD zone-range(selected) minus actual CFD zone-range(oracle); 0 C is perfect.",
+            "Only HVAC actions with actual supplied CFD ground truth are used in this test; this does not validate all 54 counterfactual actions.",
+            "Default zones are XY quadrants unless an official --zone_json is supplied.",
+        ],
+    }
+    if len(current_sub):
+        cr = current_sub.iloc[0]
+        summary["current_group_demo"] = {
+            "current_dp_id": int(cr["current_dp_id"]),
+            "popfield_selected_dp": int(cr["popfield_selected_dp"]),
+            "cfd_oracle_best_dp": int(cr["cfd_oracle_best_dp"]),
+            "current_actual_zone_range_C": float(cr["current_actual_zone_range_C"]),
+            "selected_actual_zone_range_C": float(cr["selected_actual_zone_range_C"]),
+            "current_to_selected_zone_range_reduction_pct": float(cr["current_to_selected_zone_range_reduction_pct"]),
+            "top1_exact_best": bool(cr["top1_exact_best"]),
+        }
+
+    # Save dedicated checkpoint so this validation run is reproducible.
+    ckpt_metrics = {
+        "control_test": summary,
+        "params": count_params(model),
+    }
+    save_checkpoint(
+        save_dir / "best_control_test.pt",
+        model, cfg, cond_scaler, coord_scaler, field_scaler, ra_scaler, coords,
+        {"train": tr, "val": va, "test": te}, ckpt_metrics,
+    )
+    (save_dir / "control_test_summary.json").write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    print("\n" + "=" * 112)
+    print("CONTROL-SELECTION TEST RESULT")
+    print("=" * 112)
+    print(f"Held-out repeated heat-load groups : {len(group_df)}")
+    print(f"Held-out CFD HVAC actions          : {len(cand_df)}")
+    print(f"Test field temperature MAE         : {float(test_metrics['temp_mae_c']):.4f} C")
+    print(f"Top-1 exact CFD-best action        : {summary['selection']['top1_exact_best_rate_pct']:.2f} %")
+    print(f"Top-2 CFD-best coverage            : {summary['selection']['top2_rate_pct']:.2f} %")
+    print(
+        f"Near-optimal <= {near_margin:.2f} C regret     : "
+        f"{summary['selection']['near_optimal_rate_pct']:.2f} %"
+    )
+    print(f"Pairwise HVAC ordering accuracy    : {summary['selection']['mean_pairwise_order_accuracy_pct']:.2f} %")
+    print(f"Mean selection regret              : {summary['selection']['mean_selection_regret_C']:.4f} C")
+    print(f"Median selection regret            : {summary['selection']['median_selection_regret_C']:.4f} C")
+    print(
+        f"Mean actual zone range selected/oracle: "
+        f"{summary['selection']['mean_selected_actual_zone_range_C']:.4f} / "
+        f"{summary['selection']['mean_oracle_actual_zone_range_C']:.4f} C"
+    )
+    if summary.get("current_group_demo"):
+        cg = summary["current_group_demo"]
+        print("\n[DP0 Current-load-group direct CFD check]")
+        print(
+            f"Current DP {cg['current_dp_id']} actual zone range -> selected DP {cg['popfield_selected_dp']}: "
+            f"{cg['current_actual_zone_range_C']:.4f} -> {cg['selected_actual_zone_range_C']:.4f} C "
+            f"({cg['current_to_selected_zone_range_reduction_pct']:.2f}% reduction)"
+        )
+        print(
+            f"CFD oracle best DP={cg['cfd_oracle_best_dp']} | "
+            f"PopField exact-best={cg['top1_exact_best']}"
+        )
+    print("\nSaved:")
+    print(f"  {save_dir / 'control_test_summary.json'}")
+    print(f"  {save_dir / 'control_test_group_summary.csv'}")
+    print(f"  {save_dir / 'control_test_candidates.csv'}")
+    print(f"  {save_dir / 'control_test_split.json'}")
+    print(f"  {save_dir / 'best_control_test.pt'}")
+    print("=" * 112)
+
 # ============================================================
 # 12. CLI
 # ============================================================
@@ -4975,9 +5726,87 @@ def run_sensor_export(args) -> None:
     print(f"  test MAE        : {plan['chosen_test_mae_c']:.4f} C")
 
 
+
+def run_train_repeated(args) -> None:
+    """Run multiple initialization seeds on one FIXED scenario split.
+
+    This is intended for statistically defensible reporting. `split_seed` stays fixed,
+    while only the model/minibatch seed changes. The function never selects the best
+    TEST seed; it reports mean/std across all requested seeds.
+    """
+    base_dir = ensure_dir(args.save_dir)
+    seeds = [int(x.strip()) for x in str(args.seeds).split(",") if x.strip()]
+    if not seeds:
+        raise ValueError("--seeds must contain at least one integer seed")
+
+    rows: List[Dict[str, float]] = []
+    print("\n" + "=" * 108)
+    print("REPEATED-SEED EVALUATION")
+    print(f"Fixed split_seed={args.split_seed} | model seeds={seeds}")
+    print("No best TEST seed will be selected; aggregate mean/std is the final repeated-run result.")
+    print("=" * 108)
+
+    for run_idx, seed in enumerate(seeds, 1):
+        run_args = argparse.Namespace(**vars(args))
+        run_args.seed = int(seed)
+        run_args.save_dir = str(base_dir / f"seed_{seed}")
+        run_args.optimize_after_train = False
+        set_seed(int(seed))
+        print(f"\n[Repeated {run_idx}/{len(seeds)}] seed={seed} -> {run_args.save_dir}")
+        run_train(run_args)
+
+        result_path = Path(run_args.save_dir) / "result.json"
+        with open(result_path, "r", encoding="utf-8") as f:
+            result = json.load(f)
+        val = result.get("validation", {})
+        test = result.get("test", {})
+        rows.append({
+            "seed": int(seed),
+            "split_seed": int(args.split_seed),
+            "val_temp_mae_c": float(val.get("temp_mae_c", np.nan)),
+            "val_temp_rmse_c": float(val.get("temp_rmse_c", np.nan)),
+            "test_temp_mae_c": float(test.get("temp_mae_c", np.nan)),
+            "test_temp_rmse_c": float(test.get("temp_rmse_c", np.nan)),
+            "test_velocity_component_mae": float(test.get("velocity_component_mae", np.nan)),
+            "test_ra_mae_c": float(test.get("ra_mae_c", np.nan)),
+            "params": int(result.get("params", 0)),
+        })
+
+    df = pd.DataFrame(rows)
+    df.to_csv(base_dir / "repeated_seed_results.csv", index=False)
+
+    metric_cols = [c for c in df.columns if c not in {"seed", "split_seed", "params"}]
+    summary: Dict[str, object] = {
+        "seeds": seeds,
+        "split_seed": int(args.split_seed),
+        "num_runs": int(len(df)),
+        "params": int(df["params"].iloc[0]) if len(df) else 0,
+        "metrics": {},
+    }
+    for col in metric_cols:
+        vals = df[col].astype(float).to_numpy()
+        summary["metrics"][col] = {  # type: ignore[index]
+            "mean": float(np.nanmean(vals)),
+            "std": float(np.nanstd(vals, ddof=1)) if len(vals) > 1 else 0.0,
+            "min": float(np.nanmin(vals)),
+            "max": float(np.nanmax(vals)),
+        }
+
+    with open(base_dir / "repeated_seed_summary.json", "w", encoding="utf-8") as f:
+        json.dump(summary, f, indent=2, ensure_ascii=False)
+
+    print("\n[Repeated-seed results]")
+    print(df.to_string(index=False))
+    print("\n[Mean ± Std]")
+    for col in metric_cols:
+        stat = summary["metrics"][col]  # type: ignore[index]
+        print(f"  {col}: {stat['mean']:.5f} ± {stat['std']:.5f}")
+    print(f"\nSaved: {base_dir / 'repeated_seed_results.csv'}")
+    print(f"Saved: {base_dir / 'repeated_seed_summary.json'}")
+
 def parse_args():
     p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    p.add_argument("--mode", choices=["train", "train_deploy", "optimize", "recommend", "demo", "full_experiment", "train_full", "sensor_export"], default="train",
+    p.add_argument("--mode", choices=["train", "train_repeated", "train_deploy", "optimize", "recommend", "demo", "full_experiment", "train_full", "sensor_export", "control_test"], default="train",
                    help="train_deploy = final 100%%-CFD fitting for best_deploy.pt after evaluation; train_full = split training + complete experiment")
     p.add_argument("--case_info", type=str, default="/content/Case Info 200 DesignPoints - 최종본.xlsx")
     p.add_argument("--field_zip", type=str, default="/content/Field data.zip")
@@ -4986,14 +5815,27 @@ def parse_args():
     p.add_argument("--force_rebuild_cache", action="store_true")
 
     # Training
-    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--seed", type=int, default=42,
+                   help="Model initialization / minibatch seed")
+    p.add_argument("--split_seed", type=int, default=42,
+                   help="Fixed scenario-split seed; keep this fixed across repeated model seeds")
+    p.add_argument("--seeds", type=str, default="42,13,77,101,2026",
+                   help="Comma-separated model seeds used by --mode train_repeated")
     p.add_argument("--train_ratio", type=float, default=0.70)
     p.add_argument("--val_ratio", type=float, default=0.15)
     p.add_argument("--batch_size", type=int, default=8)
-    p.add_argument("--d_model", type=int, default=64)
-    p.add_argument("--num_layers", type=int, default=2)
+    p.add_argument("--d_model", type=int, default=128,
+                   help="Latent width; increased from the original 64 because runtime headroom is available")
+    p.add_argument("--num_layers", type=int, default=4,
+                   help="FFN/PopField depth; increased from the original 2")
+    p.add_argument("--num_fields", type=int, default=8,
+                   help="Number of latent population fields. 1 reproduces the legacy single-global-field mixer")
+    p.add_argument("--fourier_bands", type=int, default=6,
+                   help="Number of fixed Fourier frequency bands for normalized XYZ coordinates")
+    p.add_argument("--no_fourier_coordinates", action="store_true",
+                   help="Disable Fourier XYZ features and use the legacy raw XYZ coordinate encoder")
     p.add_argument("--dropout", type=float, default=0.10)
-    p.add_argument("--epochs", type=int, default=200)
+    p.add_argument("--epochs", type=int, default=300)
     p.add_argument("--deploy_epochs", type=int, default=85,
                    help="Fixed epoch count for train_deploy; set this to the best epoch selected in the prior evaluation run")
     p.add_argument("--deploy_reference_history", type=str, default=None,
@@ -5018,8 +5860,10 @@ def parse_args():
     p.add_argument("--cpu", action="store_true")
 
     # Sensor study
-    p.add_argument("--sensor_counts", type=str, default="3,5,8,10,15,20")
-    p.add_argument("--sensor_pca_rank", type=int, default=20)
+    p.add_argument("--sensor_counts", type=str, default="5,10,20,30,40,60,80,100,150,200",
+                   help="Candidate sensor counts. PCA+QR location optimization is retained for every K")
+    p.add_argument("--sensor_pca_rank", type=int, default=64,
+                   help="PCA rank for sparse temperature-field reconstruction; raised from 20 to exploit more sensors")
     p.add_argument("--sensor_target_mae", type=float, default=1.0,
                    help="Validation MAE target used to choose the minimum sensor count")
     p.add_argument("--sensor_ridge", type=float, default=1e-3,
@@ -5078,6 +5922,14 @@ def parse_args():
     p.add_argument("--latency_warmup", type=int, default=3)
     p.add_argument("--latency_repeat", type=int, default=20)
 
+    # Direct CFD-ground-truth HVAC selection test
+    p.add_argument("--control_test_groups", type=int, default=12,
+                   help="Number of repeated heat-load groups held out completely for direct HVAC-selection CFD validation; <=0 uses 20%% of available repeated groups")
+    p.add_argument("--control_val_group_ratio", type=float, default=0.15,
+                   help="Fraction of remaining heat-load groups assigned to validation in control_test mode")
+    p.add_argument("--control_near_optimal_margin", type=float, default=0.25,
+                   help="Count a selected HVAC as near-optimal when its actual CFD zone range is within this many C of the CFD oracle best")
+
     # Comprehensive experiment controls
     p.add_argument("--full_load_space", choices=["combinatorial", "observed"], default="combinatorial",
                    help="combinatorial evaluates the full Cartesian product of supplied heat-load levels; observed evaluates only load combinations present in the 200 CFD cases")
@@ -5101,6 +5953,8 @@ def main():
     set_seed(args.seed)
     if args.mode == "train":
         run_train(args)
+    elif args.mode == "train_repeated":
+        run_train_repeated(args)
     elif args.mode == "train_deploy":
         run_train_deploy(args)
     elif args.mode == "train_full":
@@ -5121,6 +5975,8 @@ def main():
         run_demo(args)
     elif args.mode == "sensor_export":
         run_sensor_export(args)
+    elif args.mode == "control_test":
+        run_control_selection_test(args)
     else:
         run_full_experiment(args)
 
