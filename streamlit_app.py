@@ -865,8 +865,8 @@ elif st.session_state.app_view == "HOME":
 
     new_target = st.number_input(
         "목표 온도 (°C)",
-        min_value=22.0,
-        max_value=28.0,
+        min_value=18.0,
+        max_value=30.0,
         value=float(st.session_state.target_temp),
         step=0.1,
         format="%.1f",
