@@ -573,19 +573,29 @@ div[class*="st-key-sl_serv"] [data-testid="stWidgetLabel"] p,
 div[class*="st-key-sl_meet"] [data-testid="stWidgetLabel"] p,
 div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
   font-size: 15px !important;
-  font-weight: 600 !important;
+  font-weight: 500 !important;
 }
 
-.st-key-sl_ext [data-testid="stTickBar"] *,
-.st-key-sl_serv [data-testid="stTickBar"] *,
-.st-key-sl_meet [data-testid="stTickBar"] *,
-.st-key-sl_work [data-testid="stTickBar"] *,
-div[class*="st-key-sl_ext"] [data-testid="stTickBar"] *,
-div[class*="st-key-sl_serv"] [data-testid="stTickBar"] *,
-div[class*="st-key-sl_meet"] [data-testid="stTickBar"] *,
-div[class*="st-key-sl_work"] [data-testid="stTickBar"] * {
-  font-size: 6.4px !important;
-  font-weight: 500 !important;
+/* Smaller selected value + endpoint labels for all four cooling-factor sliders. */
+.st-key-sl_ext [data-testid="stSelectSlider"] [data-testid="stTickBar"] *,
+.st-key-sl_serv [data-testid="stSelectSlider"] [data-testid="stTickBar"] *,
+.st-key-sl_meet [data-testid="stSelectSlider"] [data-testid="stTickBar"] *,
+.st-key-sl_work [data-testid="stSelectSlider"] [data-testid="stTickBar"] *,
+div[class*="st-key-sl_ext"] [data-testid="stSelectSlider"] [data-testid="stTickBar"] *,
+div[class*="st-key-sl_serv"] [data-testid="stSelectSlider"] [data-testid="stTickBar"] *,
+div[class*="st-key-sl_meet"] [data-testid="stSelectSlider"] [data-testid="stTickBar"] *,
+div[class*="st-key-sl_work"] [data-testid="stSelectSlider"] [data-testid="stTickBar"] *,
+.st-key-sl_ext [data-testid="stTickBarMin"],
+.st-key-sl_ext [data-testid="stTickBarMax"],
+.st-key-sl_serv [data-testid="stTickBarMin"],
+.st-key-sl_serv [data-testid="stTickBarMax"],
+.st-key-sl_meet [data-testid="stTickBarMin"],
+.st-key-sl_meet [data-testid="stTickBarMax"],
+.st-key-sl_work [data-testid="stTickBarMin"],
+.st-key-sl_work [data-testid="stTickBarMax"] {
+  font-size: 8px !important;
+  line-height: 1 !important;
+  font-weight: 400 !important;
   color: #9fbed1 !important;
 }
 
@@ -596,9 +606,24 @@ div[class*="st-key-sl_work"] [data-testid="stTickBar"] * {
 div[class*="st-key-sl_ext"] [data-testid="stThumbValue"],
 div[class*="st-key-sl_serv"] [data-testid="stThumbValue"],
 div[class*="st-key-sl_meet"] [data-testid="stThumbValue"],
-div[class*="st-key-sl_work"] [data-testid="stThumbValue"] {
-  font-size: 8px !important;
-  font-weight: 600 !important;
+div[class*="st-key-sl_work"] [data-testid="stThumbValue"],
+.st-key-sl_ext [data-testid="stThumbValue"] *,
+.st-key-sl_serv [data-testid="stThumbValue"] *,
+.st-key-sl_meet [data-testid="stThumbValue"] *,
+.st-key-sl_work [data-testid="stThumbValue"] * {
+  font-size: 10px !important;
+  line-height: 1 !important;
+  font-weight: 500 !important;
+}
+
+/* Fallback for Streamlit versions that render slider labels without the test-id wrappers above. */
+.st-key-sl_ext [data-testid="stSelectSlider"] p:not([data-testid="stWidgetLabel"] p),
+.st-key-sl_serv [data-testid="stSelectSlider"] p:not([data-testid="stWidgetLabel"] p),
+.st-key-sl_meet [data-testid="stSelectSlider"] p:not([data-testid="stWidgetLabel"] p),
+.st-key-sl_work [data-testid="stSelectSlider"] p:not([data-testid="stWidgetLabel"] p) {
+  font-size: 9px !important;
+  line-height: 1.05 !important;
+  font-weight: 400 !important;
 }
 
 .cooling-load-card {
