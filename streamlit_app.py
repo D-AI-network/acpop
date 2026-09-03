@@ -157,26 +157,21 @@ html, body, [class*="css"] {
   margin: 0;
 }
 .field-panel {
-  background: rgba(8, 30, 50, 0.28);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 10px 10px 4px 10px;
   margin: 0 0 18px 0;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.025);
 }
 .map-shell {
-  background: rgba(190, 215, 230, 0.10);
-  border: 1.4px solid rgba(190, 225, 240, 0.35);
-  border-radius: 24px;
+  background: #b8c8d4;
+  border: 2px solid rgba(74, 97, 112, 0.95);
+  border-radius: 22px;
   overflow: hidden;
-  padding: 10px 10px 4px 10px;
-  box-shadow: inset 0 0 0 1px rgba(16, 53, 87, 0.15);
+  padding: 14px 14px 8px 14px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22);
 }
 .map-shell [data-testid="stPlotlyChart"],
 .map-shell .js-plotly-plot,
 .map-shell .plot-container,
 .map-shell .svg-container {
-  border-radius: 18px !important;
+  border-radius: 16px !important;
   overflow: hidden !important;
 }
 
@@ -860,13 +855,13 @@ elif st.session_state.app_view == "HOME":
         unsafe_allow_html=True,
     )
 
-    st.markdown("<div class='field-panel'><div class='map-shell'>", unsafe_allow_html=True)
+    st.markdown("<div class='map-shell'>", unsafe_allow_html=True)
     st.plotly_chart(
         make_mobile_heatmap(field_current_grid, height=340),
         use_container_width=True,
         config={"displayModeBar": False},
     )
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if st.button("냉방 최적화", type="primary", use_container_width=True, key="btn_home_to_heat"):
         st.session_state.app_view = "HEAT_LOAD"
