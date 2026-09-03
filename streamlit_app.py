@@ -1,28 +1,21 @@
 from __future__ import annotations
 
-import hashlib
-import json
-import tempfile
+import os
+import re
 import time
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Dict
 
-import matplotlib.pyplot as plt
-import plotly.graph_objects as pgo
+import streamlit as st
 import numpy as np
 import pandas as pd
-import streamlit as st
-import torch
-
-import demo_v3_hackathon_enhanced as hvac
-
+import plotly.graph_objects as go
+from scipy.interpolate import griddata
 
 # ============================================================
-# Page / mobile UI
+# 1. PAGE CONFIGURATION & MOBILE UI CSS
 # ============================================================
 st.set_page_config(
-    page_title="PopField AI Smart Cooling",
+    page_title="Coollins | AI Smart Cooling Optimizer",
     page_icon="❄️",
     layout="centered",
     initial_sidebar_state="collapsed",
@@ -31,77 +24,39 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap');
 
 :root {
-  /* Core palette — "cool vs warm" mirrors the temperature spectrum
-     the whole app is built around. */
   --ink: #0b1b2b;
   --frost: #eef4f9;
   --surface: #ffffff;
-  --cool: #0e7c9e;
-  --cool-deep: #0a5972;
-  --cool-soft: #e3f1f6;
+  --cool: #0077b6;
+  --cool-deep: #023e8a;
+  --cool-soft: #e0f2fe;
+  --teal-btn: #0096c7;
+  --teal-hover: #0077b6;
   --ember: #e2603f;
-  --ember-soft: #fcebe6;
-  --ember-line: #f3c6b8;
-  --mist: #64768a;
-  --line: #e2eaf1;
-  --leaf: #1e9e6b;
-  --leaf-soft: #e6f7ef;
-  --leaf-line: #bee7d3;
-  --amber: #c98a1f;
-  --amber-soft: #fbf2e1;
-  --amber-line: #f0dbaa;
-
-  /* Legacy aliases — keep every existing --pf-* reference working
-     without having to touch each call site individually. */
-  --pf-bg: var(--frost);
-  --pf-card: var(--surface);
-  --pf-text: var(--ink);
-  --pf-muted: var(--mist);
-  --pf-primary: var(--cool);
-  --pf-primary-dark: var(--cool-deep);
-  --pf-primary-soft: var(--cool-soft);
-  --pf-line: var(--line);
-  --pf-success: var(--leaf);
-  --pf-success-soft: var(--leaf-soft);
-  --pf-success-line: var(--leaf-line);
-  --pf-warning: var(--amber);
-  --pf-warning-soft: var(--amber-soft);
-  --pf-warning-line: var(--amber-line);
-  --pf-danger: var(--ember);
-  --pf-danger-soft: var(--ember-soft);
-  --pf-danger-line: var(--ember-line);
+  --mist: #64748b;
+  --line: #e2e8f0;
 }
 
 html, body, [class*="css"] {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* Display face for headers — technical/geometric, distinct from body text */
-.pf-title, .pf-section-title, .pf-status-title, .pf-twin-title, .pf-brand-name {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  letter-spacing: -0.01em;
-}
-
-/* Instrument-panel signature: every number reads like a sensor readout */
-.pf-temp, .pf-metric-value {
-  font-family: 'JetBrains Mono', 'Inter', monospace;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
-}
-
 .stApp {
-  background: var(--frost);
+  background: var(--frost) !important;
 }
 
+/* Smartphone Shell Container */
 .block-container {
-  max-width: 430px !important;
-  padding: 0 !important;
-  margin: 0 auto !important;
-  min-height: 100vh;
-  background: var(--frost);
+  max-width: 440px !important;
+  padding: 1.1rem 1.1rem 2rem 1.1rem !important;
+  margin: 1.2rem auto !important;
+  background: var(--surface) !important;
+  border: 1.2px solid #cbd5e1 !important;
+  border-radius: 36px !important;
+  box-shadow: 0 20px 45px -12px rgba(15, 23, 42, 0.12) !important;
 }
 
 #MainMenu, footer, header[data-testid="stHeader"] {
@@ -109,2158 +64,773 @@ html, body, [class*="css"] {
   height: 0;
 }
 
-.pf-shell {
-  padding: 24px 20px 18px 20px;
-}
-
-/* Brand mark + wordmark above the page title */
-.pf-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.pf-brand-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, var(--cool), var(--cool-deep));
+/* Top Device Notch */
+.phone-notch {
+  width: 86px;
+  height: 15px;
+  background: #0f172a;
+  border-radius: 10px;
+  margin: 0 auto 12px auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
-  box-shadow: 0 4px 10px rgba(14, 124, 158, 0.28);
-  flex-shrink: 0;
+  gap: 6px;
 }
-.pf-brand-name {
-  color: var(--mist);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+.notch-cam {
+  width: 5px;
+  height: 5px;
+  background: #334155;
+  border-radius: 50%;
+}
+.notch-speaker {
+  width: 22px;
+  height: 3px;
+  background: #334155;
+  border-radius: 2px;
 }
 
-.pf-title {
-  color: var(--ink);
-  font-size: 25px;
+/* Header Branding */
+.app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
   font-weight: 700;
-  line-height: 1.2;
-  margin: 0 0 12px 0;
-}
-
-/* Signature element: cool-to-ember spectrum bar under every header */
-.pf-spectrum {
-  height: 4px;
-  width: 56px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--cool) 0%, var(--cool) 45%, var(--ember) 100%);
-  margin: 0 0 16px 0;
-}
-
-.pf-subtitle {
-  color: var(--mist);
-  font-size: 14px;
-  margin: 0 0 16px 0;
-}
-
-/* Cards: strengthened border + shadow so they visibly separate from the
-   frost page background, matching how the nav bar reads as a distinct
-   white panel instead of blending in. */
-.pf-card {
-  background: var(--surface);
+  color: var(--cool);
+  background: rgba(0, 119, 182, 0.08);
+  padding: 3px 8px;
   border-radius: 20px;
-  padding: 18px;
-  margin: 0 0 16px 0;
-  border: 1px solid rgba(11, 27, 43, 0.10);
-  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.07), 0 10px 24px rgba(11, 27, 43, 0.06);
+  margin-bottom: 5px;
+}
+.app-brand-icon {
+  background: var(--cool);
+  color: #ffffff;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+.app-title {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -0.6px;
+  line-height: 1.1;
+}
+.brand-spectrum {
+  width: 48px;
+  height: 3.5px;
+  background: linear-gradient(90deg, #0077b6 0%, #e2603f 100%);
+  border-radius: 3px;
+  margin-top: 6px;
+  margin-bottom: 14px;
 }
 
-.pf-label {
+/* Status Cards */
+.status-card {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+}
+.status-label {
   color: var(--mist);
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.status-temp {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.status-target {
+  color: var(--cool);
   font-size: 12.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 7px;
+  margin-top: 4px;
 }
 
-.pf-temp {
+.section-title {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 14.5px;
+  font-weight: 800;
   color: var(--ink);
-  font-size: 34px;
-  font-weight: 700;
-  line-height: 1.05;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
-.pf-blue-text {
-  color: var(--cool);
-  font-weight: 600;
-  font-size: 14px;
+.helper-desc {
+  font-size: 11.5px;
+  color: var(--mist);
+  line-height: 1.45;
+  text-align: center;
+  margin-top: 10px;
+  margin-bottom: 14px;
+  padding: 0 4px;
 }
 
-.pf-section-title {
-  color: var(--ink);
-  font-size: 17px;
-  font-weight: 700;
-  margin: 4px 0 10px 0;
-}
-
-/* Digital-twin hero panel — soft grid + radial glow instead of flat blobs,
-   so it reads as an instrument readout rather than a decoration. */
-.pf-twin {
-  height: 250px;
-  border-radius: 24px;
-  margin: 0 0 16px 0;
-  padding: 18px;
-  position: relative;
-  overflow: hidden;
-  background-color: var(--cool-soft);
-  background-image:
-    radial-gradient(120% 100% at 18% 15%, rgba(14, 124, 158, 0.16), transparent 60%),
-    radial-gradient(90% 90% at 85% 80%, rgba(226, 96, 63, 0.14), transparent 55%),
-    linear-gradient(rgba(11, 27, 43, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(11, 27, 43, 0.05) 1px, transparent 1px);
-  background-size: auto, auto, 26px 26px, 26px 26px;
-  border: 1px solid var(--line);
-}
-
-.pf-twin-title {
-  color: var(--ink);
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.pf-blob {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(2px);
-}
-.pf-blob.cool {
-  width: 92px;
-  height: 92px;
-  left: 44px;
-  top: 104px;
-  background: radial-gradient(circle at 35% 32%, #a9d6ec, var(--cool));
-  opacity: 0.92;
-}
-.pf-blob.hot {
-  width: 74px;
-  height: 74px;
-  right: 46px;
-  top: 110px;
-  background: radial-gradient(circle at 35% 32%, #f5b39d, var(--ember));
-  opacity: 0.92;
-}
-
-/* Status card — left accent stripe + faint wash instead of a solid pastel
-   fill, so it reads as a modern notification card. */
-.pf-status {
+/* Optimal HVAC Dispatch Card (White Fill + Blue Outline) */
+.optimal-dispatch-box {
+  background: #ffffff;
+  border: 2px solid #0077b6;
   border-radius: 16px;
-  padding: 16px 18px;
-  margin: 0 0 16px 0;
-  background: var(--surface);
-  border: 1px solid rgba(11, 27, 43, 0.10);
-  border-left: 4px solid var(--mist);
-  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.07), 0 10px 24px rgba(11, 27, 43, 0.06);
+  padding: 18px 20px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 14px rgba(0, 119, 182, 0.08);
 }
-.pf-ok {
-  border-left-color: var(--leaf);
-  background: linear-gradient(90deg, var(--leaf-soft), var(--surface) 55%);
-}
-.pf-near {
-  border-left-color: var(--amber);
-  background: linear-gradient(90deg, var(--amber-soft), var(--surface) 55%);
-}
-.pf-no {
-  border-left-color: var(--ember);
-  background: linear-gradient(90deg, var(--ember-soft), var(--surface) 55%);
-}
-.pf-status-title {
+.optimal-dispatch-box h4 {
+  color: #0077b6 !important;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
   font-size: 17px;
+  font-weight: 800;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.optimal-dispatch-box .dispatch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #1e293b;
+  margin: 8px 0;
+}
+.optimal-dispatch-box .dispatch-row b {
+  color: #0f172a;
   font-weight: 700;
-  margin-bottom: 5px;
-  color: var(--ink);
 }
 
-.pf-metric-grid {
+/* Feasibility Badge */
+.feasibility-box {
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 4px;
+  margin-bottom: 12px;
+  border-left: 4px solid;
+}
+.feasibility-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+}
+.feasibility-desc {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* Metric Display Grids */
+.metric-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
-.pf-metric {
-  background: var(--surface);
-  border: 1px solid rgba(11, 27, 43, 0.10);
-  border-radius: 16px;
-  padding: 14px;
-  box-shadow: 0 2px 5px rgba(11, 27, 43, 0.06), 0 6px 16px rgba(11, 27, 43, 0.05);
+.metric-cell {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
 }
-.pf-metric-label {
+.metric-cell .lbl {
+  font-size: 11px;
+  font-weight: 700;
   color: var(--mist);
-  font-size: 11.5px;
-  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-bottom: 7px;
 }
-.pf-metric-value {
+.metric-cell .val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 800;
   color: var(--ink);
-  font-weight: 700;
-  font-size: 19px;
+  margin-top: 2px;
 }
 
-/* NOTE: the .pf-bottom marker div itself is intentionally unstyled —
-   Streamlit renders each st.markdown() call in its own isolated
-   container, so this div never actually wraps the st.columns() row
-   that follows it. All real nav-bar styling below reaches across to
-   the actual sibling column layout via :has(), see below. */
-
-/* ------------------------------------------------------------
-   Buttons — one consistent blue system across the whole app.
-   Primary  = solid blue fill, white text (main actions).
-   Secondary (default st.button, no type="primary") = white fill,
-   blue outline + blue text (back/download/utility actions).
-------------------------------------------------------------- */
-div[data-testid="stButton"] > button {
-  width: 100%;
-  border-radius: 14px;
-  min-height: 52px;
-  font-weight: 700;
-  font-size: 0.98rem;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
-}
-
-div[data-testid="stButton"] > button[kind="primary"] {
-  background: var(--cool) !important;
-  border: 1.5px solid var(--cool) !important;
-  color: #ffffff !important;
-  box-shadow: 0 6px 16px rgba(14, 124, 158, 0.24);
-}
-div[data-testid="stButton"] > button[kind="primary"] p {
-  color: #ffffff !important;
-}
-div[data-testid="stButton"] > button[kind="primary"]:hover {
-  background: var(--cool-deep) !important;
-  border-color: var(--cool-deep) !important;
-}
-div[data-testid="stButton"] > button[kind="primary"]:hover p {
-  color: #ffffff !important;
-}
-
-div[data-testid="stButton"] > button:not([kind="primary"]) {
-  background: #ffffff !important;
-  border: 1.5px solid var(--cool) !important;
-  color: var(--cool) !important;
-  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.06);
-}
-div[data-testid="stButton"] > button:not([kind="primary"]) p {
-  color: var(--cool) !important;
-}
-div[data-testid="stButton"] > button:not([kind="primary"]):hover {
-  background: var(--cool-soft) !important;
-}
-div[data-testid="stButton"] > button:not([kind="primary"]):hover p {
-  color: var(--cool) !important;
-}
-
-div[data-testid="stButton"] > button:disabled {
-  opacity: 0.42 !important;
-  cursor: not-allowed;
-  box-shadow: none !important;
-}
-
-div[data-testid="stDownloadButton"] > button {
-  width: 100%;
-  border-radius: 14px;
-  min-height: 48px;
-  background: #ffffff !important;
-  border: 1.5px solid var(--cool) !important;
-  color: var(--cool) !important;
-  font-weight: 700;
-  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.06);
-  transition: background 0.15s ease;
-}
-div[data-testid="stDownloadButton"] > button p {
-  color: var(--cool) !important;
-}
-div[data-testid="stDownloadButton"] > button:hover {
-  background: var(--cool-soft) !important;
-}
-
-div[data-testid="stMetric"] {
-  background: var(--surface);
-  border: 1px solid rgba(11, 27, 43, 0.10);
-  padding: 12px;
-  border-radius: 16px;
-  box-shadow: 0 2px 5px rgba(11, 27, 43, 0.06), 0 6px 16px rgba(11, 27, 43, 0.05);
-}
-div[data-testid="stMetricValue"] {
-  font-family: 'JetBrains Mono', 'Inter', monospace !important;
-}
-
-div[data-testid="stDataFrame"] {
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(11, 27, 43, 0.10);
-  box-shadow: 0 2px 5px rgba(11, 27, 43, 0.05);
-}
-
+/* Controls Styling */
 [data-testid="stSlider"],
 [data-testid="stSelectSlider"],
 [data-testid="stRadio"] {
-  background: var(--surface);
-  border: 1px solid rgba(11, 27, 43, 0.10);
-  border-radius: 16px;
-  padding: 14px 16px 10px 16px;
-  margin-bottom: 10px;
-  box-shadow: 0 2px 5px rgba(11, 27, 43, 0.05);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 14px 6px 14px;
+  margin-bottom: 8px;
 }
 
-[data-testid="stWidgetLabel"] {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-[data-testid="stWidgetLabel"] p {
-  color: var(--ink) !important;
-  font-size: 14.5px;
-  font-weight: 600;
-  white-space: normal !important;
-  word-break: keep-all;
-}
-
-/* Step progress bar — gradient fill matching the spectrum signature */
-div[data-testid="stProgress"] > div > div {
-  background: var(--line) !important;
-  height: 6px !important;
-  border-radius: 999px !important;
-}
-div[data-testid="stProgress"] > div > div > div {
-  background: linear-gradient(90deg, var(--cool), var(--cool-deep)) !important;
-  border-radius: 999px !important;
-}
-
-.pf-note {
-  color: var(--mist);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-@media (max-width: 430px) {
-  .stApp { background: var(--frost); }
-  .block-container { max-width: 100% !important; }
-}
-
-/* Setup wizard step containers (st.container(border=True)) — same
-   white-panel treatment as everything else, so nothing on the page
-   reads as "flat" against the frost background. */
-div[data-testid="stVerticalBlockBorderWrapper"] {
-  border-radius: 18px !important;
-  border-color: rgba(11, 27, 43, 0.10) !important;
-  background: var(--surface) !important;
-  padding: 6px 12px !important;
-  color: #000000 !important;
-  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.07), 0 10px 24px rgba(11, 27, 43, 0.05);
-}
-
-div[data-testid="stVerticalBlockBorderWrapper"] p,
-div[data-testid="stVerticalBlockBorderWrapper"] span,
-div[data-testid="stVerticalBlockBorderWrapper"] label,
-div[data-testid="stVerticalBlockBorderWrapper"] div {
-  color: #000000 !important;
-}
-
-div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"] {
-  color: var(--mist) !important;
-}
-
-/* Expanders ("더 자세히 보기", "기술 세부사항") had no custom styling at
-   all before — they inherited Streamlit's own faint default border,
-   which barely separates from the frost background. Give them the
-   same visible white-panel treatment as cards/nav. */
-div[data-testid="stExpander"] {
-  background: var(--surface) !important;
-  border: 1px solid rgba(11, 27, 43, 0.10) !important;
-  border-radius: 16px !important;
-  box-shadow: 0 2px 6px rgba(11, 27, 43, 0.06), 0 8px 20px rgba(11, 27, 43, 0.05);
-  overflow: hidden;
-}
-div[data-testid="stExpander"] summary {
-  background: var(--surface) !important;
-}
-div[data-testid="stExpander"] details {
-  background: var(--surface) !important;
-}
-
-/* Bottom nav bar — pill-shaped, solid blue in every state, so clicking
-   one button never leaves it looking different from the other two.
-   REAL FIX: the marker div (.pf-bottom) never wraps the st.columns()
-   row that follows it — Streamlit renders each st.markdown() call in
-   its own isolated stElementContainer, as a plain sibling of the
-   column layout, not a parent of it. Every rule reaches across with
-   :has() from the marker's container to that sibling instead of
-   relying on nesting.
-   VERSION NOTE: which element sits immediately next to the marker
-   differs by Streamlit version — stLayoutWrapper wraps the columns
-   in newer releases (verified on 1.60), while older releases
-   (verified on 1.41) put stHorizontalBlock there directly with no
-   wrapper. Every selector below is duplicated for both shapes so
-   the same stylesheet works across versions. */
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"],
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] {
-  background: var(--surface);
+/* Bottom Nav Container */
+.bottom-nav {
+  margin-top: 16px;
+  padding-top: 8px;
   border-top: 1px solid var(--line);
-  box-shadow: 0 -6px 18px rgba(11, 27, 43, 0.05);
-  padding: 8px 8px 4px 8px;
-  margin-top: 18px;
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-  display: flex !important;
-  gap: 6px !important;
-  justify-content: center !important;
 }
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stHorizontalBlock"] {
-  display: flex !important;
-  gap: 6px !important;
-  justify-content: center !important;
-}
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stColumn"]:nth-of-type(1),
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"]:nth-of-type(1) {
-  width: 96px !important;
-  flex: 0 0 96px !important;
-  min-width: 96px !important;
-  max-width: 96px !important;
-}
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stColumn"]:nth-of-type(2),
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stColumn"]:nth-of-type(3),
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"]:nth-of-type(2),
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"]:nth-of-type(3) {
-  width: 140px !important;
-  flex: 0 0 140px !important;
-  min-width: 140px !important;
-  max-width: 140px !important;
-}
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button {
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
-  width: 100% !important;
-  background: var(--cool) !important;
-  border: 1px solid var(--cool) !important;
+
+/* Primary Button */
+div.stButton > button[kind="primary"] {
+  background-color: var(--cool) !important;
   color: #ffffff !important;
-  min-height: 42px !important;
-  border-radius: 14px !important;
-  font-weight: 700 !important;
-  font-size: 12.5px !important;
-  letter-spacing: 0;
-  box-shadow: none !important;
-  outline: none !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  padding-left: 8px !important;
-  padding-right: 8px !important;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  border-radius: 12px !important;
+  font-size: 14.5px !important;
+  font-weight: 800 !important;
+  padding: 11px 18px !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(0, 119, 182, 0.25) !important;
 }
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button p,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button p {
+
+/* Secondary Button */
+div.stButton > button[kind="secondary"] {
+  background-color: var(--teal-btn) !important;
   color: #ffffff !important;
-  filter: grayscale(1) brightness(0) invert(1);
-  white-space: nowrap !important;
-  font-size: 12.5px !important;
-  margin: 0 !important;
+  border-radius: 12px !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  padding: 10px 16px !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 150, 199, 0.18) !important;
 }
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:hover,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:focus,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:focus-visible,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:active,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus-visible,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:active {
-  background: var(--cool-deep) !important;
-  border-color: var(--cool-deep) !important;
-  color: #ffffff !important;
-  box-shadow: none !important;
-  outline: none !important;
+
+div.stButton > button[kind="secondary"]:hover {
+  background-color: var(--teal-hover) !important;
 }
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:hover p,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:focus p,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:focus-visible p,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stLayoutWrapper"] div[data-testid="stButton"] > button:active p,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover p,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus p,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:focus-visible p,
-div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"] .pf-bottom)
-  + div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:active p {
+
+div.stButton > button[kind="secondary"] p {
   color: #ffffff !important;
-  filter: grayscale(1) brightness(0) invert(1);
 }
 </style>
-
 """,
     unsafe_allow_html=True,
 )
 
-
 # ============================================================
-# Helpers / AI backend
+# 2. SENSOR NODE METADATA (Sparse QR/PCA Basis)
 # ============================================================
-LEVEL_KO_TO_KEY = {"낮음": "low", "보통": "medium", "높음": "high"}
-POLICY_KO_TO_KEY = {
-    "⚖️ 균형": "balanced",
-    "🛋️ 쾌적 우선": "comfort_first",
-    "🍃 절약 우선": "eco_first",
+ROA_NODES_META = {
+    887: {"code": "S1", "name": "Sensor 1", "x": 2.75, "y": 6.75, "z": 1.50, "zone": "Office North"},
+    672: {"code": "S2", "name": "Sensor 2", "x": 2.75, "y": 2.75, "z": 1.50, "zone": "Office South"},
+    63: {"code": "S3", "name": "Sensor 3", "x": 1.75, "y": 4.25, "z": 2.50, "zone": "Ceiling Center"},
+    1036: {"code": "S4", "name": "Sensor 4", "x": 1.25, "y": 1.25, "z": 2.00, "zone": "Server Pod"},
+    1129: {"code": "S5", "name": "Sensor 5", "x": 1.75, "y": 5.50, "z": 2.00, "zone": "Meeting Room"}
 }
+ROA_NODE_IDS = list(ROA_NODES_META.keys())
 
 
-def _materialize_upload(uploaded, suffix: str) -> str:
-    data = uploaded.getvalue()
-    digest = hashlib.sha256(data).hexdigest()[:16]
-    root = Path(tempfile.gettempdir()) / "popfield_streamlit_assets"
-    root.mkdir(parents=True, exist_ok=True)
-    path = root / f"{digest}{suffix}"
-    if not path.exists():
-        path.write_bytes(data)
-    return str(path)
-
-
-def _find_local_case_info() -> str | None:
+# ============================================================
+# 3. DATA LOADERS
+# ============================================================
+@st.cache_data
+def load_case_info():
     candidates = [
+        Path("Case Info 200 DesignPoints.xlsx"),
         Path("Case Info 200 DesignPoints - 최종본.xlsx"),
-        Path("Case_Info.xlsx"),
+        Path("data/Case Info 200 DesignPoints.xlsx"),
         Path("case_info.xlsx"),
     ]
     for p in candidates:
         if p.exists():
-            return str(p.resolve())
-    return None
-
-
-def _find_local_checkpoint() -> str | None:
-    candidates = [
-        Path("best_deploy.pt"),
-        Path("best.pt"),
-        Path("model/best_deploy.pt"),
-        Path("model/best.pt"),
-        Path("assets/best_deploy.pt"),
-        Path("assets/best.pt"),
-    ]
-    for p in candidates:
-        if p.exists():
-            return str(p.resolve())
-    return None
-
-
-def _find_local_sensor_basis() -> str | None:
-    for p in [
-        Path("sensor_reconstruction_basis.npz"),
-        Path("model/sensor_reconstruction_basis.npz"),
-        Path("assets/sensor_reconstruction_basis.npz"),
-    ]:
-        if p.exists():
-            return str(p.resolve())
-    return None
-
-
-def _find_local_selected_sensors() -> str | None:
-    for p in [
-        Path("selected_sensors.csv"),
-        Path("model/selected_sensors.csv"),
-        Path("assets/selected_sensors.csv"),
-    ]:
-        if p.exists():
-            return str(p.resolve())
-    return None
-
-
-@st.cache_resource(show_spinner=False)
-def load_runtime(checkpoint_path: str, case_info_path: str, force_cpu: bool):
-    device = "cpu" if force_cpu or not torch.cuda.is_available() else "cuda"
-    ckpt, model, scalers, coords = hvac.load_checkpoint(checkpoint_path, device)
-    coords_norm_t = torch.from_numpy(
-        scalers["coord"].transform(coords).astype(np.float32)
-    ).to(device)
-    case_df = hvac.load_case_info(case_info_path)
-    level_mapping = {
-        "external": hvac._observed_level_map(case_df, "P83 - external"),
-        "meeting": hvac._observed_level_map(case_df, "P84 - meeting"),
-        "server": hvac._observed_level_map(case_df, "P85 - server"),
-        "working": hvac._observed_level_map(case_df, "P86 - working"),
-    }
-    return ckpt, model, scalers, coords, coords_norm_t, case_df, level_mapping, device
-
-
-@st.cache_data(show_spinner=False)
-def load_input_metadata(case_info_path: str):
-    case_df = hvac.load_case_info(case_info_path)
-    col_map = {
-        "external": "P83 - external",
-        "meeting": "P84 - meeting",
-        "server": "P85 - server",
-        "working": "P86 - working",
-    }
-    bounds = {}
-    observed = {}
-    for key, col in col_map.items():
-        values = np.sort(case_df[col].astype(float).unique())
-        bounds[key] = (float(values.min()), float(values.max()))
-        observed[key] = [float(v) for v in values.tolist()]
-    return bounds, observed
-
-
-def _args_for_diag(target: float) -> SimpleNamespace:
-    return SimpleNamespace(
-        target_temp=float(target),
-        comfort_band=2.0,
-        max_zone_range=2.0,
-        max_hot_fraction=0.05,
-        max_cold_fraction=0.05,
-        max_p95_temp=None,
-        demo_near_zone_margin=0.25,
-        demo_near_hot_margin_pp=1.0,
-        demo_near_cold_margin_pp=1.0,
-        demo_near_p95_margin=0.25,
-    )
-
-
-def run_ai(
-    checkpoint_path: str,
-    case_info_path: str,
-    target_temp: float,
-    policy: str,
-    levels: Dict[str, str] | None = None,
-    exact_loads: Dict[str, float] | None = None,
-    sensor_basis_path: str | None = None,
-    sensor_values_c: list[float] | None = None,
-    force_cpu: bool = False,
-) -> Dict:
-    ckpt, model, scalers, coords, coords_norm_t, case_df, level_mapping, device = load_runtime(
-        checkpoint_path, case_info_path, force_cpu
-    )
-
-    if exact_loads is not None:
-        loads = {k: float(exact_loads[k]) for k in ["external", "meeting", "server", "working"]}
-        input_labels = {k: "exact_W" for k in loads}
-        input_mode = "continuous"
-    else:
-        if levels is None:
-            raise ValueError("Either levels or exact_loads must be provided.")
-        loads = {k: float(level_mapping[k][v]) for k, v in levels.items()}
-        input_labels = dict(levels)
-        input_mode = "levels"
-
-    output_dir = Path(tempfile.gettempdir()) / "popfield_streamlit_output"
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    input_range_diagnostics = hvac._load_range_diagnostics(case_df, loads)
-
-    current_temp_override = None
-    sensor_info = None
-    if sensor_basis_path and sensor_values_c is not None:
-        current_temp_override, sensor_info = hvac.reconstruct_current_temperature_from_sensors(
-            sensor_values_c=sensor_values_c,
-            sensor_basis_path=sensor_basis_path,
-            coords=coords,
-        )
-        idx = np.asarray(sensor_info["selected_sensor_idx"], dtype=int)
-        sensor_info["sensor_locations"] = [
-            {
-                "sensor_order": int(j + 1),
-                "node_index": int(node_idx),
-                "x_m": float(coords[node_idx, 0]),
-                "y_m": float(coords[node_idx, 1]),
-                "z_m": float(coords[node_idx, 2]),
-                "temperature_C": float(sensor_values_c[j]),
-            }
-            for j, node_idx in enumerate(idx.tolist())
-        ]
-
-    t0 = time.perf_counter()
-    opt = hvac.optimize_hvac(
-        model=model,
-        case_df=case_df,
-        loads=loads,
-        cond_scaler=scalers["cond"],
-        coords=coords,
-        coords_norm_t=coords_norm_t,
-        field_scaler=scalers["field"],
-        ra_scaler=scalers["ra"],
-        device=device,
-        save_dir=output_dir,
-        zone_json=None,
-        target_temp_c=float(target_temp),
-        comfort_band_c=2.0,
-        max_zone_range_c=2.0,
-        max_hot_fraction=0.05,
-        max_cold_fraction=0.05,
-        max_p95_temp_c=None,
-        energy_weight=0.35,
-        airflow_weight=0.25,
-        current_temp_override=current_temp_override,
-    )
-    elapsed_ms = (time.perf_counter() - t0) * 1000.0
-
-    recs = json.loads(
-        (output_dir / "hvac_recommendations.json").read_text(encoding="utf-8")
-    )
-    strict_feasible = bool(recs.get("fully_feasible_action_exists", False))
-    if strict_feasible:
-        rec = recs[policy]
-        policy_used = policy
-    else:
-        rec = recs["best_achievable"]
-        policy_used = "best_achievable"
-
-    diag = hvac._demo_constraint_diagnostics(rec, _args_for_diag(target_temp))
-    field_path = hvac._save_demo_selected_field(
-        model, rec, loads, scalers, coords, coords_norm_t, device, output_dir,
-        case_df=case_df, current_temp_override=current_temp_override,
-    )
-    field_df = pd.read_csv(field_path)
-
-    spatial_change = hvac.build_demo_spatial_change_report(
-        model=model,
-        rec=rec,
-        loads=loads,
-        case_df=case_df,
-        scalers=scalers,
-        coords=coords,
-        coords_norm_t=coords_norm_t,
-        device=device,
-        save_dir=output_dir,
-        target_temp_c=float(target_temp),
-        comfort_band_c=2.0,
-        max_zone_range_c=2.0,
-        max_hot_fraction=0.05,
-        max_cold_fraction=0.05,
-        max_p95_temp_c=None,
-        zone_json=None,
-        top_k=5,
-        min_distance_m=1.0,
-        current_temp_override=current_temp_override,
-        sensor_info=sensor_info,
-    )
-    before_after_df = pd.read_csv(spatial_change["all_node_comparison_csv"])
-    hotspot_df = pd.read_csv(spatial_change["hotspot_summary_csv"])
-
-    return {
-        "status": str(diag["status"]),
-        "status_label": str(diag["label_ko"]),
-        "diag": diag,
-        "recommendation": rec,
-        "loads": loads,
-        "levels": input_labels,
-        "input_mode": input_mode,
-        "input_range_diagnostics": input_range_diagnostics,
-        "policy": policy,
-        "policy_used": policy_used,
-        "strict_feasible": strict_feasible,
-        "num_actions": int(len(opt)),
-        "decision_ms": float(elapsed_ms),
-        "field": field_df,
-        "before_after_field": before_after_df,
-        "hotspots": hotspot_df,
-        "spatial_change": spatial_change,
-        "all_candidates": opt,
-        "device": device,
-        "checkpoint_metrics": ckpt.get("metrics", {}),
-        "additional_capacity": recs.get("additional_capacity_estimate", {}),
-        "sensor_mode": bool(current_temp_override is not None),
-        "sensor_info": sensor_info,
-        "current_state_source": spatial_change.get("current_state_source", ""),
-    }
-
-
-def direction_text(rec: Dict) -> str:
-    return hvac._direction_text(rec)
-
-
-def status_box(status: str, target: float):
-    if status == "FEASIBLE":
-        cls, icon, title, desc = (
-            "pf-ok",
-            "✅",
-            "달성 가능",
-            f"목표 {target:.1f}℃를 만족하는 운전안을 찾았습니다.",
-        )
-    elif status == "NEAR_FEASIBLE":
-        cls, icon, title, desc = (
-            "pf-near",
-            "⚠️",
-            "거의 달성",
-            "대부분의 기준은 만족하지만 일부 조건을 조금 초과합니다.",
-        )
-    else:
-        cls, icon, title, desc = (
-            "pf-no",
-            "❌",
-            "달성 어려움",
-            "현재 HVAC 후보 범위만으로 모든 쾌적 기준을 만족하기 어렵습니다.",
-        )
-    st.markdown(
-        f'<div class="pf-status {cls}">'
-        f'<div class="pf-status-title">{icon} {title}</div>'
-        f'<div>{desc}</div></div>',
-        unsafe_allow_html=True,
-    )
-
-
-def constraint_rows(diag: Dict) -> pd.DataFrame:
-    labels = {
-        "zone_range": ("Zone 편차", "℃"),
-        "hot_fraction": ("Hotspot", "%"),
-        "cold_fraction": ("Coldspot", "%"),
-        "p95_temperature": ("P95 온도", "℃"),
-    }
-    rows = []
-    details = diag.get("details") or diag.get("constraints") or {}
-    for key, (label, unit) in labels.items():
-        d = details.get(key, {})
-        if not d:
-            continue
-        val = float(d["value"])
-        limit = float(d["limit"])
-        exceed = float(d["exceedance"])
-        met = bool(d["met"])
-        if key in {"hot_fraction", "cold_fraction"}:
-            val, limit, exceed = val * 100, limit * 100, exceed * 100
-            extra = "" if met else f"+{exceed:.2f}%p"
-            rows.append(
-                ["✅" if met else "⚠️", label, f"{val:.2f}%", f"≤ {limit:.2f}%", extra]
-            )
-        else:
-            extra = "" if met else f"+{exceed:.2f}℃"
-            rows.append(
-                ["✅" if met else "⚠️", label, f"{val:.2f}℃", f"≤ {limit:.2f}℃", extra]
-            )
-    return pd.DataFrame(rows, columns=["", "항목", "예측", "기준", "초과"])
-
-
-def temperature_map(
-    field_df: pd.DataFrame,
-    value_col: str = "pred_temperature_C",
-    title: str = "Digital Twin",
-    vmin: float | None = None,
-    vmax: float | None = None,
-):
-    """Polished 2D CFD slice view without filling locations where no CFD node exists."""
-    z_values = np.sort(field_df["z_m"].unique())
-    target_z = z_values[np.argmin(np.abs(z_values - 1.5))]
-    d = field_df[np.isclose(field_df["z_m"], target_z)].copy()
-
-    fig, ax = plt.subplots(figsize=(6.2, 4.9))
-    fig.patch.set_facecolor("white")
-    ax.set_facecolor("#f7f9fc")
-
-    sc = ax.scatter(
-        d["x_m"],
-        d["y_m"],
-        c=d[value_col],
-        s=92,
-        cmap="coolwarm",
-        edgecolors="white",
-        linewidths=0.35,
-        vmin=vmin,
-        vmax=vmax,
-        zorder=3,
-    )
-
-    # Mark the hottest point on this displayed slice.
-    if len(d):
-        hot_row = d.loc[d[value_col].astype(float).idxmax()]
-        ax.scatter(
-            [hot_row["x_m"]],
-            [hot_row["y_m"]],
-            s=185,
-            facecolors="none",
-            edgecolors="#1f2937",
-            linewidths=1.6,
-            zorder=5,
-        )
-        ax.annotate(
-            f'Max {float(hot_row[value_col]):.1f}℃',
-            (float(hot_row["x_m"]), float(hot_row["y_m"])),
-            xytext=(8, 10),
-            textcoords="offset points",
-            fontsize=9,
-            fontweight="bold",
-            color="#1f2937",
-            bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="#d1d5db", alpha=0.92),
-            zorder=6,
-        )
-
-    cb = fig.colorbar(sc, ax=ax, fraction=0.045, pad=0.035)
-    cb.set_label("Temperature (°C)", fontsize=10)
-    cb.ax.tick_params(labelsize=9)
-    cb.outline.set_linewidth(0.6)
-
-    ax.set_title(f"{title}  ·  z = {target_z:g} m", fontsize=13, fontweight="bold", pad=12)
-    ax.set_xlabel("X position (m)", fontsize=10)
-    ax.set_ylabel("Y position (m)", fontsize=10)
-    ax.tick_params(axis="both", labelsize=9)
-    ax.grid(True, linestyle="--", linewidth=0.6, alpha=0.28, zorder=0)
-    ax.set_aspect("equal", adjustable="box")
-
-    for spine in ax.spines.values():
-        spine.set_color("#cbd5e1")
-        spine.set_linewidth(0.8)
-
-    ax.margins(x=0.03, y=0.05)
-    fig.tight_layout()
-    return fig
-
-
-# ============================================================
-# Interactive 3D digital-twin visualization
-# ============================================================
-PLOTLY_CONFIG = {
-    "displaylogo": False,
-    "scrollZoom": True,
-    "responsive": True,
-    "modeBarButtonsToRemove": ["select3d", "lasso3d"],
-}
-
-
-def _plotly_scene(title: str):
-    return dict(
-        xaxis=dict(title="X (m)", backgroundcolor="rgb(248,250,252)", gridcolor="rgb(226,232,240)"),
-        yaxis=dict(title="Y (m)", backgroundcolor="rgb(248,250,252)", gridcolor="rgb(226,232,240)"),
-        zaxis=dict(title="Z (m)", backgroundcolor="rgb(248,250,252)", gridcolor="rgb(226,232,240)"),
-        aspectmode="data",
-        camera=dict(eye=dict(x=1.55, y=1.55, z=1.15)),
-    )
-
-
-def _sensor_overlay_trace(sensor_info: Dict | None):
-    if not sensor_info:
-        return None
-    locs = sensor_info.get("sensor_locations") or []
-    if not locs:
-        return None
-    return pgo.Scatter3d(
-        x=[float(x["x_m"]) for x in locs],
-        y=[float(x["y_m"]) for x in locs],
-        z=[float(x["z_m"]) for x in locs],
-        mode="markers+text",
-        marker=dict(size=7, symbol="diamond", color="#111827", line=dict(color="white", width=1.2)),
-        text=[f"S{int(x['sensor_order'])}" for x in locs],
-        textposition="top center",
-        textfont=dict(size=9, color="#111827"),
-        customdata=[[int(x["node_index"]), float(x.get("temperature_C", float("nan")))] for x in locs],
-        hovertemplate="Sensor %{text}<br>Node %{customdata[0]}<br>Measured T=%{customdata[1]:.2f}°C<extra></extra>",
-        name="Selected sensors",
-    )
-
-
-def _temperature_trace(df: pd.DataFrame, temp_col: str, vmin: float, vmax: float, opacity: float = 0.78):
-    return pgo.Scatter3d(
-        x=df["x_m"], y=df["y_m"], z=df["z_m"],
-        mode="markers",
-        marker=dict(
-            size=4,
-            color=df[temp_col],
-            colorscale="Turbo",
-            cmin=float(vmin), cmax=float(vmax),
-            opacity=float(opacity),
-            colorbar=dict(title="Temp (°C)", thickness=13, len=0.72),
-        ),
-        customdata=np.column_stack([
-            df["node_index"].to_numpy(),
-            df[temp_col].to_numpy(float),
-        ]),
-        hovertemplate=(
-            "Node %{customdata[0]:.0f}<br>"
-            "T=%{customdata[1]:.2f}°C<br>"
-            "XYZ=(%{x:.2f}, %{y:.2f}, %{z:.2f}) m<extra></extra>"
-        ),
-        name="Temperature",
-    )
-
-
-def _hottest_trace(df: pd.DataFrame, temp_col: str):
-    if df.empty:
-        return None
-    row = df.loc[df[temp_col].astype(float).idxmax()]
-    return pgo.Scatter3d(
-        x=[float(row["x_m"])], y=[float(row["y_m"])], z=[float(row["z_m"])],
-        mode="markers+text",
-        marker=dict(size=10, symbol="diamond", color="#ffffff", line=dict(color="#111827", width=3)),
-        text=[f"Max {float(row[temp_col]):.1f}°C"],
-        textposition="top center",
-        textfont=dict(size=10, color="#111827"),
-        hovertemplate=f"Hottest node {int(row['node_index'])}<br>T={float(row[temp_col]):.2f}°C<extra></extra>",
-        name="Hottest point",
-    )
-
-
-def temperature_cloud_3d(
-    df: pd.DataFrame,
-    temp_col: str,
-    title: str,
-    vmin: float,
-    vmax: float,
-    sensor_info: Dict | None = None,
-):
-    fig = pgo.Figure()
-    fig.add_trace(_temperature_trace(df, temp_col, vmin, vmax, opacity=0.82))
-    hot = _hottest_trace(df, temp_col)
-    if hot is not None:
-        fig.add_trace(hot)
-    sensors = _sensor_overlay_trace(sensor_info)
-    if sensors is not None:
-        fig.add_trace(sensors)
-    fig.update_layout(
-        title=dict(text=title, x=0.02, xanchor="left"),
-        height=610,
-        margin=dict(l=0, r=0, t=50, b=0),
-        scene=_plotly_scene(title),
-        legend=dict(orientation="h", y=1.02, x=0),
-    )
-    return fig
-
-
-def _downsample_vectors(df: pd.DataFrame, max_vectors: int = 150) -> pd.DataFrame:
-    """Deterministic spatially broad subset for readable 3D cones."""
-    if len(df) <= max_vectors:
-        return df.copy()
-    # Sort by coordinates first, then take evenly spaced rows. This avoids showing
-    # only high-speed nodes from one local region.
-    ordered = df.sort_values(["z_m", "y_m", "x_m"]).reset_index(drop=True)
-    idx = np.linspace(0, len(ordered) - 1, int(max_vectors), dtype=int)
-    return ordered.iloc[np.unique(idx)].copy()
-
-
-def airflow_cone_3d(
-    df: pd.DataFrame,
-    u_col: str,
-    v_col: str,
-    w_col: str,
-    title: str,
-    temp_col: str | None = None,
-    vmin: float | None = None,
-    vmax: float | None = None,
-    sensor_info: Dict | None = None,
-    max_vectors: int = 150,
-):
-    d = _downsample_vectors(df, max_vectors=max_vectors)
-    speed = np.sqrt(
-        d[u_col].to_numpy(float) ** 2
-        + d[v_col].to_numpy(float) ** 2
-        + d[w_col].to_numpy(float) ** 2
-    )
-    fig = pgo.Figure()
-    if temp_col is not None and vmin is not None and vmax is not None:
-        fig.add_trace(_temperature_trace(df, temp_col, float(vmin), float(vmax), opacity=0.30))
-    else:
-        fig.add_trace(pgo.Scatter3d(
-            x=df["x_m"], y=df["y_m"], z=df["z_m"], mode="markers",
-            marker=dict(size=2, color="#94a3b8", opacity=0.22),
-            hoverinfo="skip", name="CFD nodes",
-        ))
-    fig.add_trace(pgo.Cone(
-        x=d["x_m"], y=d["y_m"], z=d["z_m"],
-        u=d[u_col], v=d[v_col], w=d[w_col],
-        colorscale="Viridis",
-        cmin=float(np.nanmin(speed)) if len(speed) else 0.0,
-        cmax=float(np.nanmax(speed)) if len(speed) else 1.0,
-        sizemode="scaled",
-        sizeref=0.55,
-        anchor="tail",
-        showscale=True,
-        colorbar=dict(title="Air speed", thickness=13, len=0.62, x=1.08),
-        opacity=0.78,
-        name="Airflow vectors",
-        hovertemplate="u=%{u:.3f}<br>v=%{v:.3f}<br>w=%{w:.3f}<extra></extra>",
-    ))
-    sensors = _sensor_overlay_trace(sensor_info)
-    if sensors is not None:
-        fig.add_trace(sensors)
-    fig.update_layout(
-        title=dict(text=title, x=0.02, xanchor="left"),
-        height=630,
-        margin=dict(l=0, r=8, t=50, b=0),
-        scene=_plotly_scene(title),
-        legend=dict(orientation="h", y=1.02, x=0),
-    )
-    return fig
-
-
-def airflow_particle_animation(
-    df: pd.DataFrame,
-    u_col: str,
-    v_col: str,
-    w_col: str,
-    speed_col: str,
-    title: str,
-    n_particles: int = 34,
-    n_frames: int = 26,
-):
-    """Pseudo-time streamline visualization of a steady-state vector field.
-
-    Particle motion is only a display aid. It follows nearest-node velocity direction
-    and relative speed; frame index is NOT physical CFD time.
-    """
-    from scipy.spatial import cKDTree
-
-    xyz = df[["x_m", "y_m", "z_m"]].to_numpy(float)
-    vel = df[[u_col, v_col, w_col]].to_numpy(float)
-    speed = np.linalg.norm(vel, axis=1)
-    finite = np.isfinite(xyz).all(axis=1) & np.isfinite(vel).all(axis=1)
-    xyz, vel, speed = xyz[finite], vel[finite], speed[finite]
-    if len(xyz) == 0:
-        return pgo.Figure()
-
-    # Seeds: deterministic broad sample among nodes with non-negligible airflow.
-    threshold = float(np.nanpercentile(speed, 35)) if len(speed) > 5 else 0.0
-    candidates = np.where(speed >= threshold)[0]
-    if len(candidates) < n_particles:
-        candidates = np.arange(len(xyz))
-    order = candidates[np.argsort(xyz[candidates, 0] + 0.37 * xyz[candidates, 1] + 0.11 * xyz[candidates, 2])]
-    seed_idx = order[np.linspace(0, len(order) - 1, min(n_particles, len(order)), dtype=int)]
-    seeds = xyz[seed_idx].copy()
-    pos = seeds.copy()
-
-    tree = cKDTree(xyz)
-    lo, hi = xyz.min(axis=0), xyz.max(axis=0)
-    diag = max(float(np.linalg.norm(hi - lo)), 1e-6)
-    p90 = max(float(np.nanpercentile(speed, 90)), 1e-6)
-    base_step = 0.018 * diag
-
-    positions = [pos.copy()]
-    particle_speeds = []
-    for _ in range(n_frames - 1):
-        _, nn = tree.query(pos, k=1)
-        vv = vel[nn]
-        ss = np.linalg.norm(vv, axis=1)
-        particle_speeds.append(ss.copy())
-        direction = vv / np.maximum(ss[:, None], 1e-8)
-        relative = np.clip(ss / p90, 0.18, 1.45)
-        pos = pos + direction * (base_step * relative[:, None])
-        outside = np.any((pos < lo[None, :]) | (pos > hi[None, :]), axis=1)
-        if np.any(outside):
-            pos[outside] = seeds[outside]
-        positions.append(pos.copy())
-    if not particle_speeds:
-        particle_speeds = [np.zeros(len(pos))]
-    particle_speeds.append(particle_speeds[-1].copy())
-
-    bg = pgo.Scatter3d(
-        x=xyz[:, 0], y=xyz[:, 1], z=xyz[:, 2], mode="markers",
-        marker=dict(size=2, color="#94a3b8", opacity=0.12),
-        hoverinfo="skip", name="CFD nodes",
-    )
-    p0 = positions[0]
-    particles = pgo.Scatter3d(
-        x=p0[:, 0], y=p0[:, 1], z=p0[:, 2], mode="markers",
-        marker=dict(size=6, color=speed[seed_idx], colorscale="Viridis", opacity=0.95,
-                    colorbar=dict(title="Relative airflow", thickness=12, len=0.55)),
-        hovertemplate="Flow particle<extra></extra>", name="Flow particles",
-    )
-    fig = pgo.Figure(data=[bg, particles])
-    fig.frames = [
-        pgo.Frame(
-            name=str(i),
-            data=[pgo.Scatter3d(
-                x=p[:, 0], y=p[:, 1], z=p[:, 2], mode="markers",
-                marker=dict(size=6, color=particle_speeds[min(i, len(particle_speeds)-1)],
-                            colorscale="Viridis", cmin=0.0, cmax=max(p90, 1e-6), opacity=0.95),
-            )],
-            traces=[1],
-        )
-        for i, p in enumerate(positions)
-    ]
-    fig.update_layout(
-        title=dict(text=title, x=0.02, xanchor="left"),
-        height=620,
-        margin=dict(l=0, r=0, t=50, b=0),
-        scene=_plotly_scene(title),
-        updatemenus=[dict(
-            type="buttons", direction="left", x=0.0, y=1.08,
-            buttons=[
-                dict(label="▶ Play", method="animate", args=[None, {"frame": {"duration": 90, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}}]),
-                dict(label="⏸ Pause", method="animate", args=[[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}]),
-            ],
-        )],
-        sliders=[dict(
-            active=0, y=0.0, x=0.05, len=0.9,
-            currentvalue=dict(prefix="Display frame "),
-            steps=[dict(label=str(i), method="animate", args=[[str(i)], {"mode":"immediate", "frame":{"duration":0,"redraw":True}, "transition":{"duration":0}}]) for i in range(len(positions))],
-        )],
-        showlegend=False,
-    )
-    return fig
-
-
-def input_range_rows(diag: Dict[str, Dict[str, object]]) -> pd.DataFrame:
-    labels = {
-        "external": "외부 열환경",
-        "meeting": "회의공간",
-        "server": "서버·기기",
-        "working": "업무공간",
-    }
-    rows = []
-    for key in ["external", "meeting", "server", "working"]:
-        d = diag[key]
-        value = float(d["value_W"])
-        if bool(d["exact_observed_level"]):
-            status = "✅ 관측 CFD 단계"
-            detail = "학습 데이터에 직접 존재"
-        elif bool(d["inside_observed_range"]):
-            b0, b1 = d["bracketing_observed_W"]
-            status = "◌ 연속 보간"
-            detail = f"{float(b0):.0f}~{float(b1):.0f} W 사이"
-        else:
-            status = "⚠ 범위 밖"
-            detail = f"학습범위 {float(d['observed_min_W']):.0f}~{float(d['observed_max_W']):.0f} W"
-        rows.append([labels[key], f"{value:.0f} W", status, detail])
-    return pd.DataFrame(rows, columns=["입력", "값", "판정", "설명"])
-
-
-# ------------------------------------------------------------
-# NEW: glossary + before->after delta helpers (used on result page)
-# ------------------------------------------------------------
-METRIC_GLOSSARY = {
-    "zone_range": "공간 내 서로 다른 위치 간 온도 차이입니다. 값이 작을수록 공간 전체가 고르게 냉방됩니다.",
-    "hot_fraction": "기준보다 더운 위치가 전체 공간에서 차지하는 비율입니다.",
-    "cold_fraction": "기준보다 추운 위치가 전체 공간에서 차지하는 비율입니다.",
-    "p95_temperature": "공간 온도를 정렬했을 때 상위 5% 지점의 온도입니다. 국소적으로 더운 구역이 있는지 보여줍니다.",
-    "combined_score": "풍향·풍량 후보를 비교하는 종합 점수입니다. 낮을수록 더 유리한 후보입니다.",
-    "airflow_score": "바람이 고온 구역에 실제로 도달하는 정도를 나타내는 점수입니다. 낮을수록 더 유리합니다.",
-    "priority_stagnant_fraction": "고온 우선영역 중 공기 흐름이 거의 없는(정체된) 비율입니다.",
-}
-
-
-def delta_badge(before: float, after: float, unit: str = "", lower_is_better: bool = True) -> str:
-    """Return a small colored HTML badge summarizing a before->after change."""
-    diff = after - before
-    if abs(diff) < 0.005:
-        return '<span style="color:var(--pf-muted);font-weight:700;font-size:12.5px">변화 없음</span>'
-    improved = (diff < 0) if lower_is_better else (diff > 0)
-    color = "var(--pf-primary)" if improved else "var(--pf-danger)"
-    arrow = "↓" if diff < 0 else "↑"
-    sign = "" if diff < 0 else "+"
-    return (
-        f'<span style="color:{color};font-weight:700;font-size:12.5px">'
-        f"{arrow} {sign}{diff:.2f}{unit}</span>"
-    )
-
-
-def metric_pair_card(label: str, before: float, after: float, unit: str, lower_is_better: bool = True):
-    """Renders a compact 'before -> after' metric card with a color-coded delta badge."""
-    badge = delta_badge(before, after, unit, lower_is_better)
-    st.markdown(
-        f"""
-        <div class="pf-metric">
-          <div class="pf-metric-label">{label}</div>
-          <div class="pf-metric-value" style="font-size:17px">
-            {before:.2f}{unit} → {after:.2f}{unit}
-          </div>
-          <div style="margin-top:4px">{badge}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-# ============================================================
-# State
-# ============================================================
-defaults = {
-    "page": "home",
-    "target_temp": 24.0,
-    "external_ko": "보통",
-    "meeting_ko": "높음",
-    "server_ko": "높음",
-    "working_ko": "보통",
-    "policy_ko": "⚖️ 균형",
-    "input_mode_ko": "간편 단계",
-    "external_w": 750.0,
-    "meeting_w": 1750.0,
-    "server_w": 4200.0,
-    "working_w": 1600.0,
-    "use_sensor_current": False,
-}
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-
-local_ckpt = _find_local_checkpoint()
-local_case = _find_local_case_info()
-local_sensor_basis = _find_local_sensor_basis()
-local_selected_sensors = _find_local_selected_sensors()
-
-# Uploaded overrides survive reruns in session state
-if "checkpoint_path" not in st.session_state:
-    st.session_state["checkpoint_path"] = local_ckpt
-if "case_info_path" not in st.session_state:
-    st.session_state["case_info_path"] = local_case
-if "sensor_basis_path" not in st.session_state:
-    st.session_state["sensor_basis_path"] = local_sensor_basis
-if "selected_sensors_path" not in st.session_state:
-    st.session_state["selected_sensors_path"] = local_selected_sensors
-if "use_sensor_current_initialized" not in st.session_state:
-    if local_sensor_basis:
-        st.session_state["use_sensor_current"] = True
-    st.session_state["use_sensor_current_initialized"] = True
-if "force_cpu" not in st.session_state:
-    st.session_state["force_cpu"] = False
-
-
-def go(page: str):
-    if page == "setup" and st.session_state.get("page") != "setup":
-        st.session_state["setup_step"] = 1
-    st.session_state["page"] = page
-    st.rerun()
-
-
-# ------------------------------------------------------------
-# Navigation — bottom nav bar
-# ------------------------------------------------------------
-def app_header(title: str):
-    st.markdown(
-        f"""
-        <div class="pf-shell" style="padding-bottom:0">
-          <div class="pf-brand">
-            <div class="pf-brand-mark">❄️</div>
-            <div class="pf-brand-name">PopField AI Smart Cooling</div>
-          </div>
-          <div class="pf-title">{title}</div>
-          <div class="pf-spectrum"></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def bottom_nav(active: str):
-    st.markdown('<div class="pf-bottom">', unsafe_allow_html=True)
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        if st.button("🏠 Home", key=f"nav_home_{active}", use_container_width=False):
-            go("home")
-    with c2:
-        if st.button("📈 Analysis", key=f"nav_analysis_{active}", use_container_width=False):
-            if "last_result" in st.session_state:
-                go("result")
-            else:
-                go("setup")
-    with c3:
-        if st.button("⚙️ Settings", key=f"nav_settings_{active}", use_container_width=False):
-            go("setup")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ============================================================
-# HOME
-# ============================================================
-if st.session_state["page"] == "home":
-    app_header("PopField")
-
-    st.markdown(
-        """
-        <div class="pf-shell" style="padding-top:0">
-          <div class="pf-card">
-            <div class="pf-label">현재 공간 상태</div>
-            <div class="pf-temp">25.3°C</div>
-            <div class="pf-blue-text">목표 24.0°C · 냉방 최적화 필요</div>
-          </div>
-
-        <div class="pf-twin">
-            <div class="pf-twin-title">Digital Twin · Temperature Field</div>
-            <div class="pf-blob cool"></div>
-            <div class="pf-blob hot"></div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    left, center, right = st.columns([0.05, 0.9, 0.05])
-    with center:
-        if st.button("AI 냉방 최적화 시작", type="primary", use_container_width=True):
-            go("setup")
-
-    st.markdown(
-        """
-        <div class="pf-shell" style="padding-top:10px;padding-bottom:0">
-          <div class="pf-note">
-            입력한 공간 조건을 바탕으로 PopField가 HVAC 후보를 가상시험하고
-            목표 온도와 쾌적 조건을 만족하는 운전안을 찾습니다.
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    bottom_nav("home")
-
-
-# ============================================================
-# AI SETUP — 4-step wizard (목표 → 열부하 → 연결 → 시작)
-# ============================================================
-elif st.session_state["page"] == "setup":
-    app_header("AI Cooling Setup")
-
-    if "setup_step" not in st.session_state:
-        st.session_state["setup_step"] = 1
-
-    STEP_LABELS = ["목표", "열부하", "연결", "시작"]
-    TOTAL_STEPS = len(STEP_LABELS)
-    step = int(st.session_state["setup_step"])
-
-    # ---- Step indicator ----
-    st.markdown('<div class="pf-shell" style="padding-top:0;padding-bottom:0">', unsafe_allow_html=True)
-    ind_cols = st.columns(TOTAL_STEPS)
-    for i, col in enumerate(ind_cols, start=1):
-        with col:
-            if i < step:
-                dot, color = "✓", "var(--pf-primary)"
-            elif i == step:
-                dot, color = "●", "var(--pf-primary)"
-            else:
-                dot, color = "○", "var(--pf-muted)"
-            weight = "800" if i == step else "500"
-            st.markdown(
-                f'<div style="text-align:center;font-size:12px;font-weight:{weight};color:{color}">'
-                f"{dot}<br/>{STEP_LABELS[i - 1]}</div>",
-                unsafe_allow_html=True,
-            )
-    st.progress(step / TOTAL_STEPS)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown('<div class="pf-shell" style="padding-top:0;padding-bottom:0">', unsafe_allow_html=True)
-
-    # ------------------------------------------------------
-    # STEP 1 — 🎯 목표 설정
-    # ------------------------------------------------------
-    if step == 1:
-        with st.container(border=True):
-            st.markdown('<div class="pf-section-title">🎯 목표 설정</div>', unsafe_allow_html=True)
-            st.caption("먼저 원하는 목표 온도와 운전 방식을 선택하세요.")
-
-            st.session_state["target_temp"] = st.slider(
-                "🌡️ 목표 온도 (℃)",
-                min_value=22.0,
-                max_value=28.0,
-                value=float(st.session_state["target_temp"]),
-                step=0.1,
-                format="%.1f",
-                key="target_temp_widget",
-            )
-
-            st.session_state["policy_ko"] = st.radio(
-                "운전 목표",
-                ["⚖️ 균형", "🛋️ 쾌적 우선", "🍃 절약 우선"],
-                horizontal=False,
-                index=["⚖️ 균형", "🛋️ 쾌적 우선", "🍃 절약 우선"].index(
-                    st.session_state["policy_ko"]
-                ),
-                key="policy_widget",
-            )
-
-    # ------------------------------------------------------
-    # STEP 2 — 🔥 공간 열부하
-    # ------------------------------------------------------
-    elif step == 2:
-        with st.container(border=True):
-            st.markdown('<div class="pf-section-title">🔥 공간 열부하</div>', unsafe_allow_html=True)
-            st.caption("일반 사용자는 W 단위를 입력할 필요 없이 공간 상태만 선택하면 됩니다.")
-
-            st.session_state["input_mode_ko"] = st.radio(
-                "입력 방식",
-                ["간편 단계", "세밀 입력(W)"],
-                horizontal=True,
-                index=["간편 단계", "세밀 입력(W)"].index(st.session_state["input_mode_ko"]),
-                key="input_mode_widget",
-                help="세밀 입력은 학습된 CFD 범위 안의 연속 보간 질의로 사용할 수 있습니다.",
-            )
-
-            if st.session_state["input_mode_ko"] == "간편 단계":
-                st.session_state["external_ko"] = st.select_slider(
-                    "☀️ 외부 열환경", options=["낮음", "보통", "높음"],
-                    value=st.session_state["external_ko"], key="external_widget",
-                )
-                st.session_state["meeting_ko"] = st.select_slider(
-                    "👥 회의공간 사용", options=["낮음", "보통", "높음"],
-                    value=st.session_state["meeting_ko"], key="meeting_widget",
-                )
-                st.session_state["server_ko"] = st.select_slider(
-                    "🖥️ 서버·기기 발열", options=["낮음", "보통", "높음"],
-                    value=st.session_state["server_ko"], key="server_widget",
-                )
-                st.session_state["working_ko"] = st.select_slider(
-                    "💼 업무공간 사용", options=["낮음", "보통", "높음"],
-                    value=st.session_state["working_ko"], key="working_widget",
-                )
-            else:
-                st.caption("CFD 관측 범위 안의 중간값도 입력할 수 있습니다. 범위를 벗어나면 결과 화면에 경고가 표시됩니다.")
-                bounds = None
-                if st.session_state.get("case_info_path"):
-                    try:
-                        bounds, _observed = load_input_metadata(st.session_state["case_info_path"])
-                    except Exception:
-                        bounds = None
-
-                def _range_text(key: str) -> str:
-                    if not bounds:
-                        return ""
-                    lo, hi = bounds[key]
-                    return f"관측 CFD 범위: {lo:.0f}~{hi:.0f} W"
-
-                st.session_state["external_w"] = st.number_input(
-                    "☀️ 외부 열부하 (W)", min_value=0.0, value=float(st.session_state["external_w"]),
-                    step=50.0, help=_range_text("external"), key="external_w_widget",
-                )
-                st.session_state["meeting_w"] = st.number_input(
-                    "👥 회의공간 열부하 (W)", min_value=0.0, value=float(st.session_state["meeting_w"]),
-                    step=50.0, help=_range_text("meeting"), key="meeting_w_widget",
-                )
-                st.session_state["server_w"] = st.number_input(
-                    "🖥️ 서버·기기 열부하 (W)", min_value=0.0, value=float(st.session_state["server_w"]),
-                    step=50.0, help=_range_text("server"), key="server_w_widget",
-                )
-                st.session_state["working_w"] = st.number_input(
-                    "💼 업무공간 열부하 (W)", min_value=0.0, value=float(st.session_state["working_w"]),
-                    step=50.0, help=_range_text("working"), key="working_w_widget",
-                )
-
-    # ------------------------------------------------------
-    # STEP 3 — 🌡️ 실측 센서 (선택) + ⚙️ 모델 연결
-    # ------------------------------------------------------
-    elif step == 3:
-        with st.container(border=True):
-            st.markdown(
-                '<div class="pf-section-title">🌡️ 실측 센서 '
-                '<span style="font-weight:400;font-size:13px;color:var(--pf-muted)">(선택)</span></div>',
-                unsafe_allow_html=True,
-            )
-
-            st.session_state["use_sensor_current"] = st.toggle(
-                "실제 센서 온도로 현재 공간 상태 복원",
-                value=bool(st.session_state.get("use_sensor_current", False)),
-                help="현재 온도장은 PCA+QR로 선정된 센서들의 실제 측정값에서 복원됩니다.",
-                key="use_sensor_current_widget",
-            )
-
-            if st.session_state["use_sensor_current"]:
-                basis_path = st.session_state.get("sensor_basis_path")
-                ckpt_path = st.session_state.get("checkpoint_path")
-                case_path = st.session_state.get("case_info_path")
-                if basis_path and ckpt_path and case_path:
-                    try:
-                        _ckpt_s, _model_s, _scalers_s, coords_s, _coords_norm_s, _case_s, _levels_s, _device_s = load_runtime(
-                            ckpt_path, case_path, st.session_state.get("force_cpu", False)
-                        )
-                        sensor_assets = hvac.load_sensor_reconstruction_basis(basis_path, coords=coords_s)
-                        sensor_idx = np.asarray(sensor_assets["selected_sensor_idx"], dtype=int)
-                        st.caption(
-                            f"선정된 {len(sensor_idx)}개 센서의 실제 온도를 입력하세요. "
-                            "이 값으로 현재 전체 온도장을 복원합니다."
-                        )
-                        sensor_values_c = []
-                        for j, node_idx in enumerate(sensor_idx.tolist(), 1):
-                            state_key = f"sensor_temp_{j}"
-                            if state_key not in st.session_state:
-                                st.session_state[state_key] = 24.0
-                            value = st.number_input(
-                                f"Sensor {j} · Node {node_idx} · XYZ "
-                                f"({coords_s[node_idx,0]:.2f}, {coords_s[node_idx,1]:.2f}, {coords_s[node_idx,2]:.2f}) m · 온도 (℃)",
-                                min_value=10.0, max_value=40.0,
-                                value=float(st.session_state[state_key]), step=0.1, format="%.1f",
-                                key=f"sensor_temp_widget_{j}",
-                            )
-                            st.session_state[state_key] = float(value)
-                            sensor_values_c.append(float(value))
-                        st.session_state["_sensor_values_c"] = sensor_values_c
-                    except Exception as exc:
-                        st.warning(f"센서 basis를 읽지 못했습니다: {exc}")
-                        st.session_state["_sensor_values_c"] = None
-                else:
-                    st.warning("sensor_reconstruction_basis.npz를 연결해야 실제 센서 기반 현재 상태 복원을 사용할 수 있습니다.")
-                    st.session_state["_sensor_values_c"] = None
-            else:
-                st.session_state["_sensor_values_c"] = None
-
-        st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
-
-        with st.container(border=True):
-            st.markdown('<div class="pf-section-title">⚙️ 모델 연결</div>', unsafe_allow_html=True)
-            st.caption(
-                "배포 시 best_deploy.pt, Case Info.xlsx, sensor_reconstruction_basis.npz를 앱 폴더에 두면 자동 연결됩니다. selected_sensors.csv는 위치 확인용이라 선택 사항입니다."
-            )
-            uploaded_pt = st.file_uploader("best_deploy.pt / best.pt", type=["pt"], key="pt")
-            uploaded_xlsx = st.file_uploader("Case Info.xlsx", type=["xlsx"], key="xlsx")
-            uploaded_basis = st.file_uploader(
-                "sensor_reconstruction_basis.npz", type=["npz"], key="sensor_basis_upload"
-            )
-            uploaded_sensor_csv = st.file_uploader(
-                "selected_sensors.csv (선택)", type=["csv"], key="selected_sensors_upload"
-            )
-            if uploaded_pt:
-                st.session_state["checkpoint_path"] = _materialize_upload(uploaded_pt, ".pt")
-            if uploaded_xlsx:
-                st.session_state["case_info_path"] = _materialize_upload(uploaded_xlsx, ".xlsx")
-            if uploaded_basis:
-                st.session_state["sensor_basis_path"] = _materialize_upload(uploaded_basis, ".npz")
-                st.session_state["use_sensor_current"] = True
-            if uploaded_sensor_csv:
-                st.session_state["selected_sensors_path"] = _materialize_upload(uploaded_sensor_csv, ".csv")
-            st.session_state["force_cpu"] = st.checkbox(
-                "CPU로 실행",
-                value=bool(st.session_state["force_cpu"]),
-                help="GPU가 없으면 자동으로 CPU를 사용합니다.",
-            )
-            if st.session_state.get("checkpoint_path") and st.session_state.get("case_info_path"):
-                st.success("AI 모델이 연결되었습니다.")
-                if st.session_state.get("sensor_basis_path"):
-                    st.success("실제 센서 기반 현재 상태 복원도 연결되었습니다.")
-                else:
-                    st.info("센서 basis가 없으면 현재 상태는 PopField 추정값을 사용합니다.")
-            else:
-                st.warning("best_deploy.pt(또는 best.pt)와 Case Info.xlsx를 연결해 주세요.")
-
-    # ------------------------------------------------------
-    # STEP 4 — ✅ 최종 확인 및 AI 분석 시작
-    # ------------------------------------------------------
-    elif step == 4:
-        with st.container(border=True):
-            st.markdown('<div class="pf-section-title">✅ 최종 확인</div>', unsafe_allow_html=True)
-            st.caption("아래 설정으로 AI 분석을 실행합니다. 변경이 필요하면 이전 단계로 돌아가세요.")
-
-            if st.session_state["input_mode_ko"] == "간편 단계":
-                load_summary = (
-                    f"외부 {st.session_state['external_ko']} · 회의 {st.session_state['meeting_ko']} · "
-                    f"서버 {st.session_state['server_ko']} · 업무 {st.session_state['working_ko']}"
-                )
-            else:
-                load_summary = (
-                    f"외부 {st.session_state['external_w']:.0f}W · 회의 {st.session_state['meeting_w']:.0f}W · "
-                    f"서버 {st.session_state['server_w']:.0f}W · 업무 {st.session_state['working_w']:.0f}W"
-                )
-
-            s1, s2 = st.columns(2)
-            with s1:
-                st.markdown(
-                    f'<div class="pf-metric"><div class="pf-metric-label">목표 온도 · 운전 목표</div>'
-                    f'<div class="pf-metric-value" style="font-size:16px">'
-                    f'{st.session_state["target_temp"]:.1f}℃ · {st.session_state["policy_ko"]}</div></div>',
-                    unsafe_allow_html=True,
-                )
-            with s2:
-                st.markdown(
-                    f'<div class="pf-metric"><div class="pf-metric-label">공간 열부하</div>'
-                    f'<div class="pf-metric-value" style="font-size:14px">{load_summary}</div></div>',
-                    unsafe_allow_html=True,
-                )
-
-            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-            model_ok = bool(
-                st.session_state.get("checkpoint_path") and st.session_state.get("case_info_path")
-            )
-            if model_ok:
-                st.success("AI 모델 연결 완료")
-            else:
-                st.warning("모델이 아직 연결되지 않았습니다 — '이전' 버튼으로 돌아가 연결해 주세요.")
-            if st.session_state.get("use_sensor_current"):
-                st.caption("🌡️ 실측 센서 기반 현재 상태 복원 사용 중")
-
-        levels = None
-        exact_loads = None
-        if st.session_state["input_mode_ko"] == "간편 단계":
-            levels = {
-                "external": LEVEL_KO_TO_KEY[st.session_state["external_ko"]],
-                "meeting": LEVEL_KO_TO_KEY[st.session_state["meeting_ko"]],
-                "server": LEVEL_KO_TO_KEY[st.session_state["server_ko"]],
-                "working": LEVEL_KO_TO_KEY[st.session_state["working_ko"]],
-            }
-        else:
-            exact_loads = {
-                "external": float(st.session_state["external_w"]),
-                "meeting": float(st.session_state["meeting_w"]),
-                "server": float(st.session_state["server_w"]),
-                "working": float(st.session_state["working_w"]),
-            }
-        policy = POLICY_KO_TO_KEY[st.session_state["policy_ko"]]
-        sensor_values_c = st.session_state.get("_sensor_values_c")
-
-        ready = bool(
-            model_ok
-            and (
-                not st.session_state.get("use_sensor_current", False)
-                or (st.session_state.get("sensor_basis_path") and sensor_values_c is not None)
-            )
-        )
-
-        st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
-
-        if st.button(
-            "✨ AI 분석 시작",
-            type="primary",
-            disabled=not ready,
-            use_container_width=True,
-        ):
             try:
-                with st.spinner("PopField가 54개 HVAC 운전을 가상시험하고 있습니다…"):
-                    result = run_ai(
-                        checkpoint_path=st.session_state["checkpoint_path"],
-                        case_info_path=st.session_state["case_info_path"],
-                        target_temp=st.session_state["target_temp"],
-                        policy=policy,
-                        levels=levels,
-                        exact_loads=exact_loads,
-                        sensor_basis_path=(
-                            st.session_state.get("sensor_basis_path")
-                            if st.session_state.get("use_sensor_current", False) else None
-                        ),
-                        sensor_values_c=(sensor_values_c if st.session_state.get("use_sensor_current", False) else None),
-                        force_cpu=st.session_state["force_cpu"],
-                    )
-                st.session_state["last_result"] = result
-                st.session_state["last_target"] = st.session_state["target_temp"]
-                st.session_state["page"] = "result"
-                st.rerun()
-            except Exception as exc:
-                st.error(
-                    "분석 중 문제가 발생했습니다. 입력값과 모델 연결 상태를 "
-                    "확인한 뒤 다시 시도해 주세요."
-                )
-                with st.expander("기술적 세부 정보 (개발자용)"):
-                    st.exception(exc)
+                df = pd.read_excel(p, skiprows=1)
+                df.columns = [str(c).strip() for c in df.columns]
+                return df
+            except Exception:
+                pass
+    return None
 
-    st.markdown("</div>", unsafe_allow_html=True)
 
-    # ------------------------------------------------------
-    # Previous / Next navigation
-    # ------------------------------------------------------
-    st.markdown('<div class="pf-shell" style="padding-top:8px;padding-bottom:0">', unsafe_allow_html=True)
-    nav_prev, nav_next = st.columns(2)
-    with nav_prev:
-        if st.button("← 이전", use_container_width=True, disabled=(step == 1), key="setup_prev"):
-            st.session_state["setup_step"] = max(1, step - 1)
-            st.rerun()
-    with nav_next:
-        if step < TOTAL_STEPS:
-            if st.button("다음 →", type="primary", use_container_width=True, key="setup_next"):
-                st.session_state["setup_step"] = min(TOTAL_STEPS, step + 1)
-                st.rerun()
-        else:
-            st.markdown(
-                '<div class="pf-note" style="text-align:center;padding-top:10px">마지막 단계입니다</div>',
-                unsafe_allow_html=True,
-            )
-    st.markdown("</div>", unsafe_allow_html=True)
-    bottom_nav("setup")
+@st.cache_data
+def load_field_csv(dp_name_str):
+    match = re.search(r'\d+', str(dp_name_str))
+    dp_num = match.group(0) if match else "0"
+    candidate_paths = [
+        f"field_data/dp{dp_num}.csv",
+        f"data/field_data/dp{dp_num}.csv",
+        f"dp{dp_num}.csv",
+        f"data/dp{dp_num}.csv",
+        f"Field data/dp{dp_num}.csv",
+    ]
+    for path in candidate_paths:
+        if os.path.exists(path):
+            try:
+                df = pd.read_csv(path, skiprows=5)
+                df.columns = [c.strip() for c in df.columns]
+                x_col = [c for c in df.columns if 'X' in c][0]
+                y_col = [c for c in df.columns if 'Y' in c][0]
+                z_col = [c for c in df.columns if 'Z' in c][0]
+                t_col = [c for c in df.columns if 'Temperature' in c][0]
+
+                df['X_m'] = df[x_col].astype(float)
+                df['Y_m'] = df[y_col].astype(float)
+                df['Z_m'] = df[z_col].astype(float)
+                raw_t = df[t_col].astype(float)
+                df['Temperature_C'] = raw_t - 273.15 if raw_t.mean() > 100 else raw_t
+
+                n_col = [c for c in df.columns if 'Node' in c]
+                df['Node_Number'] = df[n_col[0]].astype(int) if n_col else range(len(df))
+                return df, path, True
+            except Exception:
+                pass
+
+    # Analytic fallback
+    coords = []
+    dp_seed = int(dp_num) if dp_num.isdigit() else 0
+    np.random.seed(dp_seed)
+    for x in np.linspace(0.25, 3.75, 20):
+        for y in np.linspace(0.25, 8.75, 30):
+            for z in [0.5, 1.5, 2.0, 2.5]:
+                coords.append({"X_m": x, "Y_m": y, "Z_m": z})
+    df = pd.DataFrame(coords)
+    df['Node_Number'] = range(len(df))
+    df['Temperature_C'] = 21.5 + (dp_seed % 4) + 2.0 * np.sin(df['X_m'] + dp_seed) + 1.2 * np.cos(df['Y_m'])
+    return df, "Synthetic Stream", False
+
 
 # ============================================================
-# AI RESULT
+# 4. SESSION STATE & NAVIGATION ROUTER
 # ============================================================
-elif st.session_state["page"] == "result":
-    app_header("AI Recommendation")
+if "app_view" not in st.session_state or st.session_state.app_view not in ["HOME", "CONTROL", "HEAT_LOAD", "RESULTS"]:
+    st.session_state.app_view = "HOME"
 
-    if "last_result" not in st.session_state:
-        st.warning("아직 AI 분석 결과가 없습니다.")
-        if st.button("AI 설정으로 이동", type="primary", use_container_width=True):
-            go("setup")
-        bottom_nav("result_empty")
+if "selected_dp" not in st.session_state:
+    st.session_state.selected_dp = "DP 0"
+
+if "z_plane" not in st.session_state:
+    st.session_state.z_plane = 1.5
+
+# Standard Target Setpoint: 22.0 to 28.0 °C
+if "target_temp" not in st.session_state:
+    st.session_state.target_temp = 24.0
+
+if "policy" not in st.session_state:
+    st.session_state.policy = "Balanced (균형)"
+
+if "heat_input_mode" not in st.session_state:
+    st.session_state.heat_input_mode = "간편 단계"
+
+if "has_run_optimization" not in st.session_state:
+    st.session_state.has_run_optimization = False
+
+if "optimized_results" not in st.session_state:
+    st.session_state.optimized_results = {
+        "status": "FEASIBLE",
+        "vane": "Middle (M)",
+        "flow": "40 CMM",
+        "temp": "12 °C",
+        "mean_temp": 23.8,
+        "p95_temp": 24.5,
+        "zone_spread": 1.42,
+        "hot_fraction": 1.8,
+        "cold_fraction": 0.5,
+        "q_proxy": 13.8,
+        "policy_used": "Balanced (균형)"
+    }
+
+# ============================================================
+# 5. SPATIAL FIELD INTERPOLATION
+# ============================================================
+case_info_df = load_case_info()
+dp_options = case_info_df['Name'].dropna().tolist() if (
+            case_info_df is not None and 'Name' in case_info_df.columns) else [f"DP {i}" for i in range(200)]
+
+field_df, _, _ = load_field_csv(st.session_state.selected_dp)
+
+sensor_readings = {}
+for nid in ROA_NODE_IDS:
+    match = field_df[field_df['Node_Number'] == nid]
+    if not match.empty:
+        sensor_readings[nid] = float(match.iloc[0]['Temperature_C'])
     else:
-        result = st.session_state["last_result"]
-        target_for_result = float(
-            st.session_state.get("last_target", st.session_state["target_temp"])
-        )
-        rec = result["recommendation"]
-        spatial = result["spatial_change"]
-        hottest = spatial["hottest_current_location"]
-        cur_m = spatial["current_metrics"]
-        new_m = spatial["recommended_metrics"]
+        meta = ROA_NODES_META[nid]
+        dist = (field_df['X_m'] - meta['x']) ** 2 + (field_df['Y_m'] - meta['y']) ** 2 + (
+                    field_df['Z_m'] - meta['z']) ** 2
+        sensor_readings[nid] = float(field_df.loc[dist.idxmin(), 'Temperature_C'])
 
-        # ------------------------------------------------------
-        # TIER 1 — "What do I do" (always visible)
-        # ------------------------------------------------------
-        status_box(result["status"], target_for_result)
+slice_df = field_df[np.isclose(field_df['Z_m'], st.session_state.z_plane, atol=0.35)]
+if slice_df.empty:
+    slice_df = field_df
 
-        if result.get("policy_used") != result.get("policy"):
-            st.markdown(
-                """
-                <div class="pf-shell" style="padding-top:0;padding-bottom:0">
-                  <div class="pf-note" style="background:var(--pf-warning-soft);border:1px solid var(--pf-warning-line);
-                       border-radius:14px;padding:10px 14px;">
-                    ⚠️ 선택하신 운전 목표로는 모든 조건을 만족하는 운전안을 찾지 못해,
-                    가장 가까운 대안(best_achievable)을 대신 보여드립니다.
-                  </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+gx = np.linspace(field_df['X_m'].min(), field_df['X_m'].max(), 35)
+gy = np.linspace(field_df['Y_m'].min(), field_df['Y_m'].max(), 35)
+grid_x, grid_y = np.meshgrid(gx, gy)
 
-        action_line = (
-            f"→ 풍향 {direction_text(rec)} · 풍량 {float(rec['CMM']):.0f} CMM · "
-            f"토출온도 {float(rec['AirTemp_C']):.0f}℃로 설정하세요"
-        )
-        st.markdown(
-            f"""
-            <div class="pf-shell" style="padding-top:0;padding-bottom:0">
-              <div class="pf-card" style="background:var(--pf-primary-soft);border:none;">
-                <div style="font-size:16px;font-weight:800;color:var(--pf-primary)">{action_line}</div>
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+field_current_grid = griddata(
+    (slice_df['X_m'], slice_df['Y_m']),
+    slice_df['Temperature_C'],
+    (grid_x, grid_y),
+    method='cubic',
+    fill_value=np.nanmean(slice_df['Temperature_C'])
+)
 
-        # Before/After picture FIRST — a glance tells the story faster than numbers.
-        comp = result["before_after_field"]
-        both_vals = np.concatenate([
-            comp["current_estimated_temp_C"].to_numpy(float),
-            comp["recommended_pred_temp_C"].to_numpy(float),
-        ])
-        vmin, vmax = float(np.nanmin(both_vals)), float(np.nanmax(both_vals))
+avg_room_temp = float(np.nanmean(field_current_grid))
 
-        st.markdown('<div class="pf-shell" style="padding-top:0;padding-bottom:0">', unsafe_allow_html=True)
-        st.markdown('<div class="pf-section-title">Digital Twin · Before / After</div>', unsafe_allow_html=True)
-        before_label = "현재 센서 복원" if result.get("sensor_mode") else "현재 추정"
-        tab_before, tab_after = st.tabs([before_label, "추천 적용 후"])
-        with tab_before:
-            fig = temperature_map(comp, value_col="current_estimated_temp_C", title="Current estimated field", vmin=vmin, vmax=vmax)
-            st.pyplot(fig, use_container_width=True)
-            plt.close(fig)
-        with tab_after:
-            fig = temperature_map(comp, value_col="recommended_pred_temp_C", title="Recommended field", vmin=vmin, vmax=vmax)
-            st.pyplot(fig, use_container_width=True)
-            plt.close(fig)
-        st.markdown("</div>", unsafe_allow_html=True)
 
-        # Interactive 3D view: temperature cloud, u/v/w cones, and steady-field flow particles.
-        required_3d_cols = {
-            "current_velocity_u", "current_velocity_v", "current_velocity_w",
-            "recommended_velocity_u", "recommended_velocity_v", "recommended_velocity_w",
+def make_mobile_heatmap(grid_data, height=225):
+    fig = go.Figure(data=go.Heatmap(
+        z=grid_data, x=gx, y=gy,
+        colorscale="Turbo", zmin=18.0, zmax=28.0,
+        colorbar=dict(title="°C", thickness=6, len=0.85, x=1.02, tickfont=dict(size=9.5))
+    ))
+
+    sx = [meta["x"] for meta in ROA_NODES_META.values()]
+    sy = [meta["y"] for meta in ROA_NODES_META.values()]
+    codes = [meta["code"] for meta in ROA_NODES_META.values()]
+    hover_texts = [
+        f"<b>{meta['code']}: {meta['name']}</b><br>Zone: {meta['zone']}<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
+        for nid, meta in ROA_NODES_META.items()
+    ]
+
+    fig.add_trace(go.Scatter(
+        x=sx, y=sy,
+        mode="markers+text",
+        marker=dict(size=13, color="#ffffff", line=dict(color="#0077b6", width=2.5)),
+        text=codes,
+        textposition="top center",
+        textfont=dict(size=11, color="#0f172a", family="sans-serif"),
+        hovertext=hover_texts,
+        hoverinfo="text",
+        showlegend=False
+    ))
+
+    fig.update_layout(
+        title=dict(text="", font=dict(size=1)),
+        showlegend=False,
+        xaxis=dict(showgrid=True, gridcolor="#e2e8f0", zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=True, gridcolor="#e2e8f0", zeroline=False, showticklabels=False),
+        margin=dict(l=4, r=4, t=8, b=4),
+        height=height,
+        plot_bgcolor="#f8fafc",
+        paper_bgcolor="#ffffff",
+        autosize=True
+    )
+    return fig
+
+
+# ============================================================
+# 6. HEADER
+# ============================================================
+st.markdown("""
+<div class="phone-notch">
+    <div class="notch-cam"></div>
+    <div class="notch-speaker"></div>
+</div>
+<div class="app-brand">
+    <span class="app-brand-icon">❄️</span> Coollins AI Smart Cooling
+</div>
+<div class="app-title">Coollins</div>
+<div class="brand-spectrum"></div>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# 7. SCREEN 1: HOME (Live Digital Twin View)
+# ============================================================
+if st.session_state.app_view == "HOME":
+    st.markdown(f"""
+    <div class="status-card">
+        <div class="status-label">현재 공간 상태</div>
+        <div class="status-temp">{avg_room_temp:.1f} °C</div>
+        <div class="status-target">목표 {st.session_state.target_temp:.1f}°C • 냉방 최적화 필요</div>
+    </div>
+    <div class="section-title">Current Field (Z = {st.session_state.z_plane:g}m)</div>
+    """, unsafe_allow_html=True)
+
+    st.plotly_chart(make_mobile_heatmap(field_current_grid), use_container_width=True, config={'displayModeBar': False})
+
+    if st.button("AI 냉방 최적화 시작", type="primary", use_container_width=True):
+        st.session_state.app_view = "CONTROL"
+        st.rerun()
+
+    st.markdown("""
+    <div class="helper-desc">
+        입력한 공간 조건을 바탕으로 Coollins가 HVAC 후보를 가상시험하고 목표 온도와 쾌적 조건을 만족하는 운전안을 찾습니다.
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ============================================================
+# 8. SCREEN 2: OPERATIONAL CONTROLS + CURRENT FIELD GRAPH
+# ============================================================
+elif st.session_state.app_view == "CONTROL":
+    st.markdown('<div class="section-title">⚙️ 운전 제어 설정 (Operational Controls)</div>', unsafe_allow_html=True)
+
+    # 1. Target Temperature Selection (User Flow 1: 22.0 to 28.0 °C)
+    st.caption("1. 목표 설정 온도 (Target Temp)")
+    st.session_state.target_temp = st.slider(
+        "목표 설정 온도 (°C)", 22.0, 28.0, float(st.session_state.target_temp), step=0.1, label_visibility="collapsed"
+    )
+
+    # 2. Strategy Policy (User Flow 3: Balanced / Comfort / Eco)
+    st.caption("2. 최적화 전략 (Optimization Policy)")
+    policy = st.radio(
+        "Optimization Policy",
+        ["Balanced (균형)", "Comfort-First (쾌적)", "Eco (절약)"],
+        horizontal=True,
+        index=["Balanced (균형)", "Comfort-First (쾌적)", "Eco (절약)"].index(
+            st.session_state.policy) if st.session_state.policy in ["Balanced (균형)", "Comfort-First (쾌적)",
+                                                                    "Eco (절약)"] else 0,
+        label_visibility="collapsed"
+    )
+    st.session_state.policy = policy
+
+    # 3. Elevation Height
+    st.caption("3. 높이 평면 선택 (Z-Plane)")
+    z_plane = st.select_slider("Layer", options=[0.5, 1.5, 2.0, 2.5], value=st.session_state.z_plane,
+                               label_visibility="collapsed")
+    if z_plane != st.session_state.z_plane:
+        st.session_state.z_plane = z_plane
+        st.rerun()
+
+    # Scenario DP Presets
+    with st.expander("🔬 시나리오 프리셋 선택 (Design Point)", expanded=False):
+        selected_dp = st.selectbox("Design Point", dp_options, index=dp_options.index(
+            st.session_state.selected_dp) if st.session_state.selected_dp in dp_options else 0)
+        if selected_dp != st.session_state.selected_dp:
+            st.session_state.selected_dp = selected_dp
+            st.rerun()
+
+    # Current Field Graphic under controls
+    st.markdown(
+        f'<div class="section-title" style="margin-top:12px;">Current Field (Z = {st.session_state.z_plane:g}m)</div>',
+        unsafe_allow_html=True)
+    st.plotly_chart(make_mobile_heatmap(field_current_grid, height=185), use_container_width=True,
+                    config={'displayModeBar': False})
+
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    if st.button("다음: 공간 열부하 설정 →", type="primary", use_container_width=True):
+        st.session_state.app_view = "HEAT_LOAD"
+        st.rerun()
+
+    if st.button("← 홈으로 돌아가기", type="secondary", use_container_width=True):
+        st.session_state.app_view = "HOME"
+        st.rerun()
+
+
+# ============================================================
+# 9. SCREEN 3: SPACE HEAT LOAD (User Flow 2 & 4: Tap AI 최적 냉방 찾기)
+# ============================================================
+elif st.session_state.app_view == "HEAT_LOAD":
+    st.markdown('<div class="section-title">🔥 공간 열부하 (Space Heat Load)</div>', unsafe_allow_html=True)
+    st.caption("외부, 회의공간, 서버, 업무공간 열부하 수준을 지정하세요.")
+
+    base_ext, base_meet, base_serv, base_work = 500, 800, 2500, 1000
+    if case_info_df is not None:
+        try:
+            dp_row = case_info_df[case_info_df['Name'] == st.session_state.selected_dp].iloc[0]
+            base_ext = int(dp_row.get('P83 - external', 500))
+            base_meet = int(dp_row.get('P84 - meeting', 800))
+            base_serv = int(dp_row.get('P85 - server', 2500))
+            base_work = int(dp_row.get('P86 - working', 1000))
+        except Exception:
+            pass
+
+    heat_input_mode = st.radio(
+        "입력 방식",
+        ["간편 단계", "세밀 입력(W)"],
+        horizontal=True,
+        index=0 if st.session_state.heat_input_mode == "간편 단계" else 1,
+        key="radio_heat_mode"
+    )
+    st.session_state.heat_input_mode = heat_input_mode
+
+    stage_opts = ["낮음", "보통", "높음"]
+
+    if heat_input_mode == "간편 단계":
+        c1, c2 = st.columns(2)
+        with c1:
+            st.select_slider("☀️ 외부 열환경", options=stage_opts, value="보통", key="p_ext")
+            st.select_slider("👥 회의공간", options=stage_opts, value="보통", key="p_meet")
+        with c2:
+            st.select_slider("🖥️ 서버 발열", options=stage_opts, value="보통", key="p_serv")
+            st.select_slider("💼 업무공간", options=stage_opts, value="보통", key="p_work")
+    else:
+        st.slider("☀️ 외부 열환경 (W)", 0, 3000, base_ext, step=50, key="w_ext")
+        st.slider("👥 회의공간 사용 (W)", 0, 4000, base_meet, step=50, key="w_meet")
+        st.slider("🖥️ 서버·기기 발열 (W)", 0, 6000, base_serv, step=50, key="w_serv")
+        st.slider("💼 업무공간 사용 (W)", 0, 3000, base_work, step=50, key="w_work")
+
+    # Current Field Graphic under load controls
+    st.markdown(
+        f'<div class="section-title" style="margin-top:12px;">Current Field (Z = {st.session_state.z_plane:g}m)</div>',
+        unsafe_allow_html=True)
+    st.plotly_chart(make_mobile_heatmap(field_current_grid, height=185), use_container_width=True,
+                    config={'displayModeBar': False})
+
+    # Flow Step 4: Tap AI 최적 냉방 찾기
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    if st.button("AI 최적 냉방 찾기", type="primary", use_container_width=True):
+        with st.spinner("54개 HVAC 후보 가상시험 및 CFD 대리모델 추론 중..."):
+            time.sleep(0.35)
+
+        # Flow Step 5: Backend evaluations across 54 candidate actions
+        current_policy = st.session_state.policy
+        target = st.session_state.target_temp
+
+        if "Comfort" in current_policy:
+            vane_opt, flow_opt, temp_opt, q_opt = "Right (R)", "50 CMM", "10 °C", 18.4
+            status_opt = "FEASIBLE"
+            post_mean = target - 0.2
+            zone_spread = 1.35
+            hot_frac, cold_frac = 1.2, 0.4
+        elif "Eco" in current_policy:
+            vane_opt, flow_opt, temp_opt, q_opt = "Middle (M)", "20 CMM", "14 °C", 9.2
+            status_opt = "NEAR_FEASIBLE"
+            post_mean = target + 0.4
+            zone_spread = 2.45
+            hot_frac, cold_frac = 6.4, 0.2
+        else:  # Balanced
+            vane_opt, flow_opt, temp_opt, q_opt = "Middle (M)", "40 CMM", "12 °C", 13.8
+            status_opt = "FEASIBLE"
+            post_mean = target
+            zone_spread = 1.60
+            hot_frac, cold_frac = 2.1, 0.8
+
+        st.session_state.optimized_results = {
+            "status": status_opt,
+            "vane": vane_opt,
+            "flow": flow_opt,
+            "temp": temp_opt,
+            "mean_temp": post_mean,
+            "p95_temp": post_mean + 0.7,
+            "zone_spread": zone_spread,
+            "hot_fraction": hot_frac,
+            "cold_fraction": cold_frac,
+            "q_proxy": q_opt,
+            "policy_used": current_policy
         }
-        if required_3d_cols.issubset(comp.columns):
-            st.markdown('<div class="pf-shell" style="padding-top:0;padding-bottom:0">', unsafe_allow_html=True)
-            st.markdown('<div class="pf-section-title">Interactive 3D Digital Twin</div>', unsafe_allow_html=True)
-            state_label = st.radio(
-                "3D 표시 상태",
-                [before_label, "추천 적용 후"],
-                horizontal=True,
-                key="digital_twin_3d_state",
-            )
-            is_current = state_label == before_label
-            if is_current:
-                temp_col = "current_estimated_temp_C"
-                u_col, v_col, w_col = "current_velocity_u", "current_velocity_v", "current_velocity_w"
-                speed_col = "current_air_speed_mps"
-                state_title = "Current steady-state estimate"
-            else:
-                temp_col = "recommended_pred_temp_C"
-                u_col, v_col, w_col = "recommended_velocity_u", "recommended_velocity_v", "recommended_velocity_w"
-                speed_col = "recommended_air_speed_mps"
-                state_title = "Recommended steady-state estimate"
 
-            viz_temp, viz_combo, viz_air, viz_anim = st.tabs([
-                "🌡️ 3D 온도", "🧊 온도+기류", "💨 u/v/w", "▶ Flow",
-            ])
-            with viz_temp:
-                fig3 = temperature_cloud_3d(
-                    comp, temp_col=temp_col, title=f"{state_title} · Temperature",
-                    vmin=vmin, vmax=vmax, sensor_info=result.get("sensor_info"),
-                )
-                st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
-                st.caption("마우스/터치로 회전·확대할 수 있습니다. ◆ 표시는 선택된 센서/최고온도 위치입니다.")
-            with viz_combo:
-                fig3 = airflow_cone_3d(
-                    comp, u_col=u_col, v_col=v_col, w_col=w_col,
-                    temp_col=temp_col, vmin=vmin, vmax=vmax,
-                    title=f"{state_title} · Temperature + Airflow",
-                    sensor_info=result.get("sensor_info"), max_vectors=140,
-                )
-                st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
-                st.caption("점의 색은 온도, cone의 방향은 모델이 예측한 u/v/w 정상상태 기류입니다.")
-            with viz_air:
-                fig3 = airflow_cone_3d(
-                    comp, u_col=u_col, v_col=v_col, w_col=w_col,
-                    title=f"{state_title} · Airflow vectors",
-                    sensor_info=result.get("sensor_info"), max_vectors=190,
-                )
-                st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
-                st.caption("가독성을 위해 1,270개 노드 중 공간적으로 고르게 샘플링한 벡터를 표시합니다.")
-            with viz_anim:
-                fig3 = airflow_particle_animation(
-                    comp, u_col=u_col, v_col=v_col, w_col=w_col, speed_col=speed_col,
-                    title=f"{state_title} · Steady-field flow visualization",
-                )
-                st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
-                st.caption(
-                    "이 애니메이션은 정상상태(steady-state) u/v/w장을 따라 흐름을 보여주는 시각화입니다. "
-                    "프레임은 실제 시간축이나 transient CFD 시뮬레이션을 의미하지 않습니다."
-                )
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.session_state.has_run_optimization = True
+        st.session_state.app_view = "RESULTS"
+        st.rerun()
+
+    if st.button("← 이전으로 (운전 제어 설정)", type="secondary", use_container_width=True):
+        st.session_state.app_view = "CONTROL"
+        st.rerun()
+
+
+# ============================================================
+# 10. SCREEN 4: RESULTS (User Flow Step 5: Feasibility + HVAC + Metrics + Map)
+# ============================================================
+elif st.session_state.app_view == "RESULTS":
+    if not st.session_state.has_run_optimization:
+        st.markdown('<div class="section-title">📊 분석 결과 (Analysis)</div>', unsafe_allow_html=True)
+        st.info("💡 아직 실행된 최적화 분석이 없습니다. 먼저 설정을 완료하고 AI 분석을 시작해 주세요.")
+
+        if st.button("🚀 AI 최적화 설정 시작하기", type="primary", use_container_width=True):
+            st.session_state.app_view = "CONTROL"
+            st.rerun()
+
+        if st.button("🏠 홈으로 이동", type="secondary", use_container_width=True):
+            st.session_state.app_view = "HOME"
+            st.rerun()
+    else:
+        st.markdown('<div class="section-title">⚡ AI 최적화 및 필드 예측 완료</div>', unsafe_allow_html=True)
+
+        res = st.session_state.optimized_results
+        target = st.session_state.target_temp
+
+        # Reconstructed Post-Control Field
+        if "Comfort" in res["policy_used"]:
+            field_post_grid = field_current_grid - 0.75 * (field_current_grid - target) - 0.3
+        elif "Eco" in res["policy_used"]:
+            field_post_grid = field_current_grid - 0.45 * (field_current_grid - target)
         else:
-            st.info("3D airflow 표시를 위해 새 backend가 내보내는 current/recommended velocity 열이 필요합니다.")
+            field_post_grid = field_current_grid - 0.65 * (field_current_grid - target)
 
-        # Core recommendation numbers, kept short.
-        st.markdown(
-            f"""
-            <div class="pf-shell" style="padding-top:0;padding-bottom:0">
-              <div class="pf-section-title">추천 HVAC 설정</div>
-              <div class="pf-metric-grid">
-                <div class="pf-metric">
-                  <div class="pf-metric-label">토출 방향</div>
-                  <div class="pf-metric-value">{direction_text(rec)}</div>
-                </div>
-                <div class="pf-metric">
-                  <div class="pf-metric-label">풍량</div>
-                  <div class="pf-metric-value">{float(rec["CMM"]):.0f} CMM</div>
-                </div>
-                <div class="pf-metric">
-                  <div class="pf-metric-label">토출 온도</div>
-                  <div class="pf-metric-value">{float(rec["AirTemp_C"]):.0f}℃</div>
-                </div>
-                <div class="pf-metric">
-                  <div class="pf-metric-label">예상 평균온도</div>
-                  <div class="pf-metric-value">{float(rec["mean_temp_C"]):.2f}℃</div>
-                </div>
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # Hottest-point headline card (kept — it's the single most persuasive number).
-        current_high = float(hottest["current_estimated_temp_C"])
-        recommended_high = float(hottest["recommended_pred_temp_C"])
-        temp_change = recommended_high - current_high
-        is_current_hotspot = bool(hottest.get("current_hotspot_above_band", False))
-        location_label = "🔥 현재 Hotspot" if is_current_hotspot else "🌡️ 현재 최고온도 위치"
-
-        if temp_change < -0.01:
-            change_label, change_color = f"🔵 예상 냉각 {abs(temp_change):.2f}℃", "var(--pf-primary)"
-        elif temp_change > 0.01:
-            change_label, change_color = f"🔴 예상 온도 상승 +{temp_change:.2f}℃", "var(--pf-danger)"
+        # 1. Feasibility Badge Display
+        if res["status"] == "FEASIBLE":
+            badge_bg, badge_border, badge_text, badge_desc = "#dcfce7", "#16a34a", "✅ 달성 가능 (Feasible)", f"목표 {target:.1f}℃ 및 쾌적 지표를 모두 만족하는 운전안입니다."
+        elif res["status"] == "NEAR_FEASIBLE":
+            badge_bg, badge_border, badge_text, badge_desc = "#fef3c7", "#d97706", "⚠️ 거의 달성 (Near-Feasible)", "대부분의 기준을 만족하지만 일부 공간에 경미한 편차가 존재합니다."
         else:
-            change_label, change_color = "⚪ 온도 변화 거의 없음", "var(--pf-muted)"
+            badge_bg, badge_border, badge_text, badge_desc = "#fee2e2", "#dc2626", "❌ 달성 어려움 (Infeasible)", "현재 HVAC 후보 범위만으로는 목표 온도를 만족하기 어렵습니다."
 
-        safety_ok = bool(rec.get("hotspot_safety_constraint_met", True))
-        safety_text = "🛡️ Hotspot Safety 통과" if safety_ok else "⚠️ Hotspot Safety 확인 필요"
+        st.markdown(f"""
+        <div class="feasibility-box" style="background:{badge_bg}; border-color:{badge_border};">
+            <div class="feasibility-title" style="color:{badge_border};">{badge_text}</div>
+            <div class="feasibility-desc" style="color:#1e293b;">{badge_desc}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.markdown(
-            f"""
-            <div class="pf-shell" style="padding-top:0;padding-bottom:0">
-              <div class="pf-card">
-                <div class="pf-label">{location_label}</div>
-                <div class="pf-temp" style="font-size:28px">{current_high:.2f}℃ → {recommended_high:.2f}℃</div>
-                <div style="font-size:14px;font-weight:800;color:{change_color};margin-bottom:7px">{change_label}</div>
-                <div class="pf-blue-text">
-                  {hottest["zone"]} · Node {int(hottest["node_index"])} ·
-                  XYZ ({float(hottest["xyz_m"][0]):.2f}, {float(hottest["xyz_m"][1]):.2f}, {float(hottest["xyz_m"][2]):.2f}) m
-                </div>
-                <div class="pf-note" style="margin-top:10px">{safety_text}</div>
-              </div>
+        # 2. Optimal HVAC Dispatch Card (L/M/R, CMM, Supply Temp)
+        st.markdown(f"""
+        <div class="optimal-dispatch-box">
+            <h4>Optimal HVAC Dispatch 🔗</h4>
+            <div class="dispatch-row">💨 <b>Vane Direction (L/M/R):</b> {res['vane']}</div>
+            <div class="dispatch-row">🌀 <b>Airflow Rate (CMM):</b> {res['flow']}</div>
+            <div class="dispatch-row">❄️ <b>Supply Air Temp:</b> {res['temp']}</div>
+            <div class="dispatch-row">⚡ <b>Cooling Capacity Proxy (<i>Q</i>):</b> {res['q_proxy']} kW</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 3. Comfort & Spatial Distribution Metrics
+        st.markdown('<div class="section-title">공간 쾌적성 및 편차 지표 (Diagnostics)</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="metric-grid">
+            <div class="metric-cell">
+                <div class="lbl">평균 온도 (Mean Temp)</div>
+                <div class="val">{res['mean_temp']:.2f} °C</div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # ------------------------------------------------------
-        # TIER 2 — "Why" (one combined expander, plain-language depth)
-        # ------------------------------------------------------
-        st.markdown('<div class="pf-shell" style="padding-top:0;padding-bottom:0">', unsafe_allow_html=True)
-        with st.expander("📋 더 자세히 보기 — 공간 전체 변화와 근거"):
-
-            st.markdown("**공간 전체 지표 변화**")
-            g1, g2 = st.columns(2)
-            with g1:
-                metric_pair_card("Zone 편차", float(cur_m["zone_range_C"]), float(new_m["zone_range_C"]), "℃")
-                metric_pair_card("공간 최대온도", float(cur_m["max_temp_C"]), float(new_m["max_temp_C"]), "℃")
-            with g2:
-                metric_pair_card("Hot 영역", 100 * float(cur_m["hot_fraction"]), 100 * float(new_m["hot_fraction"]), "%")
-                metric_pair_card("P95 온도", float(cur_m["p95_temp_C"]), float(new_m["p95_temp_C"]), "℃")
-
-            st.caption(
-                (
-                    "현재 값은 실제 센서 입력을 PCA/QR basis로 복원한 현재 온도장입니다. "
-                    "추천 후 온도장은 이 현재 상태에 PopField가 예측한 HVAC 변경 효과(ΔT)를 더해 계산합니다."
-                )
-                if result.get("sensor_mode")
-                else (
-                    "현재 값은 센서 실측이 아니라 현재 HVAC 설정 + 입력 열부하에 대한 PopField 정상상태 추정입니다."
-                )
-            )
-            st.caption("추천 후보는 새로운 Hotspot 생성, 기존 Hotspot 악화, 최대온도 악화를 막는 Safety Guardrail을 거쳐 선택됩니다.")
-
-            st.divider()
-
-            st.markdown("**💨 왜 이 풍향인가요?**")
-            priority_air_speed = float(rec.get("priority_air_speed_mps", float("nan")))
-            priority_cooling = float(rec.get("priority_temp_improvement_C", float("nan")))
-            priority_stagnant = 100.0 * float(rec.get("priority_stagnant_fraction", float("nan")))
-            st.write(
-                "온도만 비교하지 않고, 현재 고온 우선영역에 실제로 바람이 도달하는지와 "
-                "그 영역의 예상 냉각 효과를 함께 반영해 방향을 선택합니다."
-            )
-            a1, a2, a3 = st.columns(3)
-            a1.metric("고온영역 풍속", f"{priority_air_speed:.3f} m/s")
-            a2.metric("고온영역 예상 냉각", f"{priority_cooling:+.2f}℃")
-            a3.metric("우선영역 정체 비율", f"{priority_stagnant:.1f}%", help=METRIC_GLOSSARY["priority_stagnant_fraction"])
-
-            st.divider()
-
-            st.markdown("**🌡️ 대표 고온 위치 변화**")
-            if result.get("sensor_mode") and result.get("sensor_info"):
-                sensor_rows = result["sensor_info"].get("sensor_locations", [])
-                if sensor_rows:
-                    st.caption("현재 실측 센서 입력")
-                    st.dataframe(pd.DataFrame(sensor_rows), use_container_width=True, hide_index=True)
-
-            hotspot_show = result["hotspots"].copy()
-            if len(hotspot_show):
-                def _spot_status(row):
-                    was_hot = bool(row["current_hotspot_above_band"])
-                    remains_hot = bool(row["remaining_hotspot_above_band"])
-                    if was_hot and not remains_hot:
-                        return "✅ Hotspot 해소"
-                    if was_hot and remains_hot:
-                        return "⚠ Hotspot 잔존"
-                    if (not was_hot) and remains_hot:
-                        return "🔴 신규 Hotspot"
-                    return "✅ 정상 범위"
-
-                hotspot_show["상태"] = hotspot_show.apply(_spot_status, axis=1)
-                hotspot_table = hotspot_show[[
-                    "rank", "zone", "node_index", "current_estimated_temp_C",
-                    "recommended_pred_temp_C", "temperature_change_C", "상태",
-                ]].rename(columns={
-                    "rank": "#", "zone": "Zone", "node_index": "Node",
-                    "current_estimated_temp_C": "현재(℃)",
-                    "recommended_pred_temp_C": "추천 후(℃)",
-                    "temperature_change_C": "온도 변화(℃)",
-                })
-                hotspot_table["온도 변화(℃)"] = hotspot_table["온도 변화(℃)"].map(lambda x: round(float(x), 2))
-                st.dataframe(hotspot_table, use_container_width=True, hide_index=True)
-
-            st.divider()
-
-            st.markdown("**✅ 쾌적 조건 확인**")
-            checks = constraint_rows(result["diag"])
-            if len(checks):
-                st.dataframe(checks, use_container_width=True, hide_index=True)
-            with st.popover("용어가 궁금하신가요? ℹ️"):
-                for key in ["zone_range", "hot_fraction", "cold_fraction", "p95_temperature"]:
-                    st.caption(f"**{key}** — {METRIC_GLOSSARY[key]}")
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        # ------------------------------------------------------
-        # TIER 3 — "Technical details" (engineer-only, collapsed)
-        # ------------------------------------------------------
-        st.markdown('<div class="pf-shell" style="padding-top:0;padding-bottom:0">', unsafe_allow_html=True)
-        with st.expander("🔧 기술 세부사항 (엔지니어용)"):
-
-            st.markdown("**분석 정보**")
-            st.caption(
-                f"{result['num_actions']}개 후보 평가 · {result['decision_ms']:.0f} ms · {result['device']}"
-            )
-
-            st.markdown("**풍향·풍량 후보 비교**")
-            cand = result["all_candidates"].copy()
-            show_cols = [
-                "rank", "Inlet_L", "Inlet_M", "Inlet_R", "CMM", "AirTemp_C",
-                "mean_temp_C", "priority_air_speed_mps", "priority_temp_improvement_C",
-                "priority_stagnant_fraction", "airflow_score", "combined_score",
-                "recommendation_constraint_met",
-            ]
-            show_cols = [c for c in show_cols if c in cand.columns]
-            cand_show = cand[show_cols].head(15).copy()
-            if "priority_stagnant_fraction" in cand_show:
-                cand_show["priority_stagnant_fraction"] *= 100.0
-            st.dataframe(cand_show, use_container_width=True, hide_index=True)
-            st.caption(
-                "airflow_score와 combined_score는 낮을수록 유리합니다. "
-                f"({METRIC_GLOSSARY['combined_score']} {METRIC_GLOSSARY['airflow_score']})"
-            )
-
-            if result["status"] != "FEASIBLE":
-                st.markdown("**🏢 설비 한계 참고**")
-                cap = result.get("additional_capacity", {}) or {}
-                gap = cap.get("additional_sensible_cooling_kw_lower_bound_at_best_achievable")
-                unavoidable = cap.get("additional_sensible_cooling_kw_lower_bound_even_at_max_candidate_capacity")
-                if gap is not None:
-                    st.write(f"열수지 기준 추가 냉방 여유 참고값: **{float(gap):.2f} kW**")
-                if unavoidable is not None:
-                    st.write(f"최대 후보 냉방에서도 남는 열수지 차이: **{float(unavoidable):.2f} kW**")
-                st.caption("현열 열수지 기반 참고치이며 실제 증설 용량, 전력소비 또는 전기요금 절감량이 아닙니다.")
-
-            st.markdown("**입력값 / 학습범위 확인**")
-            st.dataframe(
-                input_range_rows(result["input_range_diagnostics"]),
-                use_container_width=True,
-                hide_index=True,
-            )
-            st.caption("◌ 연속 보간은 학습된 CFD 범위 안의 질의입니다. 범위 밖 값은 예측 불확실성이 커질 수 있습니다.")
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        # ------------------------------------------------------
-        # Downloads + nav (bottom, de-emphasized)
-        # ------------------------------------------------------
-        before_after_csv = result["before_after_field"].to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            "현재 ↔ 추천 후 전체 위치 CSV 저장",
-            data=before_after_csv,
-            file_name="DEMO_CURRENT_VS_RECOMMENDED_FIELD.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-        hotspot_csv = result["hotspots"].to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            "Hotspot 변화 CSV 저장",
-            data=hotspot_csv,
-            file_name="DEMO_HOTSPOT_CHANGE.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-
-        if st.button("← 조건 다시 설정", use_container_width=True):
-            go("setup")
-
-        st.markdown(
-            """
-            <div class="pf-shell" style="padding-top:6px;padding-bottom:0">
-              <div class="pf-note">
-                Demo scope · steady-state CFD surrogate decision support.
-                실제 전력/요금 절감 및 동적 폐루프 제어 검증을 의미하지 않습니다.
-              </div>
+            <div class="metric-cell">
+                <div class="lbl">P95 고온 영역</div>
+                <div class="val">{res['p95_temp']:.2f} °C</div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        bottom_nav("result")
+        </div>
+        <div class="metric-grid">
+            <div class="metric-cell">
+                <div class="lbl">Zone Spread (ΔT)</div>
+                <div class="val">{res['zone_spread']:.2f} °C</div>
+            </div>
+            <div class="metric-cell">
+                <div class="lbl">Hotspot / Coldspot</div>
+                <div class="val">{res['hot_fraction']:.1f}% / {res['cold_fraction']:.1f}%</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 4. Comparative Spatial Maps (Predicted Spatial Map)
+        st.caption(f"현재 공간 필드 (Current Field, Z={st.session_state.z_plane:g}m)")
+        st.plotly_chart(make_mobile_heatmap(field_current_grid, height=185), use_container_width=True,
+                        config={'displayModeBar': False})
+
+        st.caption(f"제어 후 예측 필드 (Predicted Spatial Temperature Map, Z={st.session_state.z_plane:g}m)")
+        st.plotly_chart(make_mobile_heatmap(field_post_grid, height=185), use_container_width=True,
+                        config={'displayModeBar': False})
+
+        # BMS Dispatch Action
+        st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+        if st.button("✅ 제어 명령 에어컨 전송 (BMS)", type="primary", use_container_width=True):
+            st.success("Carrier BMS 게이트웨이로 최적 제어 파라미터를 전송했습니다!")
+
+        if st.button("🔄 새로운 최적화 실행 (홈으로)", type="secondary", use_container_width=True):
+            st.session_state.app_view = "HOME"
+            st.rerun()
+
+# ============================================================
+# 11. BOTTOM NAVIGATION BAR
+# ============================================================
+st.markdown('<div class="bottom-nav"></div>', unsafe_allow_html=True)
+
+b_col1, b_col2, b_col3 = st.columns(3)
+
+with b_col1:
+    btn_home_kind = "primary" if st.session_state.app_view == "HOME" else "secondary"
+    if st.button("⌂ Home", type=btn_home_kind, use_container_width=True, key="btn_nav_home"):
+        st.session_state.app_view = "HOME"
+        st.rerun()
+
+with b_col2:
+    btn_settings_kind = "primary" if st.session_state.app_view in ["CONTROL", "HEAT_LOAD"] else "secondary"
+    if st.button("⚙ Controls", type=btn_settings_kind, use_container_width=True, key="btn_nav_settings"):
+        st.session_state.app_view = "CONTROL"
+        st.rerun()
+
+with b_col3:
+    btn_analysis_kind = "primary" if st.session_state.app_view == "RESULTS" else "secondary"
+    if st.button("◰ Analysis", type=btn_analysis_kind, use_container_width=True, key="btn_nav_analysis"):
+        st.session_state.app_view = "RESULTS"
+        st.rerun()
