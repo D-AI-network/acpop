@@ -175,6 +175,35 @@ html, body, [class*="css"] {
   overflow: hidden !important;
 }
 
+/* Real Streamlit map card: unlike an open/close HTML div, this actually wraps the chart. */
+.st-key-temperature_map_card,
+div[class*="st-key-temperature_map_card"] {
+  background: #b9cbd7 !important;
+  border: 2px solid #536d7b !important;
+  border-radius: 28px !important;
+  padding: 12px 12px 6px 12px !important;
+  margin: 8px 0 22px 0 !important;
+  overflow: hidden !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.34) !important;
+}
+
+.st-key-temperature_map_card [data-testid="stPlotlyChart"],
+div[class*="st-key-temperature_map_card"] [data-testid="stPlotlyChart"] {
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+}
+
+.st-key-temperature_map_card .js-plotly-plot,
+.st-key-temperature_map_card .plot-container,
+.st-key-temperature_map_card .svg-container,
+div[class*="st-key-temperature_map_card"] .js-plotly-plot,
+div[class*="st-key-temperature_map_card"] .plot-container,
+div[class*="st-key-temperature_map_card"] .svg-container {
+  border-radius: 18px !important;
+  overflow: hidden !important;
+}
+
 /* Compact room summary shown under Current Field */
 .avg-temp-card {
   display: flex;
@@ -846,22 +875,13 @@ elif st.session_state.app_view == "HOME":
         st.session_state.target_temp = float(new_target)
         st.rerun()
 
-    st.markdown(
-        """
-        <div class="home-field-head" style="margin-top:18px; margin-bottom:8px;">
-            <div class="home-field-title">Current Field</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown("<div class='map-shell'>", unsafe_allow_html=True)
-    st.plotly_chart(
-        make_mobile_heatmap(field_current_grid, height=340),
-        use_container_width=True,
-        config={"displayModeBar": False},
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
+    # Large rounded map card. The Current Field text heading is intentionally removed.
+    with st.container(key="temperature_map_card"):
+        st.plotly_chart(
+            make_mobile_heatmap(field_current_grid, height=350),
+            use_container_width=True,
+            config={"displayModeBar": False},
+        )
 
     if st.button("냉방 최적화", type="primary", use_container_width=True, key="btn_home_to_heat"):
         st.session_state.app_view = "HEAT_LOAD"
