@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# HOME_SIMPLIFIED_BUILD = 2026-09-03-v09
+# HOME_REFINED_BUILD = 2026-09-03-v10
 
 import base64
 import os
@@ -30,7 +30,7 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap');
 
 :root {
   --navy-bg: #102a43;
@@ -118,44 +118,40 @@ html, body, [class*="css"] {
 }
 
 /* Main app header shown from HOME onward */
+.app-title-lockup {
+  display: inline-block;
+  margin-bottom: 18px;
+}
 .app-title {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  font-size: 27px;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 28px;
   font-weight: 800;
   color: var(--sky) !important;
   margin: 0;
-  letter-spacing: -0.55px;
-  line-height: 1.08;
+  letter-spacing: -0.8px;
+  line-height: 1.04;
 }
 .brand-spectrum {
-  width: 54px;
-  height: 3px;
-  background: linear-gradient(90deg, #38bdf8 0%, #8fe3ff 100%);
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, #49cfff 0%, #eefaff 100%);
   border-radius: 999px;
-  margin-top: 7px;
-  margin-bottom: 17px;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.24);
+  margin-top: 8px;
+  margin-bottom: 0;
+  box-shadow: 0 0 12px rgba(110, 220, 255, 0.22);
 }
 
 /* HOME - Current Field becomes the hero */
 .home-field-head {
   margin: 2px 0 12px 0;
 }
-.home-field-kicker {
-  color: #6fd2ff;
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
 .home-field-title {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  color: #f0f9ff;
-  font-size: 27px;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  color: #f3fbff;
+  font-size: 31px;
   font-weight: 800;
-  letter-spacing: -0.65px;
-  line-height: 1.05;
+  letter-spacing: -0.9px;
+  line-height: 1.02;
   margin: 0;
 }
 .field-panel {
@@ -163,11 +159,11 @@ html, body, [class*="css"] {
   border: 1px solid var(--line);
   border-radius: 18px;
   padding: 10px 10px 4px 10px;
-  margin: 0 0 14px 0;
+  margin: 0 0 18px 0;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.025);
 }
 
-/* Compact room summary shown above Current Field */
+/* Compact room summary shown under Current Field */
 .avg-temp-card {
   display: flex;
   align-items: center;
@@ -176,12 +172,12 @@ html, body, [class*="css"] {
   background: rgba(11, 39, 63, 0.62);
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 11px 14px;
-  margin: 2px 0 15px 0;
+  padding: 13px 16px;
+  margin: 0 0 12px 0;
 }
 .avg-temp-label {
   color: var(--mist);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
 }
 .avg-temp-value {
@@ -193,29 +189,31 @@ html, body, [class*="css"] {
 }
 
 /* Simplified target-temperature control */
-.control-panel-title {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  color: #eaf8ff;
-  font-size: 17px;
-  font-weight: 800;
-  margin: 17px 0 3px 0;
+.target-input-wrap {
+  margin: 0 0 18px 0;
 }
-.control-panel-desc {
-  color: var(--mist);
-  font-size: 11.5px;
-  line-height: 1.45;
-  margin-bottom: 8px;
-}
-[data-testid="stNumberInput"],
-[data-testid="stSelectbox"] {
-  background: rgba(18, 51, 78, 0.70);
+.target-input-wrap [data-testid="stNumberInput"] {
+  background: rgba(11, 39, 63, 0.62);
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 8px 11px 6px 11px;
-  margin-bottom: 8px;
+  padding: 9px 14px 8px 14px;
+  margin-bottom: 0;
 }
-[data-testid="stNumberInput"] input {
+.target-input-wrap [data-testid="stNumberInput"] label,
+.target-input-wrap [data-testid="stWidgetLabel"] p {
+  color: var(--mist) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+.target-input-wrap [data-testid="stNumberInput"] input {
   color: #eefaff !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  background: transparent !important;
+}
+.target-input-wrap button {
+  color: #d9f5ff !important;
 }
 
 /* Kept for result cards and diagnostics */
@@ -247,7 +245,7 @@ html, body, [class*="css"] {
 }
 
 .section-title {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-family: 'Outfit', 'Inter', sans-serif;
   font-size: 15px;
   font-weight: 800;
   color: #e8f7ff !important;
@@ -276,7 +274,7 @@ html, body, [class*="css"] {
 }
 .optimal-dispatch-box h4 {
   color: #7ed7ff !important;
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-family: 'Outfit', 'Inter', sans-serif;
   font-size: 17px;
   font-weight: 800;
   margin: 0 0 12px 0;
@@ -306,7 +304,7 @@ html, body, [class*="css"] {
   border-left: 4px solid;
 }
 .feasibility-title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Outfit', sans-serif;
   font-size: 15px;
   font-weight: 800;
 }
@@ -369,14 +367,15 @@ html, body, [class*="css"] {
 
 /* Buttons */
 div.stButton > button[kind="primary"] {
-  background: linear-gradient(90deg, #70d5ff 0%, #9be7ff 100%) !important;
+  background: linear-gradient(90deg, #84dcff 0%, #b8efff 100%) !important;
   color: #0b2a43 !important;
   border-radius: 13px !important;
-  font-size: 14.5px !important;
-  font-weight: 800 !important;
-  padding: 11px 18px !important;
-  border: 1px solid rgba(190, 238, 255, 0.48) !important;
-  box-shadow: 0 7px 18px rgba(34, 156, 210, 0.20) !important;
+  font-family: 'Outfit', 'Inter', sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  padding: 12px 18px !important;
+  border: 1px solid rgba(210, 245, 255, 0.62) !important;
+  box-shadow: 0 8px 18px rgba(53, 176, 228, 0.18) !important;
 }
 
 div.stButton > button[kind="primary"] p {
@@ -391,8 +390,9 @@ div.stButton > button[kind="secondary"] {
   background: #1a4666 !important;
   color: #e6f6ff !important;
   border-radius: 13px !important;
+  font-family: 'Outfit', 'Inter', sans-serif !important;
   font-size: 14px !important;
-  font-weight: 800 !important;
+  font-weight: 700 !important;
   padding: 10px 16px !important;
   border: 1px solid rgba(174, 228, 255, 0.15) !important;
   box-shadow: none !important;
@@ -655,10 +655,9 @@ def make_mobile_heatmap(grid_data, height=225):
         )
     )
 
-    # Strictly plotted using validated in-bounds plot coordinates
+    # Sensor markers styled as compact navy sensor chips for a cleaner map.
     sx_plot = [meta["x_plot"] for meta in ROA_NODES_META.values()]
     sy_plot = [meta["y_plot"] for meta in ROA_NODES_META.values()]
-    codes = [meta["code"] for meta in ROA_NODES_META.values()]
     hover_texts = [
         f"<b>{meta['code']}: {meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: (L={meta['x_plot']:.2f}, W={meta['y_plot']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
         for nid, meta in ROA_NODES_META.items()
@@ -668,13 +667,20 @@ def make_mobile_heatmap(grid_data, height=225):
         go.Scatter(
             x=sx_plot,
             y=sy_plot,
-            mode="markers+text",
-            marker=dict(size=13, color="#ffffff", line=dict(color="#0077b6", width=2.5)),
-            text=codes,
-            textposition="top center",
-            textfont=dict(size=11, color="#0f172a", family="sans-serif"),
+            mode="markers",
+            marker=dict(size=18, color="#103557", line=dict(color="#c3efff", width=1.6), symbol="square"),
             hovertext=hover_texts,
             hoverinfo="text",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=sx_plot,
+            y=sy_plot,
+            mode="markers",
+            marker=dict(size=5.5, color="#8edfff", symbol="circle"),
+            hoverinfo="skip",
             showlegend=False,
         )
     )
@@ -703,8 +709,10 @@ if st.session_state.app_view != "INTRO":
     <div class="notch-cam"></div>
     <div class="notch-speaker"></div>
 </div>
-<div class="app-title">AI Smart Cooling</div>
-<div class="brand-spectrum"></div>
+<div class="app-title-lockup">
+    <div class="app-title">AI Smart Cooling</div>
+    <div class="brand-spectrum"></div>
+</div>
 """,
         unsafe_allow_html=True,
     )
@@ -734,24 +742,37 @@ if st.session_state.app_view == "INTRO":
     )
 
 elif st.session_state.app_view == "HOME":
-    # Compact current-room summary. Average temperature is informative,
-    # while the spatial field remains the main visual focus.
     st.markdown(
         f"""
+        <div class="home-field-head">
+            <div class="home-field-title">Current Field</div>
+        </div>
+
         <div class="avg-temp-card">
             <div class="avg-temp-label">현재 공간 평균 온도</div>
             <div class="avg-temp-value">{avg_room_temp:.1f} °C</div>
         </div>
-
-        <div class="home-field-head">
-            <div class="home-field-kicker">LIVE SPATIAL TEMPERATURE</div>
-            <div class="home-field-title">Current Field</div>
-        </div>
-        <div class="field-panel">
         """,
         unsafe_allow_html=True,
     )
 
+    st.markdown("<div class='target-input-wrap'>", unsafe_allow_html=True)
+    new_target = st.number_input(
+        "목표 온도 (°C)",
+        min_value=22.0,
+        max_value=28.0,
+        value=float(st.session_state.target_temp),
+        step=0.1,
+        format="%.1f",
+        key="home_target_temp_input",
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if float(new_target) != float(st.session_state.target_temp):
+        st.session_state.target_temp = float(new_target)
+        st.rerun()
+
+    st.markdown("<div class='field-panel'>", unsafe_allow_html=True)
     st.plotly_chart(
         make_mobile_heatmap(field_current_grid),
         use_container_width=True,
@@ -759,26 +780,7 @@ elif st.session_state.app_view == "HOME":
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # HOME과 기존 CONTROL 화면을 통합하되, 목표 온도 입력만 남깁니다.
-    st.markdown("<div style='margin-top: 18px;'></div>", unsafe_allow_html=True)
-    st.caption("목표 온도 (°C)")
-    new_target = st.number_input(
-        "목표 온도",
-        min_value=22.0,
-        max_value=28.0,
-        value=float(st.session_state.target_temp),
-        step=0.1,
-        format="%.1f",
-        label_visibility="collapsed",
-        key="home_target_temp_input",
-    )
-
-    if float(new_target) != float(st.session_state.target_temp):
-        st.session_state.target_temp = float(new_target)
-        st.rerun()
-
-    st.markdown("<div style='margin-top: 9px;'></div>", unsafe_allow_html=True)
-    if st.button("냉방 최적화 →", type="primary", use_container_width=True, key="btn_home_to_heat"):
+    if st.button("냉방 최적화", type="primary", use_container_width=True, key="btn_home_to_heat"):
         st.session_state.app_view = "HEAT_LOAD"
         st.rerun()
 
