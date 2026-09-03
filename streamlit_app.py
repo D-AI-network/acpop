@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# HOME_SIMPLIFIED_BUILD = 2026-09-03-v09
+
 import base64
 import os
 import re
@@ -156,16 +158,6 @@ html, body, [class*="css"] {
   line-height: 1.05;
   margin: 0;
 }
-.home-field-meta {
-  margin-top: 6px;
-  color: var(--mist);
-  font-size: 12px;
-  line-height: 1.45;
-}
-.home-field-meta b {
-  color: #8edbff;
-  font-weight: 700;
-}
 .field-panel {
   background: rgba(8, 30, 50, 0.28);
   border: 1px solid var(--line);
@@ -200,7 +192,7 @@ html, body, [class*="css"] {
   letter-spacing: -0.5px;
 }
 
-/* Merged target-temperature / layer controls */
+/* Simplified target-temperature control */
 .control-panel-title {
   font-family: 'Space Grotesk', 'Inter', sans-serif;
   color: #eaf8ff;
@@ -377,17 +369,20 @@ html, body, [class*="css"] {
 
 /* Buttons */
 div.stButton > button[kind="primary"] {
-  background: linear-gradient(90deg, #1687ca 0%, #20a8e5 100%) !important;
-  color: #ffffff !important;
+  background: linear-gradient(90deg, #70d5ff 0%, #9be7ff 100%) !important;
+  color: #0b2a43 !important;
   border-radius: 13px !important;
   font-size: 14.5px !important;
   font-weight: 800 !important;
   padding: 11px 18px !important;
-  border: 1px solid rgba(126, 215, 255, 0.24) !important;
-  box-shadow: 0 6px 16px rgba(5, 48, 82, 0.28) !important;
+  border: 1px solid rgba(190, 238, 255, 0.48) !important;
+  box-shadow: 0 7px 18px rgba(34, 156, 210, 0.20) !important;
 }
 
-div.stButton > button[kind="primary"] p,
+div.stButton > button[kind="primary"] p {
+  color: #0b2a43 !important;
+}
+
 div.stButton > button[kind="secondary"] p {
   color: #ffffff !important;
 }
@@ -497,6 +492,8 @@ if "selected_dp" not in st.session_state:
 
 if "z_plane" not in st.session_state:
     st.session_state.z_plane = 1.5
+# HOME 화면에서는 측정 높이 선택을 사용하지 않고 1.5m로 고정합니다.
+st.session_state.z_plane = 1.5
 
 if "target_temp" not in st.session_state:
     st.session_state.target_temp = 24.0
@@ -749,9 +746,6 @@ elif st.session_state.app_view == "HOME":
         <div class="home-field-head">
             <div class="home-field-kicker">LIVE SPATIAL TEMPERATURE</div>
             <div class="home-field-title">Current Field</div>
-            <div class="home-field-meta">
-                센서 기반 공간 온도 분포 · <b>Z = {st.session_state.z_plane:g}m</b>
-            </div>
         </div>
         <div class="field-panel">
         """,
@@ -765,53 +759,26 @@ elif st.session_state.app_view == "HOME":
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # HOME and the old CONTROL screen are intentionally merged here.
-    st.markdown(
-        """
-        <div class="control-panel-title">냉방 설정</div>
-        <div class="control-panel-desc">
-            원하는 목표 온도를 직접 입력하세요. 최적화 전략은 별도 선택 없이 균형 운전으로 적용됩니다.
-        </div>
-        """,
-        unsafe_allow_html=True,
+    # HOME과 기존 CONTROL 화면을 통합하되, 목표 온도 입력만 남깁니다.
+    st.markdown("<div style='margin-top: 18px;'></div>", unsafe_allow_html=True)
+    st.caption("목표 온도 (°C)")
+    new_target = st.number_input(
+        "목표 온도",
+        min_value=22.0,
+        max_value=28.0,
+        value=float(st.session_state.target_temp),
+        step=0.1,
+        format="%.1f",
+        label_visibility="collapsed",
+        key="home_target_temp_input",
     )
 
-    c_target, c_layer = st.columns([1.45, 1.0])
-    with c_target:
-        st.caption("목표 온도 (°C)")
-        new_target = st.number_input(
-            "목표 온도",
-            min_value=22.0,
-            max_value=28.0,
-            value=float(st.session_state.target_temp),
-            step=0.1,
-            format="%.1f",
-            label_visibility="collapsed",
-            key="home_target_temp_input",
-        )
-    with c_layer:
-        st.caption("측정 높이 (Z)")
-        z_options = [0.5, 1.5, 2.0, 2.5]
-        new_z = st.selectbox(
-            "측정 높이",
-            z_options,
-            index=z_options.index(st.session_state.z_plane) if st.session_state.z_plane in z_options else 1,
-            label_visibility="collapsed",
-            key="home_z_plane_select",
-        )
-
-    changed = False
     if float(new_target) != float(st.session_state.target_temp):
         st.session_state.target_temp = float(new_target)
-        changed = True
-    if float(new_z) != float(st.session_state.z_plane):
-        st.session_state.z_plane = float(new_z)
-        changed = True
-    if changed:
         st.rerun()
 
-    st.markdown("<div style='margin-top: 7px;'></div>", unsafe_allow_html=True)
-    if st.button("다음: 공간 열부하 설정 →", type="primary", use_container_width=True, key="btn_home_to_heat"):
+    st.markdown("<div style='margin-top: 9px;'></div>", unsafe_allow_html=True)
+    if st.button("냉방 최적화 →", type="primary", use_container_width=True, key="btn_home_to_heat"):
         st.session_state.app_view = "HEAT_LOAD"
         st.rerun()
 
