@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# COOLING_FACTORS_BUILD = 2026-09-03-v25
+# FACTOR_SLIDER_BUILD = 2026-09-03-v26
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -691,6 +691,71 @@ div[class*="st-key-sl_work"] [data-baseweb="slider"] * {
   font-size: 12px !important;
   line-height: 1.05 !important;
   font-weight: 500 !important;
+}
+
+
+/* v26 FINAL OVERRIDE:
+   Force the SelectSlider's visible stage text (보통/높음/매우 낮음/매우 높음)
+   to be small. The factor title is explicitly restored below. */
+.st-key-sl_ext [data-testid="stSelectSlider"],
+.st-key-sl_serv [data-testid="stSelectSlider"],
+.st-key-sl_meet [data-testid="stSelectSlider"],
+.st-key-sl_work [data-testid="stSelectSlider"],
+div[class*="st-key-sl_ext"] [data-testid="stSelectSlider"],
+div[class*="st-key-sl_serv"] [data-testid="stSelectSlider"],
+div[class*="st-key-sl_meet"] [data-testid="stSelectSlider"],
+div[class*="st-key-sl_work"] [data-testid="stSelectSlider"],
+.st-key-sl_ext [data-testid="stSelectSlider"] div,
+.st-key-sl_serv [data-testid="stSelectSlider"] div,
+.st-key-sl_meet [data-testid="stSelectSlider"] div,
+.st-key-sl_work [data-testid="stSelectSlider"] div,
+div[class*="st-key-sl_ext"] [data-testid="stSelectSlider"] div,
+div[class*="st-key-sl_serv"] [data-testid="stSelectSlider"] div,
+div[class*="st-key-sl_meet"] [data-testid="stSelectSlider"] div,
+div[class*="st-key-sl_work"] [data-testid="stSelectSlider"] div,
+.st-key-sl_ext [data-testid="stSelectSlider"] span,
+.st-key-sl_serv [data-testid="stSelectSlider"] span,
+.st-key-sl_meet [data-testid="stSelectSlider"] span,
+.st-key-sl_work [data-testid="stSelectSlider"] span,
+.st-key-sl_ext [data-testid="stSelectSlider"] p,
+.st-key-sl_serv [data-testid="stSelectSlider"] p,
+.st-key-sl_meet [data-testid="stSelectSlider"] p,
+.st-key-sl_work [data-testid="stSelectSlider"] p {
+  font-size: 10px !important;
+  line-height: 1.0 !important;
+  font-weight: 450 !important;
+}
+
+/* Restore only the four factor names so they remain visually dominant. */
+.st-key-sl_ext [data-testid="stWidgetLabel"] p,
+.st-key-sl_serv [data-testid="stWidgetLabel"] p,
+.st-key-sl_meet [data-testid="stWidgetLabel"] p,
+.st-key-sl_work [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_ext"] [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_serv"] [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_meet"] [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
+  font-size: 15px !important;
+  line-height: 1.25 !important;
+  font-weight: 500 !important;
+}
+
+/* Explicit endpoint/value hooks when Streamlit exposes them. */
+.st-key-sl_ext [data-testid="stThumbValue"],
+.st-key-sl_serv [data-testid="stThumbValue"],
+.st-key-sl_meet [data-testid="stThumbValue"],
+.st-key-sl_work [data-testid="stThumbValue"],
+.st-key-sl_ext [data-testid="stTickBar"],
+.st-key-sl_serv [data-testid="stTickBar"],
+.st-key-sl_meet [data-testid="stTickBar"],
+.st-key-sl_work [data-testid="stTickBar"],
+.st-key-sl_ext [data-testid="stTickBar"] *,
+.st-key-sl_serv [data-testid="stTickBar"] *,
+.st-key-sl_meet [data-testid="stTickBar"] *,
+.st-key-sl_work [data-testid="stTickBar"] * {
+  font-size: 10px !important;
+  line-height: 1.0 !important;
+  font-weight: 450 !important;
 }
 
 .cooling-load-card {
