@@ -572,8 +572,8 @@ div[class*="st-key-sl_ext"] [data-testid="stWidgetLabel"] p,
 div[class*="st-key-sl_serv"] [data-testid="stWidgetLabel"] p,
 div[class*="st-key-sl_meet"] [data-testid="stWidgetLabel"] p,
 div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
-  font-size: 13px !important;
-  font-weight: 700 !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
 }
 
 .st-key-sl_ext [data-testid="stTickBar"] *,
@@ -584,9 +584,9 @@ div[class*="st-key-sl_ext"] [data-testid="stTickBar"] *,
 div[class*="st-key-sl_serv"] [data-testid="stTickBar"] *,
 div[class*="st-key-sl_meet"] [data-testid="stTickBar"] *,
 div[class*="st-key-sl_work"] [data-testid="stTickBar"] * {
-  font-size: 9px !important;
+  font-size: 7.8px !important;
   font-weight: 600 !important;
-  color: #a9c8db !important;
+  color: #9fbed1 !important;
 }
 
 .st-key-sl_ext [data-testid="stThumbValue"],
@@ -597,7 +597,7 @@ div[class*="st-key-sl_ext"] [data-testid="stThumbValue"],
 div[class*="st-key-sl_serv"] [data-testid="stThumbValue"],
 div[class*="st-key-sl_meet"] [data-testid="stThumbValue"],
 div[class*="st-key-sl_work"] [data-testid="stThumbValue"] {
-  font-size: 10.5px !important;
+  font-size: 9px !important;
   font-weight: 700 !important;
 }
 
@@ -618,10 +618,10 @@ div[class*="st-key-sl_work"] [data-testid="stThumbValue"] {
 }
 .cooling-load-label {
   font-family: 'Outfit', 'Noto Sans KR', sans-serif;
-  font-size: 15.5px;
+  font-size: 17.5px;
   font-weight: 800;
-  color: #dff5ff;
-  letter-spacing: -0.2px;
+  color: #e9f8ff;
+  letter-spacing: -0.3px;
 }
 .cooling-load-level {
   font-family: 'Outfit', 'Noto Sans KR', sans-serif;
@@ -633,7 +633,7 @@ div[class*="st-key-sl_work"] [data-testid="stThumbValue"] {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 5px;
-  margin-bottom: 11px;
+  margin-bottom: 2px;
 }
 .cooling-load-segment {
   height: 6px;
@@ -645,14 +645,48 @@ div[class*="st-key-sl_work"] [data-testid="stThumbValue"] {
 .cooling-load-segment.on-3 { background: #8edbcb; }
 .cooling-load-segment.on-4 { background: #ffad66; }
 .cooling-load-segment.on-5 { background: #ff6b7a; }
-.cooling-load-major {
-  font-size: 11.5px;
-  color: #bad8e9;
-  line-height: 1.45;
+
+.major-factor-card {
+  background: linear-gradient(180deg, rgba(12, 42, 67, 0.95) 0%, rgba(14, 50, 79, 0.92) 100%);
+  border: 1px solid rgba(174, 228, 255, 0.20);
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin: -4px 0 16px 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
 }
-.cooling-load-major b {
-  color: #edf9ff;
+.major-factor-title {
+  font-family: 'Outfit', 'Noto Sans KR', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #dff5ff;
+  margin-bottom: 9px;
+}
+.major-factor-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.major-factor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(255, 173, 102, 0.11);
+  border: 1px solid rgba(255, 173, 102, 0.32);
+  color: #f4fbff;
+  font-size: 10.5px;
   font-weight: 700;
+  white-space: nowrap;
+}
+.major-factor-chip.very-high {
+  background: rgba(255, 107, 122, 0.12);
+  border-color: rgba(255, 107, 122, 0.40);
+}
+.major-factor-empty {
+  color: #9fbfd3;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 /* Info/success boxes stay readable in the dark shell */
@@ -1128,14 +1162,27 @@ elif st.session_state.app_view == "HEAT_LOAD":
     burden_score = sum(factor_values.values()) / len(factor_values)
     burden_index = max(1, min(5, int(round(burden_score))))
     burden_label = stage_opts[burden_index - 1]
-    max_level = max(factor_values.values())
-    major_factors = [name for name, level in factor_values.items() if level == max_level]
-    major_text = " · ".join(major_factors)
+    # 주요 영향 요인은 '높음(4)' 또는 '매우 높음(5)'으로 설정된 항목만 별도 표시합니다.
+    factor_icons = {
+        "외부 열환경": "☀️",
+        "서버 발열": "🖥️",
+        "회의공간": "👥",
+        "업무공간": "💼",
+    }
+    major_factors = [(name, level) for name, level in factor_values.items() if level >= 4]
 
     segments_html = "".join(
         f'<div class="cooling-load-segment {f"on-{i}" if i <= burden_index else ""}"></div>'
         for i in range(1, 6)
     )
+
+    if major_factors:
+        major_chips_html = "".join(
+            f'<span class="major-factor-chip {"very-high" if level == 5 else ""}">'             f'{factor_icons[name]} {name} · {stage_opts[level - 1]}</span>'
+            for name, level in major_factors
+        )
+    else:
+        major_chips_html = '<span class="major-factor-empty">현재 높음 이상으로 설정된 영향 요인이 없습니다.</span>'
 
     st.markdown(
         f"""
@@ -1145,7 +1192,11 @@ elif st.session_state.app_view == "HEAT_LOAD":
                 <div class="cooling-load-level">{burden_label}</div>
             </div>
             <div class="cooling-load-segments">{segments_html}</div>
-            <div class="cooling-load-major">주요 영향 요인&nbsp;&nbsp;<b>{major_text}</b></div>
+        </div>
+
+        <div class="major-factor-card">
+            <div class="major-factor-title">주요 영향 요인</div>
+            <div class="major-factor-chips">{major_chips_html}</div>
         </div>
         """,
         unsafe_allow_html=True,
