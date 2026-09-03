@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v28
+# FACTOR_UI_BUILD = 2026-09-03-v32
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -473,6 +473,32 @@ div[data-testid="stPlotlyChart"] {
   font-weight: 800;
   margin: 13px 0 8px 0;
 }
+
+/* Current Field + Predicted Field grouped in one result card. */
+.st-key-field_comparison_card,
+div[class*="st-key-field_comparison_card"] {
+  background: rgba(8, 31, 52, 0.48) !important;
+  border: 1.5px solid rgba(89, 211, 255, 0.54) !important;
+  border-radius: 22px !important;
+  padding: 10px 12px 8px 12px !important;
+  margin: 14px 0 18px 0 !important;
+  box-shadow: 0 7px 20px rgba(2, 20, 38, 0.18) !important;
+  overflow: hidden !important;
+}
+
+.st-key-field_comparison_card [data-testid="stPlotlyChart"],
+div[class*="st-key-field_comparison_card"] [data-testid="stPlotlyChart"] {
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  margin-bottom: 4px !important;
+}
+
+.field-map-divider {
+  height: 1px;
+  background: rgba(174, 228, 255, 0.14);
+  margin: 8px 0 8px 0;
+}
+
 
 /* Metric Display Grids */
 .metric-grid {
@@ -1870,71 +1896,116 @@ for nid, meta in ROA_NODES_META.items():
 
 
 def make_mobile_heatmap(grid_data, height=340):
-    heatmap_data = np.array(grid_data, dtype=float, copy=True)
+    """Interactive 3D spatial-temperature surface used by HOME and RESULTS."""
+    surface_data = np.asarray(grid_data, dtype=float)
 
-    fig = go.Figure(
-        data=go.Heatmap(
-            z=heatmap_data,
-            x=grid_len_axis,  # 0.25 to 8.75m
-            y=grid_wid_axis,  # 0.25 to 3.75m
+    # Plotly Surface: X/Y are room coordinates, Z height visualizes temperature.
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Surface(
+            z=surface_data,
+            x=grid_len_axis,
+            y=grid_wid_axis,
+            surfacecolor=surface_data,
             colorscale="Turbo",
-            hoverongaps=False,
-            zmin=18.0,
-            zmax=28.0,
-            colorbar=dict(title=dict(text="°C", font=dict(size=10, color="#d9f3ff")), thickness=7, len=0.9, x=1.02, tickfont=dict(size=9.5, color="#b7d7e8"), outlinecolor="rgba(174,228,255,0.18)"),
+            cmin=18.0,
+            cmax=28.0,
+            showscale=True,
+            colorbar=dict(
+                title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
+                thickness=7,
+                len=0.62,
+                x=0.96,
+                tickfont=dict(size=9, color="#b7d7e8"),
+                outlinecolor="rgba(174,228,255,0.18)",
+            ),
+            hovertemplate=(
+                "X: %{x:.2f} m<br>"
+                "Y: %{y:.2f} m<br>"
+                "온도: %{z:.2f} °C"
+                "<extra></extra>"
+            ),
+            lighting=dict(
+                ambient=0.72,
+                diffuse=0.75,
+                specular=0.16,
+                roughness=0.88,
+            ),
         )
     )
 
-    # Invisible hover targets plus custom navy sensor-shaped icons.
+    # Keep the sensors visible in the 3D field.
     sx_plot = [meta["x_plot"] for meta in sensor_plot_meta.values()]
     sy_plot = [meta["y_plot"] for meta in sensor_plot_meta.values()]
+    sz_plot = [sensor_readings.get(nid, np.nan) for nid in sensor_plot_meta.keys()]
     hover_texts = [
-        f"<b>{meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: (L={meta['x_plot']:.2f}, W={meta['y_plot']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
+        (
+            f"<b>{meta['name']}</b><br>"
+            f"Zone: {meta['zone']}<br>"
+            f"Coords: (L={meta['x_plot']:.2f}, W={meta['y_plot']:.2f})m<br>"
+            f"Live: {sensor_readings.get(nid, 0.0):.2f}°C"
+        )
         for nid, meta in sensor_plot_meta.items()
     ]
 
     fig.add_trace(
-        go.Scatter(
+        go.Scatter3d(
             x=sx_plot,
             y=sy_plot,
+            z=sz_plot,
             mode="markers",
-            marker=dict(size=24, color="rgba(0,0,0,0)", line=dict(width=0)),
+            marker=dict(
+                size=5,
+                color="#0b3555",
+                line=dict(color="#9fe4ff", width=1.2),
+                symbol="diamond",
+            ),
             hovertext=hover_texts,
             hoverinfo="text",
             showlegend=False,
         )
     )
 
-    sensor_icon_uri = f"data:image/svg+xml;base64,{SENSOR_ICON_SVG_B64}"
-    for x_pos, y_pos in zip(sx_plot, sy_plot):
-        fig.add_layout_image(
-            dict(
-                source=sensor_icon_uri,
-                x=x_pos,
-                y=y_pos,
-                xref="x",
-                yref="y",
-                sizex=0.72,
-                sizey=0.62,
-                xanchor="center",
-                yanchor="middle",
-                sizing="contain",
-                opacity=1.0,
-                layer="above",
-            )
-        )
-
     fig.update_layout(
         title=dict(text="", font=dict(size=1)),
         showlegend=False,
-        xaxis=dict(range=[x_min - 0.25, x_max + 0.25], showgrid=False, zeroline=False, showticklabels=False),
-        yaxis=dict(range=[y_min - 0.25, y_max + 0.25], showgrid=False, zeroline=False, showticklabels=False),
-        margin=dict(l=0, r=6, t=0, b=0),
         height=height,
-        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
-        autosize=True,
+        scene=dict(
+            bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(
+                title="",
+                showbackground=False,
+                showgrid=False,
+                zeroline=False,
+                showticklabels=False,
+            ),
+            yaxis=dict(
+                title="",
+                showbackground=False,
+                showgrid=False,
+                zeroline=False,
+                showticklabels=False,
+            ),
+            zaxis=dict(
+                title="",
+                range=[18.0, 28.0],
+                showbackground=False,
+                showgrid=False,
+                zeroline=False,
+                showticklabels=False,
+            ),
+            aspectmode="manual",
+            aspectratio=dict(x=1.7, y=0.86, z=0.55),
+            camera=dict(
+                eye=dict(x=1.45, y=-1.55, z=1.10),
+                center=dict(x=0.0, y=0.0, z=-0.08),
+            ),
+        ),
     )
+
     return fig
 
 
@@ -2432,11 +2503,6 @@ elif st.session_state.app_view == "RESULTS":
             unsafe_allow_html=True,
         )
 
-        if res.get("model_inference_used", False):
-            st.caption(
-                f"PopField inference · {int(res.get('num_candidates', 0))} HVAC candidates · "
-                f"{Path(res.get('checkpoint_used', 'best_deploy.pt')).name}"
-            )
 
         st.markdown('<div class="section-title">공간 쾌적성 및 편차 지표 (Diagnostics)</div>', unsafe_allow_html=True)
         st.markdown(
@@ -2465,11 +2531,22 @@ elif st.session_state.app_view == "RESULTS":
             unsafe_allow_html=True,
         )
 
-        st.markdown('<div class="field-map-title">Current Field</div>', unsafe_allow_html=True)
-        st.plotly_chart(make_mobile_heatmap(result_current_grid, height=185), use_container_width=True, config={"displayModeBar": False})
+        with st.container(key="field_comparison_card"):
+            st.markdown('<div class="field-map-title">Current Field</div>', unsafe_allow_html=True)
+            st.plotly_chart(
+                make_mobile_heatmap(result_current_grid, height=245),
+                use_container_width=True,
+                config={"displayModeBar": False},
+            )
 
-        st.markdown('<div class="field-map-title">Predicted Field</div>', unsafe_allow_html=True)
-        st.plotly_chart(make_mobile_heatmap(field_post_grid, height=185), use_container_width=True, config={"displayModeBar": False})
+            st.markdown('<div class="field-map-divider"></div>', unsafe_allow_html=True)
+
+            st.markdown('<div class="field-map-title">Predicted Field</div>', unsafe_allow_html=True)
+            st.plotly_chart(
+                make_mobile_heatmap(field_post_grid, height=245),
+                use_container_width=True,
+                config={"displayModeBar": False},
+            )
 
         st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
         if st.button("✅ 제어 명령 에어컨 전송 (BMS)", type="primary", use_container_width=True):
