@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# MAP_SENSOR_REFINED_BUILD = 2026-09-03-v11
+# SENSOR_RADAR_ROUNDED_BUILD = 2026-09-03-v12
 
 import base64
 import os
@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from scipy.interpolate import griddata
 import torch
 
-SENSOR_ICON_B64 = "iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAABR0lEQVR42u2ZSw6DMAwFcc7QK1Vdc1LWVa/UO9BVpYqKqgSHZ4eZLR8lo5dA7GEAAAAAgDNiEQd1f87z2rXbxQyBFeKiirSo8sbr+HXP9JjCSbQM4iKLDCPwH3FrIpUCS1Z5n89t2Tu7Eeg9aZXEol7Ctenzej6lwFZpUaSwZE5fhBTKl3B2EIhABCKwluWRTP2eNAJbHb0URzr5Et6bHmX6pAK906IqKEgT+J50bYoiVGOoB2YXuEUkFWnHYgA9kUqR0bpyAAAA0OVvjLJfe9Tvj/Us7QiZ1lKeumd7xDHQehfXWqR5yoss7pfIPRLd6oGZ5HmOt3ikL5u8pcQ9H77isXR7oHY+5WxL13v8NNYVe2D2vc9zLySByq8wIBCBCEQgAgGBCEQgAgGBCExIVS+gt2LqJ1v7IyQQAAAAAAAAAAAAAI7hBUCwm17HDkU2AAAAAElFTkSuQmCC"
+SENSOR_ICON_SVG_B64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgdmlld0JveD0iMCAwIDcyIDcyIj4KICA8cmVjdCB4PSI4IiB5PSI3IiB3aWR0aD0iNTYiIGhlaWdodD0iMTUiIHJ4PSI3LjUiIGZpbGw9IiMxMjNiNWQiLz4KICA8cmVjdCB4PSIyMCIgeT0iMTkiIHdpZHRoPSIzMiIgaGVpZ2h0PSIxMyIgcng9IjYuNSIgZmlsbD0iIzEyM2I1ZCIvPgogIDxjaXJjbGUgY3g9IjM2IiBjeT0iMjUiIHI9IjIuNSIgZmlsbD0iIzhmZTNmZiIvPgogIDxwYXRoIGQ9Ik0yNSAzOCBRMzYgMzAgNDcgMzgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSI0LjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0xOCA0NSBRMzYgMzEgNTQgNDUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSI0LjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0xMSA1MyBRMzYgMzMgNjEgNTMiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSI0LjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4="
 
 # MERGED_HOME_BUILD = 2026-09-03-v8_HOME_CONTROL_COMBINED
 
@@ -215,7 +215,25 @@ html, body, [class*="css"] {
   background: transparent !important;
 }
 .target-input-wrap button {
-  color: #d9f5ff !important;
+  color: #123b5d !important;
+}
+
+/* Target temperature is entered in navy on the light input surface. */
+div[data-testid="stNumberInput"] input {
+  color: #123b5d !important;
+  -webkit-text-fill-color: #123b5d !important;
+  opacity: 1 !important;
+}
+div[data-testid="stNumberInput"] button,
+div[data-testid="stNumberInput"] button svg {
+  color: #123b5d !important;
+  fill: #123b5d !important;
+}
+
+/* Slightly soften the map frame corners. */
+div[data-testid="stPlotlyChart"] {
+  border-radius: 18px !important;
+  overflow: hidden !important;
 }
 
 
@@ -228,15 +246,21 @@ div[data-testid="stNumberInput"] div[data-baseweb="input"] {
 }
 div[data-testid="stNumberInput"] input {
   background: transparent !important;
-  color: #eefaff !important;
+  color: #123b5d !important;
+  -webkit-text-fill-color: #123b5d !important;
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 18px !important;
   font-weight: 700 !important;
+  opacity: 1 !important;
 }
 div[data-testid="stNumberInput"] button {
   background: transparent !important;
-  color: #d9f5ff !important;
+  color: #123b5d !important;
   border: none !important;
+}
+div[data-testid="stNumberInput"] button svg {
+  fill: #123b5d !important;
+  color: #123b5d !important;
 }
 div[data-testid="stNumberInput"] button:hover {
   background: rgba(126, 215, 255, 0.08) !important;
@@ -674,13 +698,34 @@ for nid, meta in ROA_NODES_META.items():
     sensor_readings[nid] = float(field_current_grid[idx])
 
 
-def make_mobile_heatmap(grid_data, height=310):
+def make_mobile_heatmap(grid_data, height=330):
+    # Mask only a few corner cells so the heatmap itself reads as a softly rounded rectangle.
+    heatmap_data = np.array(grid_data, dtype=float, copy=True)
+    rows, cols = heatmap_data.shape
+    radius = 3.2
+    corner_specs = [
+        (0, 0, 1, 1),
+        (0, cols - 1, 1, -1),
+        (rows - 1, 0, -1, 1),
+        (rows - 1, cols - 1, -1, -1),
+    ]
+    for r0, c0, rs, cs in corner_specs:
+        for dr in range(4):
+            for dc in range(4):
+                # Rounded quarter-circle cutout at each corner.
+                if (dr - radius) ** 2 + (dc - radius) ** 2 > radius ** 2:
+                    rr = r0 + rs * dr
+                    cc = c0 + cs * dc
+                    if 0 <= rr < rows and 0 <= cc < cols:
+                        heatmap_data[rr, cc] = np.nan
+
     fig = go.Figure(
         data=go.Heatmap(
-            z=grid_data,
+            z=heatmap_data,
             x=grid_len_axis,  # 0.25 to 8.75m
             y=grid_wid_axis,  # 0.25 to 3.75m
             colorscale="Turbo",
+            hoverongaps=False,
             zmin=18.0,
             zmax=28.0,
             colorbar=dict(title=dict(text="°C", font=dict(size=10, color="#d9f3ff")), thickness=7, len=0.9, x=1.02, tickfont=dict(size=9.5, color="#b7d7e8"), outlinecolor="rgba(174,228,255,0.18)"),
@@ -707,7 +752,7 @@ def make_mobile_heatmap(grid_data, height=310):
         )
     )
 
-    sensor_icon_uri = f"data:image/png;base64,{SENSOR_ICON_B64}"
+    sensor_icon_uri = f"data:image/svg+xml;base64,{SENSOR_ICON_SVG_B64}"
     for x_pos, y_pos in zip(sx_plot, sy_plot):
         fig.add_layout_image(
             dict(
@@ -716,8 +761,8 @@ def make_mobile_heatmap(grid_data, height=310):
                 y=y_pos,
                 xref="x",
                 yref="y",
-                sizex=0.46,
-                sizey=0.38,
+                sizex=0.72,
+                sizey=0.62,
                 xanchor="center",
                 yanchor="middle",
                 sizing="contain",
@@ -817,7 +862,7 @@ elif st.session_state.app_view == "HOME":
     )
 
     st.plotly_chart(
-        make_mobile_heatmap(field_current_grid, height=310),
+        make_mobile_heatmap(field_current_grid, height=330),
         use_container_width=True,
         config={"displayModeBar": False},
     )
