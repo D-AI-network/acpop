@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# COOLING_FACTORS_BUILD = 2026-09-03-v19
+# COOLING_FACTORS_BUILD = 2026-09-03-v20
 
 # SENSOR_RADAR_ROUNDED_BUILD = 2026-09-03-v12
 
@@ -522,13 +522,18 @@ div.stButton > button[kind="secondary"]:hover {
   filter: drop-shadow(0 0 7px rgba(85, 210, 255, 0.16));
 }
 .cooling-factor-desc {
-  color: var(--mist);
+  color: #b8d5e6;
   font-size: 12px;
+  font-weight: 650;
   line-height: 1.5;
   margin: 0 0 15px 0;
 }
+.cooling-factor-desc .step-emphasis {
+  color: #f5fbff;
+  font-weight: 850;
+}
 
-/* Make the four 5-level sliders feel like compact input cards. */
+/* The keyed wrapper stays invisible so each factor has only ONE rounded card. */
 .st-key-sl_ext,
 .st-key-sl_serv,
 .st-key-sl_meet,
@@ -537,10 +542,63 @@ div[class*="st-key-sl_ext"],
 div[class*="st-key-sl_serv"],
 div[class*="st-key-sl_meet"],
 div[class*="st-key-sl_work"] {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.st-key-sl_ext [data-testid="stSelectSlider"],
+.st-key-sl_serv [data-testid="stSelectSlider"],
+.st-key-sl_meet [data-testid="stSelectSlider"],
+.st-key-sl_work [data-testid="stSelectSlider"],
+div[class*="st-key-sl_ext"] [data-testid="stSelectSlider"],
+div[class*="st-key-sl_serv"] [data-testid="stSelectSlider"],
+div[class*="st-key-sl_meet"] [data-testid="stSelectSlider"],
+div[class*="st-key-sl_work"] [data-testid="stSelectSlider"] {
   background: rgba(18, 51, 78, 0.58) !important;
   border: 1px solid rgba(174, 228, 255, 0.16) !important;
   border-radius: 18px !important;
   padding: 11px 13px 8px 13px !important;
+}
+
+/* Factor name > selected value > endpoint labels, in that visual hierarchy. */
+.st-key-sl_ext [data-testid="stWidgetLabel"] p,
+.st-key-sl_serv [data-testid="stWidgetLabel"] p,
+.st-key-sl_meet [data-testid="stWidgetLabel"] p,
+.st-key-sl_work [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_ext"] [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_serv"] [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_meet"] [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+.st-key-sl_ext [data-testid="stTickBar"] *,
+.st-key-sl_serv [data-testid="stTickBar"] *,
+.st-key-sl_meet [data-testid="stTickBar"] *,
+.st-key-sl_work [data-testid="stTickBar"] *,
+div[class*="st-key-sl_ext"] [data-testid="stTickBar"] *,
+div[class*="st-key-sl_serv"] [data-testid="stTickBar"] *,
+div[class*="st-key-sl_meet"] [data-testid="stTickBar"] *,
+div[class*="st-key-sl_work"] [data-testid="stTickBar"] * {
+  font-size: 9px !important;
+  font-weight: 600 !important;
+  color: #a9c8db !important;
+}
+
+.st-key-sl_ext [data-testid="stThumbValue"],
+.st-key-sl_serv [data-testid="stThumbValue"],
+.st-key-sl_meet [data-testid="stThumbValue"],
+.st-key-sl_work [data-testid="stThumbValue"],
+div[class*="st-key-sl_ext"] [data-testid="stThumbValue"],
+div[class*="st-key-sl_serv"] [data-testid="stThumbValue"],
+div[class*="st-key-sl_meet"] [data-testid="stThumbValue"],
+div[class*="st-key-sl_work"] [data-testid="stThumbValue"] {
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
 }
 
 .cooling-load-card {
@@ -559,13 +617,15 @@ div[class*="st-key-sl_work"] {
   margin-bottom: 10px;
 }
 .cooling-load-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--mist);
+  font-family: 'Outfit', 'Noto Sans KR', sans-serif;
+  font-size: 15.5px;
+  font-weight: 800;
+  color: #dff5ff;
+  letter-spacing: -0.2px;
 }
 .cooling-load-level {
   font-family: 'Outfit', 'Noto Sans KR', sans-serif;
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 800;
   color: #f5fbff;
 }
@@ -1008,7 +1068,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
             </svg>
             <span>냉방 영향 요소</span>
         </div>
-        <div class="cooling-factor-desc">공간 온도에 영향을 주는 조건을 5단계로 설정하세요.</div>
+        <div class="cooling-factor-desc">공간 온도에 영향을 주는 조건을 <span class="step-emphasis">5단계</span>로 설정하세요.</div>
         """,
         unsafe_allow_html=True,
     )
@@ -1081,7 +1141,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
         f"""
         <div class="cooling-load-card">
             <div class="cooling-load-top">
-                <div class="cooling-load-label">현재 냉방 부담</div>
+                <div class="cooling-load-label">종합 열환경 수준</div>
                 <div class="cooling-load-level">{burden_label}</div>
             </div>
             <div class="cooling-load-segments">{segments_html}</div>
