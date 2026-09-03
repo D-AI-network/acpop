@@ -311,7 +311,7 @@ div.stButton > button[kind="secondary"] p {
 
 
 # ============================================================
-# 2. LOAD REPO ASSETS (Model, Sensors, Basis, Cases)
+# 2. LOAD SENSOR METADATA & ASSETS
 # ============================================================
 @st.cache_data
 def load_case_info():
@@ -332,12 +332,14 @@ def load_case_info():
 
 @st.cache_data
 def load_sensor_config():
+    # Canonical physical positions matching CFD coordinates
+    # Long axis: 0 to 8.75m | Short axis: 0 to 3.75m | Height: 0 to 2.5m
     default_meta = {
-        887:  {"code": "S1", "name": "Sensor 1", "x": 2.75, "y": 6.75, "z": 1.50, "zone": "Office North"},
-        672:  {"code": "S2", "name": "Sensor 2", "x": 2.75, "y": 2.75, "z": 1.50, "zone": "Office South"},
-        63:   {"code": "S3", "name": "Sensor 3", "x": 1.75, "y": 4.25, "z": 2.50, "zone": "Ceiling Center"},
-        1036: {"code": "S4", "name": "Sensor 4", "x": 1.25, "y": 1.25, "z": 2.00, "zone": "Server Pod"},
-        1129: {"code": "S5", "name": "Sensor 5", "x": 1.75, "y": 5.50, "z": 2.00, "zone": "Meeting Room"},
+        887:  {"code": "S1", "name": "Sensor 1", "long": 6.75, "short": 2.75, "z": 1.50, "zone": "Office North"},
+        672:  {"code": "S2", "name": "Sensor 2", "long": 2.75, "short": 2.75, "z": 1.50, "zone": "Office South"},
+        63:   {"code": "S3", "name": "Sensor 3", "long": 4.25, "short": 1.75, "z": 2.50, "zone": "Ceiling Center"},
+        1036: {"code": "S4", "name": "Sensor 4", "long": 1.25, "short": 1.25, "z": 2.00, "zone": "Server Pod"},
+        1129: {"code": "S5", "name": "Sensor 5", "long": 5.50, "short": 1.75, "z": 2.00, "zone": "Meeting Room"},
     }
 
     p = Path("selected_sensors.csv")
@@ -362,16 +364,20 @@ def load_sensor_config():
                 d_spec = default_meta[d_nid]
 
                 nid = int(row[node_col]) if node_col and not pd.isna(row[node_col]) else d_nid
-                x_val = float(row[x_col]) if x_col and not pd.isna(row[x_col]) else d_spec["x"]
-                y_val = float(row[y_col]) if y_col and not pd.isna(row[y_col]) else d_spec["y"]
-                z_val = float(row[z_col]) if z_col and not pd.isna(row[z_col]) else d_spec["z"]
+                raw_x = float(row[x_col]) if x_col and not pd.isna(row[x_col]) else d_spec["short"]
+                raw_y = float(row[y_col]) if y_col and not pd.isna(row[y_col]) else d_spec["long"]
+                raw_z = float(row[z_col]) if z_col and not pd.isna(row[z_col]) else d_spec["z"]
+
+                # Long dimension is always the larger axis (up to 8.75m)
+                long_val = max(raw_x, raw_y)
+                short_val = min(raw_x, raw_y)
 
                 parsed_meta[nid] = {
                     "code": f"S{i+1}",
                     "name": f"Sensor {i+1}",
-                    "x": x_val,
-                    "y": y_val,
-                    "z": z_val,
+                    "long": long_val,
+                    "short": short_val,
+                    "z": raw_z,
                     "zone": d_spec["zone"],
                 }
 
@@ -464,12 +470,12 @@ dp_options = (
 
 
 # ============================================================
-# 4. FULL ORIENTED 2D SPATIAL GRID ENGINE (Length Y = 9m, Width X = 4m)
+# 4. 2D SPATIAL GRID ENGINE (Length = 0~8.75m, Width = 0~3.75m)
 # ============================================================
-# Horizontal axis = Length Y (0.25m to 8.75m), Vertical axis = Width X (0.25m to 3.75m)
-gy_axis = np.linspace(0.25, 8.75, 45)  # 45 points along length
-gx_axis = np.linspace(0.25, 3.75, 25)  # 25 points along width
-grid_y_mesh, grid_x_mesh = np.meshgrid(gy_axis, gx_axis)
+# Horizontal axis = Length (0.25m to 8.75m), Vertical axis = Width (0.25m to 3.75m)
+grid_long_axis = np.linspace(0.25, 8.75, 45)
+grid_short_axis = np.linspace(0.25, 3.75, 25)
+mesh_long, mesh_short = np.meshgrid(grid_long_axis, grid_short_axis)
 
 stage_to_watt = {"낮음": -1.0, "보통": 0.0, "높음": 1.8}
 ext_shift = stage_to_watt.get(st.session_state.get("p_ext", "보통"), 0.0)
@@ -480,17 +486,11 @@ work_shift = stage_to_watt.get(st.session_state.get("p_work", "보통"), 0.0)
 match = re.search(r"\d+", str(st.session_state.selected_dp))
 dp_id = int(match.group(0)) if match else 0
 
-# Base background temperature
+# Base field calculation incorporating thermal plumes at respective zones
 base_dist = 22.0 + (dp_id % 3) * 0.5
-
-# Physical heat dissipation plumes
-# Server plume (S4 near X=1.25, Y=1.25)
-server_plume = (1.5 + serv_shift) * np.exp(-((grid_x_mesh - 1.25) ** 2 + (grid_y_mesh - 1.25) ** 2) / 2.0)
-# Solar infiltration (S1 near X=2.75, Y=6.75)
-solar_drift = (1.2 + ext_shift) * np.exp(-((grid_x_mesh - 2.75) ** 2 + (grid_y_mesh - 6.75) ** 2) / 3.0)
-# Meeting room load (S5 near X=1.75, Y=5.50)
-meet_load = (1.0 + meet_shift) * np.exp(-((grid_x_mesh - 1.75) ** 2 + (grid_y_mesh - 5.50) ** 2) / 2.0)
-# Vertical stratification
+server_plume = (1.6 + serv_shift) * np.exp(-((mesh_long - 1.25) ** 2 + (mesh_short - 1.25) ** 2) / 2.0)
+solar_drift = (1.3 + ext_shift) * np.exp(-((mesh_long - 6.75) ** 2 + (mesh_short - 2.75) ** 2) / 3.0)
+meet_load = (1.1 + meet_shift) * np.exp(-((mesh_long - 5.50) ** 2 + (mesh_short - 1.75) ** 2) / 2.0)
 z_strat = (st.session_state.z_plane - 1.5) * 0.6
 
 field_current_grid = base_dist + server_plume + solar_drift + meet_load + z_strat
@@ -499,8 +499,8 @@ avg_room_temp = float(np.nanmean(field_current_grid))
 # Compute live readings for each sensor coordinate
 sensor_readings = {}
 for nid, meta in ROA_NODES_META.items():
-    dist = (grid_x_mesh - meta["x"]) ** 2 + (grid_y_mesh - meta["y"]) ** 2
-    idx = np.unravel_index(np.argmin(dist), grid_x_mesh.shape)
+    dist = (mesh_long - meta["long"]) ** 2 + (mesh_short - meta["short"]) ** 2
+    idx = np.unravel_index(np.argmin(dist), mesh_long.shape)
     sensor_readings[nid] = float(field_current_grid[idx])
 
 
@@ -508,28 +508,28 @@ def make_mobile_heatmap(grid_data, height=225):
     fig = go.Figure(
         data=go.Heatmap(
             z=grid_data,
-            x=gy_axis,  # Length along horizontal (0 ~ 9m)
-            y=gx_axis,  # Width along vertical (0 ~ 4m)
+            x=grid_long_axis,
+            y=grid_short_axis,
             colorscale="Turbo",
             zmin=18.0,
             zmax=28.0,
-            colorbar=dict(title="°C", thickness=6, len=0.85, x=1.02, tickfont=dict(size=9.5)),
+            colorbar=dict(title="°C", thickness=7, len=0.9, x=1.02, tickfont=dict(size=9.5)),
         )
     )
 
-    # Plot sensors matching horizontal=Y, vertical=X
-    sy = [meta["y"] for meta in ROA_NODES_META.values()]
-    sx = [meta["x"] for meta in ROA_NODES_META.values()]
+    # Plot sensors matching horizontal=Long, vertical=Short
+    s_x = [meta["long"] for meta in ROA_NODES_META.values()]
+    s_y = [meta["short"] for meta in ROA_NODES_META.values()]
     codes = [meta["code"] for meta in ROA_NODES_META.values()]
     hover_texts = [
-        f"<b>{meta['code']}: {meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: (X={meta['x']:.2f}, Y={meta['y']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
+        f"<b>{meta['code']}: {meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: (L={meta['long']:.2f}, W={meta['short']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
         for nid, meta in ROA_NODES_META.items()
     ]
 
     fig.add_trace(
         go.Scatter(
-            x=sy,
-            y=sx,
+            x=s_x,
+            y=s_y,
             mode="markers+text",
             marker=dict(size=13, color="#ffffff", line=dict(color="#0077b6", width=2.5)),
             text=codes,
@@ -544,12 +544,12 @@ def make_mobile_heatmap(grid_data, height=225):
     fig.update_layout(
         title=dict(text="", font=dict(size=1)),
         showlegend=False,
-        xaxis=dict(range=[0.0, 9.0], showgrid=False, zeroline=False, showticklabels=False),
-        yaxis=dict(range=[0.0, 4.0], showgrid=False, zeroline=False, showticklabels=False),
-        margin=dict(l=4, r=4, t=8, b=4),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        margin=dict(l=0, r=0, t=4, b=0),
         height=height,
-        plot_bgcolor="#f8fafc",
-        paper_bgcolor="#ffffff",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
         autosize=True,
     )
     return fig
