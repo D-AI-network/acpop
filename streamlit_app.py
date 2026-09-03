@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# FACTOR_UI_BUILD = 2026-09-03-v27
+# FACTOR_UI_BUILD = 2026-09-03-v28
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -899,6 +899,45 @@ div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
 [data-testid="stAlert"] {
   border-radius: 13px !important;
 }
+
+/* ============================================================
+   v28 ABSOLUTE FINAL SLIDER TYPOGRAPHY OVERRIDE
+   All text INSIDE SelectSlider -> 8px bold.
+   Only the factor-name label is restored to 15px.
+   ============================================================ */
+div[data-testid="stSelectSlider"] *,
+div[data-testid="stSelectSlider"] *::before,
+div[data-testid="stSelectSlider"] *::after {
+  font-size: 8px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.15px !important;
+}
+
+/* Restore only the factor title: 외부 열환경 / 서버 발열 / 회의공간 / 업무공간 */
+div[data-testid="stSelectSlider"] label[data-testid="stWidgetLabel"] *,
+div[data-testid="stSelectSlider"] [data-testid="stWidgetLabel"] * {
+  font-size: 15px !important;
+  line-height: 1.25 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.25px !important;
+}
+
+/* Extra direct hooks for the visible selected value and both endpoint texts. */
+div[data-testid="stSelectSlider"] [role="slider"] *,
+div[data-testid="stSelectSlider"] [data-testid="stThumbValue"],
+div[data-testid="stSelectSlider"] [data-testid="stThumbValue"] *,
+div[data-testid="stSelectSlider"] [data-testid="stTickBar"],
+div[data-testid="stSelectSlider"] [data-testid="stTickBar"] *,
+div[data-testid="stSelectSlider"] [data-testid="stTickBarMin"],
+div[data-testid="stSelectSlider"] [data-testid="stTickBarMax"],
+div[data-testid="stSelectSlider"] [data-baseweb="slider"] *,
+div[data-testid="stSelectSlider"] [aria-valuenow] * {
+  font-size: 8px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+}
+
 </style>
 """,
     unsafe_allow_html=True,
