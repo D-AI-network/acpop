@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# CURRENT_TEMP_EDITABLE_BUILD = 2026-09-03-v3
+
 # FACTOR_UI_BUILD = 2026-09-03-v28
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
@@ -268,6 +270,39 @@ div[class*="st-key-temperature_map_card"] .svg-container {
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.5px;
+}
+
+/* Editable current-temperature control: replaces the old read-only average card. */
+.st-key-current_temp_input {
+  background: rgba(11, 39, 63, 0.62) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 14px !important;
+  padding: 9px 14px 8px 14px !important;
+  margin: 0 0 12px 0 !important;
+}
+.st-key-current_temp_input [data-testid="stWidgetLabel"] p {
+  color: var(--mist) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+.st-key-current_temp_input [data-testid="stNumberInput"] div[data-baseweb="input"] {
+  background: #f3f6fa !important;
+  border: 1px solid rgba(255,255,255,0.75) !important;
+  border-radius: 10px !important;
+}
+.st-key-current_temp_input input {
+  background: transparent !important;
+  color: #123b5d !important;
+  -webkit-text-fill-color: #123b5d !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 22px !important;
+  font-weight: 800 !important;
+}
+.st-key-current_temp_input button,
+.st-key-current_temp_input button svg {
+  color: #123b5d !important;
+  fill: #123b5d !important;
+  border: none !important;
 }
 
 /* Simplified target-temperature control */
@@ -1148,6 +1183,10 @@ for k, v in {"p_ext": "보통", "p_meet": "보통", "p_serv": "보통", "p_work"
 if "has_run_optimization" not in st.session_state:
     st.session_state.has_run_optimization = False
 
+
+def _invalidate_optimization_result():
+    st.session_state.has_run_optimization = False
+
 if "optimized_results" not in st.session_state:
     st.session_state.optimized_results = {
         "status": "FEASIBLE",
@@ -1495,9 +1534,26 @@ if current_field is None:
     }
 
 current_coords = np.asarray(current_field["coords"], dtype=np.float32)
-current_temp_nodes = np.asarray(current_field["temp_c"], dtype=np.float32)
-avg_room_temp = float(current_field["mean_temp_c"])
+base_current_temp_nodes = np.asarray(current_field["temp_c"], dtype=np.float32)
+base_avg_room_temp = float(np.nanmean(base_current_temp_nodes))
 current_field_source = str(current_field["source"])
+
+# User-adjustable current room temperature.
+# IMPORTANT: the deployed PopField checkpoint was not trained with current-room-temperature
+# as a separate input variable. Therefore this control only shifts the CURRENT field baseline
+# while preserving the spatial temperature pattern. It does not silently alter model inputs.
+# Reset the control to the selected DP's true/model mean whenever the DP changes.
+if st.session_state.get("current_temp_dp_id") != dp_id:
+    st.session_state.current_temp_dp_id = dp_id
+    st.session_state.current_temp_input = float(round(base_avg_room_temp, 1))
+    st.session_state.has_run_optimization = False
+
+requested_current_temp = float(
+    st.session_state.get("current_temp_input", round(base_avg_room_temp, 1))
+)
+current_temp_delta = requested_current_temp - base_avg_room_temp
+current_temp_nodes = base_current_temp_nodes + current_temp_delta
+avg_room_temp = float(np.nanmean(current_temp_nodes))
 
 # Use the actual/model coordinate envelope rather than the old hand-crafted 9m x 4m crop.
 x_min, x_max = float(np.min(current_coords[:, 0])), float(np.max(current_coords[:, 0]))
@@ -1648,14 +1704,19 @@ if st.session_state.app_view == "INTRO":
     )
 
 elif st.session_state.app_view == "HOME":
-    st.markdown(
-        f"""
-        <div class="avg-temp-card">
-            <div class="avg-temp-label">현재 공간 평균 온도</div>
-            <div class="avg-temp-value">{avg_room_temp:.1f} °C</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    st.markdown('<span style="display:none">CURRENT_TEMP_EDITABLE_BUILD_V3</span>', unsafe_allow_html=True)
+    # The current room temperature itself is editable.  The selected DP's
+    # spatial temperature pattern is preserved and shifted so that its mean
+    # matches this user-controlled value.
+    st.number_input(
+        "현재 공간 평균 온도 (°C)",
+        min_value=15.0,
+        max_value=35.0,
+        step=0.1,
+        format="%.1f",
+        key="current_temp_input",
+        help="선택된 DP의 공간 온도 패턴은 유지하고, 전체 평균을 이 값에 맞춥니다.",
+        on_change=_invalidate_optimization_result,
     )
 
     if current_field_source.startswith("Actual CFD"):
@@ -1677,7 +1738,13 @@ elif st.session_state.app_view == "HOME":
 
     if float(new_target) != float(st.session_state.target_temp):
         st.session_state.target_temp = float(new_target)
+        st.session_state.has_run_optimization = False
         st.rerun()
+
+    st.caption(
+        f"원본 평균 {base_avg_room_temp:.1f}°C → 현재 설정 {avg_room_temp:.1f}°C "
+        f"(ΔT {current_temp_delta:+.1f}°C). 공간 패턴은 유지됩니다."
+    )
 
     st.markdown(
         """
