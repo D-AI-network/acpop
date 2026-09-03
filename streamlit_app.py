@@ -573,7 +573,7 @@ div[class*="st-key-sl_serv"] [data-testid="stWidgetLabel"] p,
 div[class*="st-key-sl_meet"] [data-testid="stWidgetLabel"] p,
 div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
   font-size: 15px !important;
-  font-weight: 800 !important;
+  font-weight: 600 !important;
 }
 
 .st-key-sl_ext [data-testid="stTickBar"] *,
@@ -584,8 +584,8 @@ div[class*="st-key-sl_ext"] [data-testid="stTickBar"] *,
 div[class*="st-key-sl_serv"] [data-testid="stTickBar"] *,
 div[class*="st-key-sl_meet"] [data-testid="stTickBar"] *,
 div[class*="st-key-sl_work"] [data-testid="stTickBar"] * {
-  font-size: 7.8px !important;
-  font-weight: 600 !important;
+  font-size: 6.4px !important;
+  font-weight: 500 !important;
   color: #9fbed1 !important;
 }
 
@@ -597,8 +597,8 @@ div[class*="st-key-sl_ext"] [data-testid="stThumbValue"],
 div[class*="st-key-sl_serv"] [data-testid="stThumbValue"],
 div[class*="st-key-sl_meet"] [data-testid="stThumbValue"],
 div[class*="st-key-sl_work"] [data-testid="stThumbValue"] {
-  font-size: 9px !important;
-  font-weight: 700 !important;
+  font-size: 8px !important;
+  font-weight: 600 !important;
 }
 
 .cooling-load-card {
