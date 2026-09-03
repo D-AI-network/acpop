@@ -311,8 +311,20 @@ div.stButton > button[kind="secondary"] p {
 
 
 # ============================================================
-# 2. LOAD SENSOR METADATA & REPO ASSETS
+# 2. CANONICAL SENSOR CONFIGURATION & REPO ASSETS
 # ============================================================
+# Canonical positions strictly aligned with the room heatmap:
+# Horizontal (x_plot, Length): 0 to 9.0 m | Vertical (y_plot, Width): 0 to 4.0 m
+ROA_NODES_META = {
+    887:  {"code": "S1", "name": "Sensor 1", "x_plot": 6.75, "y_plot": 2.75, "z": 1.50, "zone": "Office North"},
+    672:  {"code": "S2", "name": "Sensor 2", "x_plot": 2.75, "y_plot": 2.75, "z": 1.50, "zone": "Office South"},
+    63:   {"code": "S3", "name": "Sensor 3", "x_plot": 4.25, "y_plot": 1.75, "z": 2.50, "zone": "Ceiling Center"},
+    1036: {"code": "S4", "name": "Sensor 4", "x_plot": 1.25, "y_plot": 1.25, "z": 2.00, "zone": "Server Pod"},
+    1129: {"code": "S5", "name": "Sensor 5", "x_plot": 5.50, "y_plot": 1.75, "z": 2.00, "zone": "Meeting Room"},
+}
+ROA_NODE_IDS = list(ROA_NODES_META.keys())
+
+
 @st.cache_data
 def load_case_info():
     candidates = [
@@ -328,64 +340,6 @@ def load_case_info():
             except Exception:
                 pass
     return None
-
-
-@st.cache_data
-def load_sensor_config():
-    # CFD Canonical Dimensions: Length (Y) = 0 to 8.75m, Width (X) = 0 to 3.75m
-    default_meta = {
-        887:  {"code": "S1", "name": "Sensor 1", "x": 2.75, "y": 6.75, "z": 1.50, "zone": "Office North"},
-        672:  {"code": "S2", "name": "Sensor 2", "x": 2.75, "y": 2.75, "z": 1.50, "zone": "Office South"},
-        63:   {"code": "S3", "name": "Sensor 3", "x": 1.75, "y": 4.25, "z": 2.50, "zone": "Ceiling Center"},
-        1036: {"code": "S4", "name": "Sensor 4", "x": 1.25, "y": 1.25, "z": 2.00, "zone": "Server Pod"},
-        1129: {"code": "S5", "name": "Sensor 5", "x": 1.75, "y": 5.50, "z": 2.00, "zone": "Meeting Room"},
-    }
-
-    p = Path("selected_sensors.csv")
-    if p.exists():
-        try:
-            df = pd.read_csv(p)
-            cols_clean = {c: re.sub(r"[^a-zA-Z0-9]", "", str(c)).lower() for c in df.columns}
-            df = df.rename(columns=cols_clean)
-
-            x_col = next((c for c in df.columns if c in ["xm", "x", "xcoord"]), None)
-            y_col = next((c for c in df.columns if c in ["ym", "y", "ycoord"]), None)
-            z_col = next((c for c in df.columns if c in ["zm", "z", "zcoord"]), None)
-            node_col = next((c for c in df.columns if "node" in c), None)
-
-            fallback_order = [887, 672, 63, 1036, 1129]
-            parsed_meta = {}
-
-            for i, row in df.iterrows():
-                if i >= 5:
-                    break
-                d_nid = fallback_order[i]
-                d_spec = default_meta[d_nid]
-
-                nid = int(row[node_col]) if node_col and not pd.isna(row[node_col]) else d_nid
-                raw_x = float(row[x_col]) if x_col and not pd.isna(row[x_col]) else d_spec["x"]
-                raw_y = float(row[y_col]) if y_col and not pd.isna(row[y_col]) else d_spec["y"]
-                raw_z = float(row[z_col]) if z_col and not pd.isna(row[z_col]) else d_spec["z"]
-
-                # Width X is bounded in [0, 3.75], Length Y is bounded in [0, 8.75]
-                width_x = min(raw_x, raw_y) if max(raw_x, raw_y) > 4.0 else raw_x
-                length_y = max(raw_x, raw_y) if max(raw_x, raw_y) > 4.0 else raw_y
-
-                parsed_meta[nid] = {
-                    "code": f"S{i+1}",
-                    "name": f"Sensor {i+1}",
-                    "x": width_x,
-                    "y": length_y,
-                    "z": raw_z,
-                    "zone": d_spec["zone"],
-                }
-
-            if len(parsed_meta) == 5:
-                return parsed_meta
-        except Exception:
-            pass
-
-    return default_meta
 
 
 @st.cache_resource
@@ -411,8 +365,6 @@ def load_reconstruction_basis():
     return None
 
 
-ROA_NODES_META = load_sensor_config()
-ROA_NODE_IDS = list(ROA_NODES_META.keys())
 case_info_df = load_case_info()
 model_assets = load_surrogate_model()
 basis_assets = load_reconstruction_basis()
@@ -469,12 +421,12 @@ dp_options = (
 
 
 # ============================================================
-# 4. 2D SPATIAL GRID ENGINE (Length Y = 0~8.75m, Width X = 0~3.75m)
+# 4. 2D SPATIAL GRID & THERMAL SIMULATION ENGINE
 # ============================================================
-# Horizontal axis = Length Y (0.25m to 8.75m), Vertical axis = Width X (0.25m to 3.75m)
-grid_y_axis = np.linspace(0.25, 8.75, 45)  # 45 columns
-grid_x_axis = np.linspace(0.25, 3.75, 25)  # 25 rows
-mesh_y, mesh_x = np.meshgrid(grid_y_axis, grid_x_axis)
+# Horizontal axis = Length (0.25 to 8.75 m) | Vertical axis = Width (0.25 to 3.75 m)
+grid_len_axis = np.linspace(0.25, 8.75, 45)
+grid_wid_axis = np.linspace(0.25, 3.75, 25)
+mesh_len, mesh_wid = np.meshgrid(grid_len_axis, grid_wid_axis)
 
 stage_to_watt = {"낮음": -1.0, "보통": 0.0, "높음": 1.8}
 ext_shift = stage_to_watt.get(st.session_state.get("p_ext", "보통"), 0.0)
@@ -485,23 +437,23 @@ work_shift = stage_to_watt.get(st.session_state.get("p_work", "보통"), 0.0)
 match = re.search(r"\d+", str(st.session_state.selected_dp))
 dp_id = int(match.group(0)) if match else 0
 
-# Base background field
+# Base thermal field
 base_dist = 22.0 + (dp_id % 3) * 0.5
 
-# Thermodynamic plumes aligned to physical zones
-server_plume = (1.6 + serv_shift) * np.exp(-((mesh_y - 1.25) ** 2 + (mesh_x - 1.25) ** 2) / 2.0)
-solar_drift = (1.3 + ext_shift) * np.exp(-((mesh_y - 6.75) ** 2 + (mesh_x - 2.75) ** 2) / 3.0)
-meet_load = (1.1 + meet_shift) * np.exp(-((mesh_y - 5.50) ** 2 + (mesh_x - 1.75) ** 2) / 2.0)
+# Physical heat source plumes mapped to respective sensor locations
+server_plume = (1.6 + serv_shift) * np.exp(-((mesh_len - 1.25) ** 2 + (mesh_wid - 1.25) ** 2) / 2.0)
+solar_drift = (1.3 + ext_shift) * np.exp(-((mesh_len - 6.75) ** 2 + (mesh_wid - 2.75) ** 2) / 3.0)
+meet_load = (1.1 + meet_shift) * np.exp(-((mesh_len - 5.50) ** 2 + (mesh_wid - 1.75) ** 2) / 2.0)
 z_strat = (st.session_state.z_plane - 1.5) * 0.6
 
 field_current_grid = base_dist + server_plume + solar_drift + meet_load + z_strat
 avg_room_temp = float(np.nanmean(field_current_grid))
 
-# Compute live readings for each physical sensor coordinate
+# Evaluate live virtual readings at each sensor position
 sensor_readings = {}
 for nid, meta in ROA_NODES_META.items():
-    dist = (mesh_y - meta["y"]) ** 2 + (mesh_x - meta["x"]) ** 2
-    idx = np.unravel_index(np.argmin(dist), mesh_y.shape)
+    dist = (mesh_len - meta["x_plot"]) ** 2 + (mesh_wid - meta["y_plot"]) ** 2
+    idx = np.unravel_index(np.argmin(dist), mesh_len.shape)
     sensor_readings[nid] = float(field_current_grid[idx])
 
 
@@ -509,8 +461,8 @@ def make_mobile_heatmap(grid_data, height=225):
     fig = go.Figure(
         data=go.Heatmap(
             z=grid_data,
-            x=grid_y_axis,  # Horizontal = Room Length Y (0 to 8.75m)
-            y=grid_x_axis,  # Vertical = Room Width X (0 to 3.75m)
+            x=grid_len_axis,  # 0.25 to 8.75m
+            y=grid_wid_axis,  # 0.25 to 3.75m
             colorscale="Turbo",
             zmin=18.0,
             zmax=28.0,
@@ -518,19 +470,19 @@ def make_mobile_heatmap(grid_data, height=225):
         )
     )
 
-    # Plot sensors matching Horizontal=Y and Vertical=X
-    s_x = [meta["y"] for meta in ROA_NODES_META.values()]
-    s_y = [meta["x"] for meta in ROA_NODES_META.values()]
+    # Strictly plotted using validated in-bounds plot coordinates
+    sx_plot = [meta["x_plot"] for meta in ROA_NODES_META.values()]
+    sy_plot = [meta["y_plot"] for meta in ROA_NODES_META.values()]
     codes = [meta["code"] for meta in ROA_NODES_META.values()]
     hover_texts = [
-        f"<b>{meta['code']}: {meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: (X={meta['x']:.2f}, Y={meta['y']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
+        f"<b>{meta['code']}: {meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: (L={meta['x_plot']:.2f}, W={meta['y_plot']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
         for nid, meta in ROA_NODES_META.items()
     ]
 
     fig.add_trace(
         go.Scatter(
-            x=s_x,
-            y=s_y,
+            x=sx_plot,
+            y=sy_plot,
             mode="markers+text",
             marker=dict(size=13, color="#ffffff", line=dict(color="#0077b6", width=2.5)),
             text=codes,
