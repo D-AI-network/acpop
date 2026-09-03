@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# FACTOR_UI_BUILD = 2026-09-03-v28
+# FACTOR_UI_BUILD = 2026-09-03-v29
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -814,8 +814,12 @@ div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
   font-family: 'Outfit', 'Noto Sans KR', sans-serif;
   font-size: 20px;
   font-weight: 800;
-  color: #f5fbff;
 }
+.cooling-load-level.level-1 { color: #66d9ff; }
+.cooling-load-level.level-2 { color: #52c9ef; }
+.cooling-load-level.level-3 { color: #8edbcb; }
+.cooling-load-level.level-4 { color: #ffad66; }
+.cooling-load-level.level-5 { color: #ff6b7a; }
 .cooling-load-segments {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -933,6 +937,63 @@ div[data-testid="stSelectSlider"] [data-testid="stTickBarMin"],
 div[data-testid="stSelectSlider"] [data-testid="stTickBarMax"],
 div[data-testid="stSelectSlider"] [data-baseweb="slider"] *,
 div[data-testid="stSelectSlider"] [aria-valuenow] * {
+  font-size: 8px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+}
+
+
+/* ============================================================
+   v29: force the visible 5-step slider texts to 8px BOLD.
+   Streamlit versions may expose select_slider as stSlider or stSelectSlider,
+   so both are targeted. This is scoped only to the four cooling-factor keys.
+   ============================================================ */
+.st-key-sl_ext [data-testid="stSlider"] *,
+.st-key-sl_ext [data-testid="stSelectSlider"] *,
+.st-key-sl_serv [data-testid="stSlider"] *,
+.st-key-sl_serv [data-testid="stSelectSlider"] *,
+.st-key-sl_meet [data-testid="stSlider"] *,
+.st-key-sl_meet [data-testid="stSelectSlider"] *,
+.st-key-sl_work [data-testid="stSlider"] *,
+.st-key-sl_work [data-testid="stSelectSlider"] *,
+div[class*="st-key-sl_ext"] [data-testid="stSlider"] *,
+div[class*="st-key-sl_ext"] [data-testid="stSelectSlider"] *,
+div[class*="st-key-sl_serv"] [data-testid="stSlider"] *,
+div[class*="st-key-sl_serv"] [data-testid="stSelectSlider"] *,
+div[class*="st-key-sl_meet"] [data-testid="stSlider"] *,
+div[class*="st-key-sl_meet"] [data-testid="stSelectSlider"] *,
+div[class*="st-key-sl_work"] [data-testid="stSlider"] *,
+div[class*="st-key-sl_work"] [data-testid="stSelectSlider"] * {
+  font-size: 8px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.2px !important;
+}
+
+/* Restore only the four factor names. */
+.st-key-sl_ext [data-testid="stWidgetLabel"] *,
+.st-key-sl_serv [data-testid="stWidgetLabel"] *,
+.st-key-sl_meet [data-testid="stWidgetLabel"] *,
+.st-key-sl_work [data-testid="stWidgetLabel"] *,
+div[class*="st-key-sl_ext"] [data-testid="stWidgetLabel"] *,
+div[class*="st-key-sl_serv"] [data-testid="stWidgetLabel"] *,
+div[class*="st-key-sl_meet"] [data-testid="stWidgetLabel"] *,
+div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] * {
+  font-size: 15px !important;
+  line-height: 1.25 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.25px !important;
+}
+
+/* Directly hit BaseWeb slider labels / selected value as a final fallback. */
+.st-key-sl_ext [data-baseweb="slider"] *,
+.st-key-sl_serv [data-baseweb="slider"] *,
+.st-key-sl_meet [data-baseweb="slider"] *,
+.st-key-sl_work [data-baseweb="slider"] *,
+div[class*="st-key-sl_ext"] [data-baseweb="slider"] *,
+div[class*="st-key-sl_serv"] [data-baseweb="slider"] *,
+div[class*="st-key-sl_meet"] [data-baseweb="slider"] *,
+div[class*="st-key-sl_work"] [data-baseweb="slider"] * {
   font-size: 8px !important;
   line-height: 1 !important;
   font-weight: 800 !important;
@@ -1457,7 +1518,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
         <div class="cooling-load-card">
             <div class="cooling-load-top">
                 <div class="cooling-load-label">종합 열환경 수준</div>
-                <div class="cooling-load-level">{burden_label}</div>
+                <div class="cooling-load-level level-{burden_index}">{burden_label}</div>
             </div>
             <div class="cooling-load-segments">{segments_html}</div>
         </div>
