@@ -329,6 +329,7 @@ def load_case_info():
                 pass
     return None
 
+
 @st.cache_data
 def load_sensor_config():
     p = Path("selected_sensors.csv")
@@ -350,7 +351,6 @@ def load_sensor_config():
             return meta
         except Exception:
             pass
-    # Fallback to defaults
     return {
         887: {"code": "S1", "name": "Sensor 1", "x": 2.75, "y": 6.75, "z": 1.50, "zone": "Office North"},
         672: {"code": "S2", "name": "Sensor 2", "x": 2.75, "y": 2.75, "z": 1.50, "zone": "Office South"},
@@ -358,6 +358,7 @@ def load_sensor_config():
         1036: {"code": "S4", "name": "Sensor 4", "x": 1.25, "y": 1.25, "z": 2.00, "zone": "Server Pod"},
         1129: {"code": "S5", "name": "Sensor 5", "x": 1.75, "y": 5.50, "z": 2.00, "zone": "Meeting Room"},
     }
+
 
 @st.cache_resource
 def load_surrogate_model():
@@ -370,15 +371,19 @@ def load_surrogate_model():
             pass
     return None
 
-@st.cache_data
+
+# FIXED: Using @st.cache_resource and converting to a pure dictionary to prevent UnserializableReturnValueError
+@st.cache_resource
 def load_reconstruction_basis():
     p = Path("sensor_reconstruction_basis.npz")
     if p.exists():
         try:
-            return np.load(p)
+            with np.load(p) as data:
+                return {k: data[k] for k in data.files}
         except Exception:
             pass
     return None
+
 
 ROA_NODES_META = load_sensor_config()
 ROA_NODE_IDS = list(ROA_NODES_META.keys())
@@ -408,7 +413,6 @@ if "policy" not in st.session_state:
 if "heat_input_mode" not in st.session_state:
     st.session_state.heat_input_mode = "간편 단계"
 
-# Stored load conditions
 for k, v in {"p_ext": "보통", "p_meet": "보통", "p_serv": "보통", "p_work": "보통"}.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -441,45 +445,35 @@ dp_options = (
 # ============================================================
 # 4. REAL DYNAMIC SPATIAL RECONSTRUCTION ENGINE
 # ============================================================
-# Regular 2D mesh grid for indoor floor plan
 gx = np.linspace(0.25, 3.75, 35)
 gy = np.linspace(0.25, 8.75, 35)
 grid_x, grid_y = np.meshgrid(gx, gy)
 
-# Dynamic load weights translated into real physical degrees Celsius
 stage_to_watt = {"낮음": -1.0, "보통": 0.0, "높음": 1.8}
 ext_shift = stage_to_watt.get(st.session_state.get("p_ext", "보통"), 0.0)
 meet_shift = stage_to_watt.get(st.session_state.get("p_meet", "보통"), 0.0)
 serv_shift = stage_to_watt.get(st.session_state.get("p_serv", "보통"), 0.0)
 work_shift = stage_to_watt.get(st.session_state.get("p_work", "보통"), 0.0)
 
-# Generate baseline field using basis_assets if available, or mathematical modal basis
 match = re.search(r"\d+", str(st.session_state.selected_dp))
 dp_id = int(match.group(0)) if match else 0
 
 if basis_assets is not None and "basis" in basis_assets:
-    # Full reconstruction using pre-trained POD basis
     modes = basis_assets["basis"][:, :5]
     coeffs = np.sin(np.linspace(dp_id * 0.1, (dp_id + 5) * 0.1, 5))
     recon_1d = 22.0 + np.dot(modes, coeffs)
     coords = basis_assets.get("coords", np.vstack([grid_x.ravel(), grid_y.ravel()]).T)
     field_current_grid = griddata(coords, recon_1d, (grid_x, grid_y), method="linear", fill_value=23.5)
 else:
-    # Physical thermal diffusion model matching the coordinates
     base_dist = 22.0 + (dp_id % 3) * 0.5
-    # Server heat plume (S4 near x=1.25, y=1.25)
     server_plume = (1.5 + serv_shift) * np.exp(-((grid_x - 1.25) ** 2 + (grid_y - 1.25) ** 2) / 2.0)
-    # Solar window drift (S1 near x=2.75, y=6.75)
     solar_drift = (1.2 + ext_shift) * np.exp(-((grid_x - 2.75) ** 2 + (grid_y - 6.75) ** 2) / 3.0)
-    # Meeting room load (S5 near x=1.75, y=5.5)
     meet_load = (1.0 + meet_shift) * np.exp(-((grid_x - 1.75) ** 2 + (grid_y - 5.50) ** 2) / 2.0)
-    # Elevation stratification
     z_strat = (st.session_state.z_plane - 1.5) * 0.6
     field_current_grid = base_dist + server_plume + solar_drift + meet_load + z_strat
 
 avg_room_temp = float(np.nanmean(field_current_grid))
 
-# Compute live virtual readings for the 5 sensor locations
 sensor_readings = {}
 for nid, meta in ROA_NODES_META.items():
     dist = (grid_x - meta["x"]) ** 2 + (grid_y - meta["y"]) ** 2
@@ -661,7 +655,6 @@ elif st.session_state.app_view == "HEAT_LOAD":
         p_serv = st.select_slider("🖥️ 서버 발열", options=stage_opts, value=st.session_state.p_serv, key="sl_serv")
         p_work = st.select_slider("💼 업무공간", options=stage_opts, value=st.session_state.p_work, key="sl_work")
 
-    # Immediate rerun on slider change to ensure real-time visual feedback
     if (
         p_ext != st.session_state.p_ext
         or p_meet != st.session_state.p_meet
@@ -686,7 +679,6 @@ elif st.session_state.app_view == "HEAT_LOAD":
         policy = st.session_state.policy
         total_load_intensity = ext_shift + meet_shift + serv_shift + work_shift
 
-        # Evaluate optimum parameters across candidates
         if "Comfort" in policy:
             vane_opt = "Middle (M)" if total_load_intensity < 2.0 else "Right (R)"
             flow_opt, temp_opt, q_opt = "50 CMM", "10 °C", 18.4
@@ -753,7 +745,6 @@ elif st.session_state.app_view == "RESULTS":
         res = st.session_state.optimized_results
         target = st.session_state.target_temp
 
-        # Dynamic post-control field influenced by the chosen dispatch action
         if "Comfort" in res["policy_used"]:
             field_post_grid = field_current_grid - 0.80 * (field_current_grid - target) - 0.2
         elif "Eco" in res["policy_used"]:
@@ -761,7 +752,6 @@ elif st.session_state.app_view == "RESULTS":
         else:
             field_post_grid = field_current_grid - 0.68 * (field_current_grid - target)
 
-        # 1. Feasibility Badge
         if res["status"] == "FEASIBLE":
             badge_bg, badge_border, badge_text, badge_desc = (
                 "#dcfce7",
@@ -794,7 +784,6 @@ elif st.session_state.app_view == "RESULTS":
             unsafe_allow_html=True,
         )
 
-        # 2. Optimal HVAC Dispatch Card
         st.markdown(
             f"""
         <div class="optimal-dispatch-box">
@@ -808,7 +797,6 @@ elif st.session_state.app_view == "RESULTS":
             unsafe_allow_html=True,
         )
 
-        # 3. Spatial Diagnostics
         st.markdown('<div class="section-title">공간 쾌적성 및 편차 지표 (Diagnostics)</div>', unsafe_allow_html=True)
         st.markdown(
             f"""
@@ -836,7 +824,6 @@ elif st.session_state.app_view == "RESULTS":
             unsafe_allow_html=True,
         )
 
-        # 4. Comparative Heatmap Plots
         st.caption(f"현재 공간 필드 (Current Field, Z={st.session_state.z_plane:g}m)")
         st.plotly_chart(make_mobile_heatmap(field_current_grid, height=185), use_container_width=True, config={"displayModeBar": False})
 
