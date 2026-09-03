@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 # CFD_RETRIEVAL_FINAL_V4 = 2026-09-03
+# UI_REFINEMENT_BUILD = 2026-09-03-v31
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
@@ -59,6 +60,7 @@ except Exception as exc:
     POPFIELD_BACKEND_IMPORT_ERROR = repr(exc)
 
 SENSOR_ICON_SVG_B64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgdmlld0JveD0iMCAwIDcyIDcyIj4KICA8cmVjdCB4PSIxOCIgeT0iOCIgd2lkdGg9IjM2IiBoZWlnaHQ9IjE0IiByeD0iNyIgZmlsbD0iIzEyM2I1ZCIvPgogIDxjaXJjbGUgY3g9IjM2IiBjeT0iMTUiIHI9IjIuNiIgZmlsbD0iIzlmZTRmZiIvPgogIDxwYXRoIGQ9Ik0yOSAzMCBRMzYgMjQgNDMgMzAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0yNCAzOCBRMzYgMjkgNDggMzgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0xOSA0NyBRMzYgMzQgNTMgNDciIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4="
+RESULT_TITLE_SNOWFLAKE_B64 = "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"
 
 # MERGED_HOME_BUILD = 2026-09-03-v8_HOME_CONTROL_COMBINED
 
@@ -435,22 +437,41 @@ div[data-testid="stPlotlyChart"] {
   font-weight: 700;
 }
 
-/* Feasibility Badge */
+/* Feasibility / target-achievement card */
 .feasibility-box {
-  border-radius: 12px;
-  padding: 12px 14px;
-  margin-top: 4px;
-  margin-bottom: 12px;
-  border-left: 4px solid;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-top: 6px;
+  margin-bottom: 14px;
+  border: 1.5px solid;
+  box-shadow: 0 6px 16px rgba(2, 20, 38, 0.12);
 }
 .feasibility-title {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Outfit', 'Noto Sans KR', sans-serif;
   font-size: 15px;
   font-weight: 800;
 }
 .feasibility-desc {
   font-size: 12px;
-  margin-top: 2px;
+  margin-top: 3px;
+}
+.results-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.results-title-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+.field-map-title {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  color: #e8f7ff !important;
+  font-size: 15px;
+  font-weight: 800;
+  margin: 13px 0 8px 0;
 }
 
 /* Metric Display Grids */
@@ -973,6 +994,62 @@ div[data-testid="stSelectSlider"] [data-testid="stTickBarMax"],
 div[data-testid="stSelectSlider"] [data-baseweb="slider"] *,
 div[data-testid="stSelectSlider"] [aria-valuenow] * {
   font-size: 8px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+}
+
+
+/* ============================================================
+   v31 cooling-factor slider typography
+   Make only the stage/value texts tiny (9px); keep factor names readable.
+   Current Streamlit may expose select_slider through stSlider rather than stSelectSlider.
+   ============================================================ */
+.st-key-sl_ext [data-testid="stSlider"] *,
+.st-key-sl_serv [data-testid="stSlider"] *,
+.st-key-sl_meet [data-testid="stSlider"] *,
+.st-key-sl_work [data-testid="stSlider"] *,
+div[class*="st-key-sl_ext"] [data-testid="stSlider"] *,
+div[class*="st-key-sl_serv"] [data-testid="stSlider"] *,
+div[class*="st-key-sl_meet"] [data-testid="stSlider"] *,
+div[class*="st-key-sl_work"] [data-testid="stSlider"] *,
+.st-key-sl_ext [data-testid="stSelectSlider"] *,
+.st-key-sl_serv [data-testid="stSelectSlider"] *,
+.st-key-sl_meet [data-testid="stSelectSlider"] *,
+.st-key-sl_work [data-testid="stSelectSlider"] * {
+  font-size: 9px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.15px !important;
+}
+
+/* Restore only the four factor names. */
+.st-key-sl_ext [data-testid="stWidgetLabel"] *,
+.st-key-sl_serv [data-testid="stWidgetLabel"] *,
+.st-key-sl_meet [data-testid="stWidgetLabel"] *,
+.st-key-sl_work [data-testid="stWidgetLabel"] *,
+div[class*="st-key-sl_ext"] [data-testid="stWidgetLabel"] *,
+div[class*="st-key-sl_serv"] [data-testid="stWidgetLabel"] *,
+div[class*="st-key-sl_meet"] [data-testid="stWidgetLabel"] *,
+div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] * {
+  font-size: 15px !important;
+  line-height: 1.25 !important;
+  font-weight: 500 !important;
+}
+
+/* Explicit selected-value / endpoint hooks as a fallback. */
+.st-key-sl_ext [data-testid="stThumbValue"],
+.st-key-sl_serv [data-testid="stThumbValue"],
+.st-key-sl_meet [data-testid="stThumbValue"],
+.st-key-sl_work [data-testid="stThumbValue"],
+.st-key-sl_ext [data-testid="stTickBar"] *,
+.st-key-sl_serv [data-testid="stTickBar"] *,
+.st-key-sl_meet [data-testid="stTickBar"] *,
+.st-key-sl_work [data-testid="stTickBar"] *,
+.st-key-sl_ext [data-baseweb="slider"] *,
+.st-key-sl_serv [data-baseweb="slider"] *,
+.st-key-sl_meet [data-baseweb="slider"] *,
+.st-key-sl_work [data-baseweb="slider"] * {
+  font-size: 9px !important;
   line-height: 1 !important;
   font-weight: 800 !important;
 }
@@ -1917,11 +1994,9 @@ elif st.session_state.app_view == "HOME":
         on_change=_sync_current_temp_from_home_widget,
     )
 
+    # Keep the HOME screen clean: do not show the nearest-CFD diagnostic under the current temperature.
     if matched_scenario is not None and current_field_source.startswith("Actual CFD"):
-        st.caption(
-            f"가장 가까운 실제 CFD: DP {matched_dp_id} · 실제 평균 {matched_mean_temp_c:.1f}°C "
-            f"(입력 대비 {matched_mean_temp_c - float(st.session_state.current_temp_query):+.1f}°C)"
-        )
+        pass
     elif current_field_source.startswith("PopField"):
         if FIELD_ZIP_PATH is None:
             st.warning(
@@ -2282,7 +2357,10 @@ elif st.session_state.app_view == "RESULTS":
             st.session_state.app_view = "HOME"
             st.rerun()
     else:
-        st.markdown('<div class="section-title">⚡ AI 최적화 및 필드 예측 완료</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="section-title results-title-row"><img class="results-title-icon" src="data:image/png;base64,{RESULT_TITLE_SNOWFLAKE_B64}" alt="snowflake">AI 최적화 필드 예측</div>',
+            unsafe_allow_html=True,
+        )
 
         res = st.session_state.optimized_results
         target = st.session_state.target_temp
@@ -2301,44 +2379,54 @@ elif st.session_state.app_view == "RESULTS":
 
         if res["status"] == "FEASIBLE":
             badge_bg, badge_border, badge_text, badge_desc = (
-                "#dcfce7",
-                "#16a34a",
-                "✅ 달성 가능 (Feasible)",
-                f"목표 {target:.1f}℃ 및 쾌적 지표를 모두 만족하는 운전안입니다.",
+                "rgba(117, 218, 174, 0.16)",
+                "#6dd3a0",
+                "✅ 목표 온도 달성 가능",
+                f"목표 {target:.1f}℃ 및 쾌적 지표를 만족하는 냉방 설정입니다.",
             )
         elif res["status"] == "NEAR_FEASIBLE":
             badge_bg, badge_border, badge_text, badge_desc = (
-                "#fef3c7",
-                "#d97706",
-                "⚠️ 거의 달성 (Near-Feasible)",
-                "대부분의 기준을 만족하지만 일부 공간에 경미한 편차가 존재합니다.",
+                "rgba(242, 193, 91, 0.14)",
+                "#e7b95d",
+                "⚠️ 목표 온도 근접 달성",
+                "대부분의 기준을 만족하지만 일부 공간에 경미한 편차가 있습니다.",
             )
         else:
             badge_bg, badge_border, badge_text, badge_desc = (
-                "#fee2e2",
-                "#dc2626",
-                "❌ 달성 어려움 (Infeasible)",
-                "현재 HVAC 후보 범위만으로는 목표 온도를 만족하기 어렵습니다.",
+                "rgba(255, 120, 132, 0.14)",
+                "#ff7f8d",
+                "❌ 목표 온도 달성 어려움",
+                "현재 냉방 설정 후보만으로는 목표 온도를 만족하기 어렵습니다.",
             )
 
         st.markdown(
             f"""
         <div class="feasibility-box" style="background:{badge_bg}; border-color:{badge_border};">
             <div class="feasibility-title" style="color:{badge_border};">{badge_text}</div>
-            <div class="feasibility-desc" style="color:#1e293b;">{badge_desc}</div>
+            <div class="feasibility-desc" style="color:#d8edf8;">{badge_desc}</div>
         </div>
         """,
             unsafe_allow_html=True,
         )
 
+        vane_map = {
+            "Left (L)": "좌측 (L)",
+            "Middle (M)": "중앙 (M)",
+            "Right (R)": "우측 (R)",
+            "L / M": "좌측 / 중앙",
+            "M / R": "중앙 / 우측",
+            "L / R": "좌측 / 우측",
+        }
+        vane_display = vane_map.get(str(res['vane']), str(res['vane']))
+
         st.markdown(
             f"""
         <div class="optimal-dispatch-box">
-            <h4>Optimal HVAC Dispatch 🔗</h4>
-            <div class="dispatch-row">💨 <b>Vane Direction (L/M/R):</b> {res['vane']}</div>
-            <div class="dispatch-row">🌀 <b>Airflow Rate (CMM):</b> {res['flow']}</div>
-            <div class="dispatch-row">❄️ <b>Supply Air Temp:</b> {res['temp']}</div>
-            <div class="dispatch-row">⚡ <b>Cooling Capacity Proxy (<i>Q</i>):</b> {res['q_proxy']} kW</div>
+            <h4>AI 추천 냉방 설정</h4>
+            <div class="dispatch-row">💨 <b>바람 방향:</b> {vane_display}</div>
+            <div class="dispatch-row">🌀 <b>풍량:</b> {res['flow']}</div>
+            <div class="dispatch-row">❄️ <b>공급 공기 온도:</b> {res['temp']}</div>
+            <div class="dispatch-row">◈ <b>냉방 출력 추정치:</b> {float(res['q_proxy']):.2f} kW</div>
         </div>
         """,
             unsafe_allow_html=True,
@@ -2377,15 +2465,10 @@ elif st.session_state.app_view == "RESULTS":
             unsafe_allow_html=True,
         )
 
-        matched_id_text = res.get("matched_dp_id", "-")
-        matched_mean_text = float(res.get("matched_mean_temp_c", np.nan))
-        st.caption(
-            f"현재 공간 필드 · 실제 CFD DP {matched_id_text} · 평균 {matched_mean_text:.1f}°C "
-            f"(Z={st.session_state.z_plane:g}m)"
-        )
+        st.markdown('<div class="field-map-title">Current Field</div>', unsafe_allow_html=True)
         st.plotly_chart(make_mobile_heatmap(result_current_grid, height=185), use_container_width=True, config={"displayModeBar": False})
 
-        st.caption(f"제어 후 예측 필드 (Predicted Spatial Temperature Map, Z={st.session_state.z_plane:g}m)")
+        st.markdown('<div class="field-map-title">Predicted Field</div>', unsafe_allow_html=True)
         st.plotly_chart(make_mobile_heatmap(field_post_grid, height=185), use_container_width=True, config={"displayModeBar": False})
 
         st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
