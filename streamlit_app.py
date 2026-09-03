@@ -332,7 +332,6 @@ def load_case_info():
 
 @st.cache_data
 def load_sensor_config():
-    # Ground truth defaults (5 optimal sensors from QR/PCA basis)
     default_meta = {
         887:  {"code": "S1", "name": "Sensor 1", "x": 2.75, "y": 6.75, "z": 1.50, "zone": "Office North"},
         672:  {"code": "S2", "name": "Sensor 2", "x": 2.75, "y": 2.75, "z": 1.50, "zone": "Office South"},
@@ -465,11 +464,12 @@ dp_options = (
 
 
 # ============================================================
-# 4. DYNAMIC SPATIAL RECONSTRUCTION ENGINE
+# 4. FULL ORIENTED 2D SPATIAL GRID ENGINE (Length Y = 9m, Width X = 4m)
 # ============================================================
-gx = np.linspace(0.25, 3.75, 35)
-gy = np.linspace(0.25, 8.75, 35)
-grid_x, grid_y = np.meshgrid(gx, gy)
+# Horizontal axis = Length Y (0.25m to 8.75m), Vertical axis = Width X (0.25m to 3.75m)
+gy_axis = np.linspace(0.25, 8.75, 45)  # 45 points along length
+gx_axis = np.linspace(0.25, 3.75, 25)  # 25 points along width
+grid_y_mesh, grid_x_mesh = np.meshgrid(gy_axis, gx_axis)
 
 stage_to_watt = {"낮음": -1.0, "보통": 0.0, "높음": 1.8}
 ext_shift = stage_to_watt.get(st.session_state.get("p_ext", "보통"), 0.0)
@@ -480,21 +480,27 @@ work_shift = stage_to_watt.get(st.session_state.get("p_work", "보통"), 0.0)
 match = re.search(r"\d+", str(st.session_state.selected_dp))
 dp_id = int(match.group(0)) if match else 0
 
-# Base field calculation incorporating thermal plumes at respective sensor zones
+# Base background temperature
 base_dist = 22.0 + (dp_id % 3) * 0.5
-server_plume = (1.5 + serv_shift) * np.exp(-((grid_x - 1.25) ** 2 + (grid_y - 1.25) ** 2) / 2.0)
-solar_drift = (1.2 + ext_shift) * np.exp(-((grid_x - 2.75) ** 2 + (grid_y - 6.75) ** 2) / 3.0)
-meet_load = (1.0 + meet_shift) * np.exp(-((grid_x - 1.75) ** 2 + (grid_y - 5.50) ** 2) / 2.0)
+
+# Physical heat dissipation plumes
+# Server plume (S4 near X=1.25, Y=1.25)
+server_plume = (1.5 + serv_shift) * np.exp(-((grid_x_mesh - 1.25) ** 2 + (grid_y_mesh - 1.25) ** 2) / 2.0)
+# Solar infiltration (S1 near X=2.75, Y=6.75)
+solar_drift = (1.2 + ext_shift) * np.exp(-((grid_x_mesh - 2.75) ** 2 + (grid_y_mesh - 6.75) ** 2) / 3.0)
+# Meeting room load (S5 near X=1.75, Y=5.50)
+meet_load = (1.0 + meet_shift) * np.exp(-((grid_x_mesh - 1.75) ** 2 + (grid_y_mesh - 5.50) ** 2) / 2.0)
+# Vertical stratification
 z_strat = (st.session_state.z_plane - 1.5) * 0.6
 
 field_current_grid = base_dist + server_plume + solar_drift + meet_load + z_strat
 avg_room_temp = float(np.nanmean(field_current_grid))
 
-# Compute live virtual readings for the 5 sensor locations
+# Compute live readings for each sensor coordinate
 sensor_readings = {}
 for nid, meta in ROA_NODES_META.items():
-    dist = (grid_x - meta["x"]) ** 2 + (grid_y - meta["y"]) ** 2
-    idx = np.unravel_index(np.argmin(dist), grid_x.shape)
+    dist = (grid_x_mesh - meta["x"]) ** 2 + (grid_y_mesh - meta["y"]) ** 2
+    idx = np.unravel_index(np.argmin(dist), grid_x_mesh.shape)
     sensor_readings[nid] = float(field_current_grid[idx])
 
 
@@ -502,8 +508,8 @@ def make_mobile_heatmap(grid_data, height=225):
     fig = go.Figure(
         data=go.Heatmap(
             z=grid_data,
-            x=gx,
-            y=gy,
+            x=gy_axis,  # Length along horizontal (0 ~ 9m)
+            y=gx_axis,  # Width along vertical (0 ~ 4m)
             colorscale="Turbo",
             zmin=18.0,
             zmax=28.0,
@@ -511,18 +517,19 @@ def make_mobile_heatmap(grid_data, height=225):
         )
     )
 
-    sx = [meta["x"] for meta in ROA_NODES_META.values()]
+    # Plot sensors matching horizontal=Y, vertical=X
     sy = [meta["y"] for meta in ROA_NODES_META.values()]
+    sx = [meta["x"] for meta in ROA_NODES_META.values()]
     codes = [meta["code"] for meta in ROA_NODES_META.values()]
     hover_texts = [
-        f"<b>{meta['code']}: {meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: ({meta['x']:.2f}, {meta['y']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
+        f"<b>{meta['code']}: {meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: (X={meta['x']:.2f}, Y={meta['y']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
         for nid, meta in ROA_NODES_META.items()
     ]
 
     fig.add_trace(
         go.Scatter(
-            x=sx,
-            y=sy,
+            x=sy,
+            y=sx,
             mode="markers+text",
             marker=dict(size=13, color="#ffffff", line=dict(color="#0077b6", width=2.5)),
             text=codes,
@@ -537,8 +544,8 @@ def make_mobile_heatmap(grid_data, height=225):
     fig.update_layout(
         title=dict(text="", font=dict(size=1)),
         showlegend=False,
-        xaxis=dict(showgrid=True, gridcolor="#e2e8f0", zeroline=False, showticklabels=False),
-        yaxis=dict(showgrid=True, gridcolor="#e2e8f0", zeroline=False, showticklabels=False),
+        xaxis=dict(range=[0.0, 9.0], showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(range=[0.0, 4.0], showgrid=False, zeroline=False, showticklabels=False),
         margin=dict(l=4, r=4, t=8, b=4),
         height=height,
         plot_bgcolor="#f8fafc",
@@ -657,7 +664,7 @@ elif st.session_state.app_view == "CONTROL":
 
 
 # ============================================================
-# 8. SCREEN 3: SPACE HEAT LOAD (Triggers Evaluation)
+# 8. SCREEN 3: SPACE HEAT LOAD
 # ============================================================
 elif st.session_state.app_view == "HEAT_LOAD":
     st.markdown('<div class="section-title">🔥 공간 열부하 (Space Heat Load)</div>', unsafe_allow_html=True)
