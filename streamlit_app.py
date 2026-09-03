@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v34
+# FACTOR_UI_BUILD = 2026-09-03-v35
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -2071,6 +2071,186 @@ def make_mobile_heatmap(grid_data, height=340):
     return fig
 
 
+def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
+    """True 3D CFD field: XYZ node cloud + room wireframe + selected sensors."""
+    coords_xyz = np.asarray(coords_xyz, dtype=float)
+    temp_nodes = np.asarray(temp_nodes, dtype=float).reshape(-1)
+
+    valid = (
+        coords_xyz.ndim == 2
+        and coords_xyz.shape[1] >= 3
+        and len(coords_xyz) == len(temp_nodes)
+    )
+    if not valid:
+        return make_mobile_heatmap(field_current_grid, height=height)
+
+    finite = np.isfinite(coords_xyz[:, :3]).all(axis=1) & np.isfinite(temp_nodes)
+    coords = coords_xyz[finite, :3]
+    temps = temp_nodes[finite]
+
+    if len(coords) == 0:
+        return make_mobile_heatmap(field_current_grid, height=height)
+
+    # Downsample deterministically for mobile responsiveness while preserving
+    # the full 3D spatial envelope.
+    if len(coords) > max_points:
+        pick = np.linspace(0, len(coords) - 1, max_points, dtype=int)
+        pc = coords[pick]
+        pt = temps[pick]
+    else:
+        pc = coords
+        pt = temps
+
+    xmin, ymin, zmin = np.min(coords, axis=0)
+    xmax, ymax, zmax = np.max(coords, axis=0)
+
+    fig = go.Figure()
+
+    # CFD nodes: temperature is encoded by color; the points themselves show
+    # the actual 3D room volume rather than a raised 2D sheet.
+    fig.add_trace(
+        go.Scatter3d(
+            x=pc[:, 0],
+            y=pc[:, 1],
+            z=pc[:, 2],
+            mode="markers",
+            marker=dict(
+                size=2.4,
+                color=pt,
+                colorscale="Turbo",
+                cmin=18.0,
+                cmax=28.0,
+                opacity=0.58,
+                colorbar=dict(
+                    title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
+                    thickness=8,
+                    len=0.70,
+                    x=0.965,
+                    tickfont=dict(size=9, color="#d9f3ff"),
+                    outlinecolor="rgba(174,228,255,0.18)",
+                ),
+            ),
+            hovertemplate=(
+                "X: %{x:.2f} m<br>"
+                "Y: %{y:.2f} m<br>"
+                "Z: %{z:.2f} m<br>"
+                "온도: %{marker.color:.2f} °C"
+                "<extra></extra>"
+            ),
+            showlegend=False,
+        )
+    )
+
+    # Room bounding-box wireframe.
+    corners = {
+        "000": (xmin, ymin, zmin), "100": (xmax, ymin, zmin),
+        "010": (xmin, ymax, zmin), "110": (xmax, ymax, zmin),
+        "001": (xmin, ymin, zmax), "101": (xmax, ymin, zmax),
+        "011": (xmin, ymax, zmax), "111": (xmax, ymax, zmax),
+    }
+    edges = [
+        ("000","100"), ("000","010"), ("100","110"), ("010","110"),
+        ("001","101"), ("001","011"), ("101","111"), ("011","111"),
+        ("000","001"), ("100","101"), ("010","011"), ("110","111"),
+    ]
+    for a, b in edges:
+        xa, ya, za = corners[a]
+        xb, yb, zb = corners[b]
+        fig.add_trace(
+            go.Scatter3d(
+                x=[xa, xb], y=[ya, yb], z=[za, zb],
+                mode="lines",
+                line=dict(color="rgba(151, 205, 232, 0.42)", width=2),
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+
+    # Selected sensor positions: use the nearest real CFD node to each canonical
+    # sensor location and display a red sphere, like the reference 3D layout.
+    sensor_x, sensor_y, sensor_z, sensor_labels, sensor_hover = [], [], [], [], []
+    for nid, meta in ROA_NODES_META.items():
+        target = np.asarray(
+            [float(meta["x_plot"]), float(meta["y_plot"]), float(meta["z"])],
+            dtype=float,
+        )
+        dist = np.sum((coords - target[None, :]) ** 2, axis=1)
+        idx = int(np.argmin(dist))
+        sx, sy, sz = coords[idx]
+        sensor_x.append(float(sx))
+        sensor_y.append(float(sy))
+        sensor_z.append(float(sz))
+        sensor_labels.append(str(meta.get("code", meta.get("name", ""))))
+        sensor_hover.append(
+            f"<b>{meta['name']}</b><br>"
+            f"X={sx:.2f}m, Y={sy:.2f}m, Z={sz:.2f}m<br>"
+            f"온도={temps[idx]:.2f}°C"
+        )
+
+    fig.add_trace(
+        go.Scatter3d(
+            x=sensor_x,
+            y=sensor_y,
+            z=sensor_z,
+            mode="markers+text",
+            marker=dict(
+                size=7,
+                color="#ff4b3e",
+                line=dict(color="#ffb4ad", width=1.2),
+                symbol="circle",
+                opacity=1.0,
+            ),
+            text=sensor_labels,
+            textposition="middle right",
+            textfont=dict(size=10, color="#f3fbff"),
+            hovertext=sensor_hover,
+            hoverinfo="text",
+            showlegend=False,
+        )
+    )
+
+    fig.update_layout(
+        height=height,
+        margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        showlegend=False,
+        scene=dict(
+            domain=dict(x=[0.00, 0.91], y=[0.00, 1.00]),
+            bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(
+                title=dict(text="X (m)", font=dict(size=9, color="#7faec8")),
+                showbackground=False,
+                showgrid=False,
+                zeroline=False,
+                tickfont=dict(size=8, color="#6f9db8"),
+                color="#6f9db8",
+            ),
+            yaxis=dict(
+                title=dict(text="Y (m)", font=dict(size=9, color="#7faec8")),
+                showbackground=False,
+                showgrid=False,
+                zeroline=False,
+                tickfont=dict(size=8, color="#6f9db8"),
+                color="#6f9db8",
+            ),
+            zaxis=dict(
+                title=dict(text="Z (m)", font=dict(size=9, color="#7faec8")),
+                showbackground=False,
+                showgrid=False,
+                zeroline=False,
+                tickfont=dict(size=8, color="#6f9db8"),
+                color="#6f9db8",
+            ),
+            aspectmode="data",
+            camera=dict(
+                eye=dict(x=1.42, y=-1.58, z=1.02),
+                center=dict(x=0.0, y=0.0, z=-0.05),
+            ),
+        ),
+    )
+    return fig
+
+
 # ============================================================
 # 5. HEADER
 # ============================================================
@@ -2174,7 +2354,7 @@ elif st.session_state.app_view == "HOME":
 
     with st.container(key="temperature_map_card"):
         st.plotly_chart(
-            make_mobile_heatmap(field_current_grid, height=350),
+            make_true_3d_field(current_coords, current_temp_nodes, height=390),
             use_container_width=True,
             config={"displayModeBar": False},
         )
@@ -2447,6 +2627,8 @@ elif st.session_state.app_view == "HEAT_LOAD":
                     "q_proxy": float(rec["estimated_sensible_cooling_kw"]),
                     "policy_used": policy,
                     "field_post_grid": np.asarray(field_post_grid, dtype=np.float32),
+                    "field_post_coords": np.asarray(backend["coords"], dtype=np.float32),
+                    "field_post_temp_nodes": np.asarray(pred_temp_nodes, dtype=np.float32),
                     "pred_ra_temp_c": float(pred_ra[0]),
                     "num_candidates": int(len(opt_df)),
                     "mapped_loads_W": {k: float(v) for k, v in loads.items()},
@@ -2468,6 +2650,8 @@ elif st.session_state.app_view == "HEAT_LOAD":
                         ),
                         dtype=np.float32,
                     ),
+                    "field_current_coords": np.asarray(matched_current["coords"], dtype=np.float32),
+                    "field_current_temp_nodes": np.asarray(matched_current["temp_c"], dtype=np.float32),
                 }
 
                 st.session_state.has_run_optimization = True
@@ -2510,9 +2694,27 @@ elif st.session_state.app_view == "RESULTS":
             # This is the actual PopField output for the selected HVAC action.
             field_post_grid = np.asarray(res["field_post_grid"], dtype=float)
         else:
-            # Only possible for stale browser session state created by the older app.
             field_post_grid = np.asarray(field_current_grid, dtype=float)
-            st.warning("이전 버전의 임시 결과가 남아 있습니다. 새 최적화를 한 번 실행해 주세요.")
+
+        result_current_coords = np.asarray(
+            res.get("field_current_coords", current_coords),
+            dtype=float,
+        )
+        result_current_nodes = np.asarray(
+            res.get("field_current_temp_nodes", current_temp_nodes),
+            dtype=float,
+        )
+        result_pred_coords = np.asarray(
+            res.get("field_post_coords", result_current_coords),
+            dtype=float,
+        )
+        result_pred_nodes = np.asarray(
+            res.get("field_post_temp_nodes", result_current_nodes),
+            dtype=float,
+        )
+
+        if "field_post_temp_nodes" not in res:
+            st.warning("이전 결과가 남아 있어 3D 예측 필드를 새로 만들 수 없습니다. 냉방 최적화를 다시 실행해 주세요.")
 
         if res["status"] == "FEASIBLE":
             badge_bg, badge_border, badge_text, badge_desc = (
@@ -2600,7 +2802,7 @@ elif st.session_state.app_view == "RESULTS":
         with st.container(key="field_comparison_card"):
             st.markdown('<div class="field-map-title">Current Field</div>', unsafe_allow_html=True)
             st.plotly_chart(
-                make_mobile_heatmap(result_current_grid, height=305),
+                make_true_3d_field(result_current_coords, result_current_nodes, height=380),
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
@@ -2609,7 +2811,7 @@ elif st.session_state.app_view == "RESULTS":
 
             st.markdown('<div class="field-map-title">Predicted Field</div>', unsafe_allow_html=True)
             st.plotly_chart(
-                make_mobile_heatmap(field_post_grid, height=305),
+                make_true_3d_field(result_pred_coords, result_pred_nodes, height=380),
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
