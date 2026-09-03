@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# FACTOR_SLIDER_BUILD = 2026-09-03-v26
+# FACTOR_UI_BUILD = 2026-09-03-v27
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -758,6 +758,36 @@ div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
   font-weight: 450 !important;
 }
 
+
+/* v27: hard override for the visible 5-step labels.
+   Applies to 선택값(보통/높음/매우 높음) and endpoints(매우 낮음/매우 높음). */
+[data-testid="stSelectSlider"] [data-baseweb="slider"],
+[data-testid="stSelectSlider"] [data-baseweb="slider"] *,
+[data-testid="stSelectSlider"] [data-testid="stThumbValue"],
+[data-testid="stSelectSlider"] [data-testid="stThumbValue"] *,
+[data-testid="stSelectSlider"] [data-testid="stTickBar"],
+[data-testid="stSelectSlider"] [data-testid="stTickBar"] *,
+[data-testid="stSelectSlider"] [data-testid="stTickBarMin"],
+[data-testid="stSelectSlider"] [data-testid="stTickBarMax"] {
+  font-size: 8px !important;
+  line-height: 1 !important;
+  font-weight: 800 !important;
+}
+
+/* Keep factor names readable; they sit outside the BaseWeb slider itself. */
+.st-key-sl_ext [data-testid="stWidgetLabel"] p,
+.st-key-sl_serv [data-testid="stWidgetLabel"] p,
+.st-key-sl_meet [data-testid="stWidgetLabel"] p,
+.st-key-sl_work [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_ext"] [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_serv"] [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_meet"] [data-testid="stWidgetLabel"] p,
+div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
+  font-size: 15px !important;
+  line-height: 1.25 !important;
+  font-weight: 500 !important;
+}
+
 .cooling-load-card {
   background: linear-gradient(180deg, rgba(11, 38, 62, 0.94) 0%, rgba(13, 47, 75, 0.92) 100%);
   border: 1px solid rgba(174, 228, 255, 0.20);
@@ -840,6 +870,25 @@ div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
   background: rgba(255, 107, 122, 0.12);
   border-color: rgba(255, 107, 122, 0.40);
 }
+
+/* Factor-specific chip frames */
+.major-factor-chip.factor-ext {
+  background: rgba(255, 159, 67, 0.11) !important;
+  border-color: rgba(255, 159, 67, 0.78) !important;
+}
+.major-factor-chip.factor-serv {
+  background: rgba(66, 165, 245, 0.11) !important;
+  border-color: rgba(66, 165, 245, 0.78) !important;
+}
+.major-factor-chip.factor-meet {
+  background: rgba(156, 93, 202, 0.11) !important;
+  border-color: rgba(156, 93, 202, 0.80) !important;
+}
+.major-factor-chip.factor-work {
+  background: rgba(141, 110, 99, 0.13) !important;
+  border-color: rgba(141, 110, 99, 0.86) !important;
+}
+
 .major-factor-empty {
   color: #9fbfd3;
   font-size: 11px;
@@ -1343,6 +1392,12 @@ elif st.session_state.app_view == "HEAT_LOAD":
         "회의공간": "👥",
         "업무공간": "💼",
     }
+    factor_chip_class = {
+        "외부 열환경": "factor-ext",
+        "서버 발열": "factor-serv",
+        "회의공간": "factor-meet",
+        "업무공간": "factor-work",
+    }
     major_factors = [(name, level) for name, level in factor_values.items() if level >= 4]
 
     segments_html = "".join(
@@ -1352,7 +1407,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
 
     if major_factors:
         major_chips_html = "".join(
-            f'<span class="major-factor-chip {"very-high" if level == 5 else ""}">'             f'{factor_icons[name]} {name} · {stage_opts[level - 1]}</span>'
+            f'<span class="major-factor-chip {factor_chip_class[name]}">'             f'{factor_icons[name]} {name} · {stage_opts[level - 1]}</span>'
             for name, level in major_factors
         )
     else:
