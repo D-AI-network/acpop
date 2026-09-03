@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# COOLING_FACTORS_BUILD = 2026-09-03-v19
+
 # SENSOR_RADAR_ROUNDED_BUILD = 2026-09-03-v12
 
 import base64
@@ -502,6 +504,97 @@ div.stButton > button[kind="secondary"]:hover {
   border-color: rgba(174, 228, 255, 0.27) !important;
 }
 
+/* Cooling-factor screen */
+.cooling-factor-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 6px 0;
+  font-family: 'Outfit', 'Noto Sans KR', 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: #f3fbff;
+}
+.cooling-factor-title svg {
+  width: 30px;
+  height: 24px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 7px rgba(85, 210, 255, 0.16));
+}
+.cooling-factor-desc {
+  color: var(--mist);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 0 15px 0;
+}
+
+/* Make the four 5-level sliders feel like compact input cards. */
+.st-key-sl_ext,
+.st-key-sl_serv,
+.st-key-sl_meet,
+.st-key-sl_work,
+div[class*="st-key-sl_ext"],
+div[class*="st-key-sl_serv"],
+div[class*="st-key-sl_meet"],
+div[class*="st-key-sl_work"] {
+  background: rgba(18, 51, 78, 0.58) !important;
+  border: 1px solid rgba(174, 228, 255, 0.16) !important;
+  border-radius: 18px !important;
+  padding: 11px 13px 8px 13px !important;
+}
+
+.cooling-load-card {
+  background: linear-gradient(180deg, rgba(11, 38, 62, 0.94) 0%, rgba(13, 47, 75, 0.92) 100%);
+  border: 1px solid rgba(174, 228, 255, 0.20);
+  border-radius: 18px;
+  padding: 15px 16px 14px 16px;
+  margin: 17px 0 16px 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.cooling-load-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.cooling-load-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mist);
+}
+.cooling-load-level {
+  font-family: 'Outfit', 'Noto Sans KR', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: #f5fbff;
+}
+.cooling-load-segments {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+  margin-bottom: 11px;
+}
+.cooling-load-segment {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(151, 190, 214, 0.18);
+}
+.cooling-load-segment.on-1 { background: #66d9ff; }
+.cooling-load-segment.on-2 { background: #52c9ef; }
+.cooling-load-segment.on-3 { background: #8edbcb; }
+.cooling-load-segment.on-4 { background: #ffad66; }
+.cooling-load-segment.on-5 { background: #ff6b7a; }
+.cooling-load-major {
+  font-size: 11.5px;
+  color: #bad8e9;
+  line-height: 1.45;
+}
+.cooling-load-major b {
+  color: #edf9ff;
+  font-weight: 700;
+}
+
 /* Info/success boxes stay readable in the dark shell */
 [data-testid="stAlert"] {
   border-radius: 13px !important;
@@ -712,7 +805,7 @@ grid_len_axis = np.linspace(0.25, 8.75, 45)
 grid_wid_axis = np.linspace(0.25, 3.75, 25)
 mesh_len, mesh_wid = np.meshgrid(grid_len_axis, grid_wid_axis)
 
-stage_to_watt = {"낮음": -1.0, "보통": 0.0, "높음": 1.8}
+stage_to_watt = {"매우 낮음": -0.8, "낮음": -0.4, "보통": 0.0, "높음": 0.8, "매우 높음": 1.6}
 ext_shift = stage_to_watt.get(st.session_state.get("p_ext", "보통"), 0.0)
 meet_shift = stage_to_watt.get(st.session_state.get("p_meet", "보통"), 0.0)
 serv_shift = stage_to_watt.get(st.session_state.get("p_serv", "보통"), 0.0)
@@ -899,20 +992,57 @@ elif st.session_state.app_view == "HOME":
 
 
 # ============================================================
-# 7. SCREEN 2: SPACE HEAT LOAD
+# 7. SCREEN 2: COOLING INFLUENCE FACTORS
 # ============================================================
 elif st.session_state.app_view == "HEAT_LOAD":
-    st.markdown('<div class="section-title">🔥 공간 열부하 (Space Heat Load)</div>', unsafe_allow_html=True)
-    st.caption("외부, 회의공간, 서버, 업무공간 열부하 수준을 지정하세요.")
+    # The title uses a small wall-mounted AC SVG instead of a flame emoji.
+    st.markdown(
+        """
+        <div class="cooling-factor-title">
+            <svg viewBox="0 0 96 62" aria-hidden="true">
+                <rect x="5" y="8" width="86" height="39" rx="10" fill="none" stroke="#aee4ff" stroke-width="4"/>
+                <path d="M13 36 H83 Q82 47 73 50 H23 Q14 47 13 36 Z" fill="rgba(110,210,255,0.12)" stroke="#74d7ff" stroke-width="3"/>
+                <path d="M24 40 H72" stroke="#dff7ff" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>
+                <circle cx="70" cy="21" r="2.4" fill="#67d7ff"/>
+                <circle cx="77" cy="21" r="2.4" fill="#67d7ff" opacity="0.75"/>
+            </svg>
+            <span>냉방 영향 요소</span>
+        </div>
+        <div class="cooling-factor-desc">공간 온도에 영향을 주는 조건을 5단계로 설정하세요.</div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    stage_opts = ["낮음", "보통", "높음"]
+    stage_opts = ["매우 낮음", "낮음", "보통", "높음", "매우 높음"]
+
+    # Old sessions are already compatible because 낮음/보통/높음 remain valid options.
     c1, c2 = st.columns(2)
     with c1:
-        p_ext = st.select_slider("☀️ 외부 열환경", options=stage_opts, value=st.session_state.p_ext, key="sl_ext")
-        p_meet = st.select_slider("👥 회의공간", options=stage_opts, value=st.session_state.p_meet, key="sl_meet")
+        p_ext = st.select_slider(
+            "☀️ 외부 열환경",
+            options=stage_opts,
+            value=st.session_state.p_ext if st.session_state.p_ext in stage_opts else "보통",
+            key="sl_ext",
+        )
+        p_meet = st.select_slider(
+            "👥 회의공간",
+            options=stage_opts,
+            value=st.session_state.p_meet if st.session_state.p_meet in stage_opts else "보통",
+            key="sl_meet",
+        )
     with c2:
-        p_serv = st.select_slider("🖥️ 서버 발열", options=stage_opts, value=st.session_state.p_serv, key="sl_serv")
-        p_work = st.select_slider("💼 업무공간", options=stage_opts, value=st.session_state.p_work, key="sl_work")
+        p_serv = st.select_slider(
+            "🖥️ 서버 발열",
+            options=stage_opts,
+            value=st.session_state.p_serv if st.session_state.p_serv in stage_opts else "보통",
+            key="sl_serv",
+        )
+        p_work = st.select_slider(
+            "💼 업무공간",
+            options=stage_opts,
+            value=st.session_state.p_work if st.session_state.p_work in stage_opts else "보통",
+            key="sl_work",
+        )
 
     if (
         p_ext != st.session_state.p_ext
@@ -926,8 +1056,42 @@ elif st.session_state.app_view == "HEAT_LOAD":
         st.session_state.p_work = p_work
         st.rerun()
 
-    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-    if st.button("AI 최적 냉방 찾기", type="primary", use_container_width=True):
+    # Lightweight interpretation of the four user inputs.
+    # The summary is intentionally simple: all four settings contribute equally.
+    stage_index = {name: i + 1 for i, name in enumerate(stage_opts)}
+    factor_values = {
+        "외부 열환경": stage_index[p_ext],
+        "서버 발열": stage_index[p_serv],
+        "회의공간": stage_index[p_meet],
+        "업무공간": stage_index[p_work],
+    }
+    burden_score = sum(factor_values.values()) / len(factor_values)
+    burden_index = max(1, min(5, int(round(burden_score))))
+    burden_label = stage_opts[burden_index - 1]
+    max_level = max(factor_values.values())
+    major_factors = [name for name, level in factor_values.items() if level == max_level]
+    major_text = " · ".join(major_factors)
+
+    segments_html = "".join(
+        f'<div class="cooling-load-segment {f"on-{i}" if i <= burden_index else ""}"></div>'
+        for i in range(1, 6)
+    )
+
+    st.markdown(
+        f"""
+        <div class="cooling-load-card">
+            <div class="cooling-load-top">
+                <div class="cooling-load-label">현재 냉방 부담</div>
+                <div class="cooling-load-level">{burden_label}</div>
+            </div>
+            <div class="cooling-load-segments">{segments_html}</div>
+            <div class="cooling-load-major">주요 영향 요인&nbsp;&nbsp;<b>{major_text}</b></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if st.button("AI 최적 냉방 찾기", type="primary", use_container_width=True, key="btn_run_cooling_opt"):
         with st.spinner("54개 HVAC 후보 가상시험 및 CFD 대리모델 추론 중..."):
             time.sleep(0.35)
 
@@ -973,10 +1137,6 @@ elif st.session_state.app_view == "HEAT_LOAD":
 
         st.session_state.has_run_optimization = True
         st.session_state.app_view = "RESULTS"
-        st.rerun()
-
-    if st.button("← 이전으로 (Current Field / 냉방 설정)", type="secondary", use_container_width=True):
-        st.session_state.app_view = "HOME"
         st.rerun()
 
 
@@ -1111,7 +1271,7 @@ if st.session_state.app_view != "INTRO":
 
     with b_col2:
         btn_settings_kind = "primary" if st.session_state.app_view == "HEAT_LOAD" else "secondary"
-        if st.button("🔥 Load", type=btn_settings_kind, use_container_width=True, key="btn_nav_settings"):
+        if st.button("❄️ Load", type=btn_settings_kind, use_container_width=True, key="btn_nav_settings"):
             st.session_state.app_view = "HEAT_LOAD"
             st.rerun()
 
