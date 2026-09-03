@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from typing import Dict
 
 import matplotlib.pyplot as plt
-import plotly.graph_objects as go
+import plotly.graph_objects as pgo
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -1070,7 +1070,7 @@ def _sensor_overlay_trace(sensor_info: Dict | None):
     locs = sensor_info.get("sensor_locations") or []
     if not locs:
         return None
-    return go.Scatter3d(
+    return pgo.Scatter3d(
         x=[float(x["x_m"]) for x in locs],
         y=[float(x["y_m"]) for x in locs],
         z=[float(x["z_m"]) for x in locs],
@@ -1086,7 +1086,7 @@ def _sensor_overlay_trace(sensor_info: Dict | None):
 
 
 def _temperature_trace(df: pd.DataFrame, temp_col: str, vmin: float, vmax: float, opacity: float = 0.78):
-    return go.Scatter3d(
+    return pgo.Scatter3d(
         x=df["x_m"], y=df["y_m"], z=df["z_m"],
         mode="markers",
         marker=dict(
@@ -1114,7 +1114,7 @@ def _hottest_trace(df: pd.DataFrame, temp_col: str):
     if df.empty:
         return None
     row = df.loc[df[temp_col].astype(float).idxmax()]
-    return go.Scatter3d(
+    return pgo.Scatter3d(
         x=[float(row["x_m"])], y=[float(row["y_m"])], z=[float(row["z_m"])],
         mode="markers+text",
         marker=dict(size=10, symbol="diamond", color="#ffffff", line=dict(color="#111827", width=3)),
@@ -1134,7 +1134,7 @@ def temperature_cloud_3d(
     vmax: float,
     sensor_info: Dict | None = None,
 ):
-    fig = go.Figure()
+    fig = pgo.Figure()
     fig.add_trace(_temperature_trace(df, temp_col, vmin, vmax, opacity=0.82))
     hot = _hottest_trace(df, temp_col)
     if hot is not None:
@@ -1181,16 +1181,16 @@ def airflow_cone_3d(
         + d[v_col].to_numpy(float) ** 2
         + d[w_col].to_numpy(float) ** 2
     )
-    fig = go.Figure()
+    fig = pgo.Figure()
     if temp_col is not None and vmin is not None and vmax is not None:
         fig.add_trace(_temperature_trace(df, temp_col, float(vmin), float(vmax), opacity=0.30))
     else:
-        fig.add_trace(go.Scatter3d(
+        fig.add_trace(pgo.Scatter3d(
             x=df["x_m"], y=df["y_m"], z=df["z_m"], mode="markers",
             marker=dict(size=2, color="#94a3b8", opacity=0.22),
             hoverinfo="skip", name="CFD nodes",
         ))
-    fig.add_trace(go.Cone(
+    fig.add_trace(pgo.Cone(
         x=d["x_m"], y=d["y_m"], z=d["z_m"],
         u=d[u_col], v=d[v_col], w=d[w_col],
         colorscale="Viridis",
@@ -1241,7 +1241,7 @@ def airflow_particle_animation(
     finite = np.isfinite(xyz).all(axis=1) & np.isfinite(vel).all(axis=1)
     xyz, vel, speed = xyz[finite], vel[finite], speed[finite]
     if len(xyz) == 0:
-        return go.Figure()
+        return pgo.Figure()
 
     # Seeds: deterministic broad sample among nodes with non-negligible airflow.
     threshold = float(np.nanpercentile(speed, 35)) if len(speed) > 5 else 0.0
@@ -1277,23 +1277,23 @@ def airflow_particle_animation(
         particle_speeds = [np.zeros(len(pos))]
     particle_speeds.append(particle_speeds[-1].copy())
 
-    bg = go.Scatter3d(
+    bg = pgo.Scatter3d(
         x=xyz[:, 0], y=xyz[:, 1], z=xyz[:, 2], mode="markers",
         marker=dict(size=2, color="#94a3b8", opacity=0.12),
         hoverinfo="skip", name="CFD nodes",
     )
     p0 = positions[0]
-    particles = go.Scatter3d(
+    particles = pgo.Scatter3d(
         x=p0[:, 0], y=p0[:, 1], z=p0[:, 2], mode="markers",
         marker=dict(size=6, color=speed[seed_idx], colorscale="Viridis", opacity=0.95,
                     colorbar=dict(title="Relative airflow", thickness=12, len=0.55)),
         hovertemplate="Flow particle<extra></extra>", name="Flow particles",
     )
-    fig = go.Figure(data=[bg, particles])
+    fig = pgo.Figure(data=[bg, particles])
     fig.frames = [
-        go.Frame(
+        pgo.Frame(
             name=str(i),
-            data=[go.Scatter3d(
+            data=[pgo.Scatter3d(
                 x=p[:, 0], y=p[:, 1], z=p[:, 2], mode="markers",
                 marker=dict(size=6, color=particle_speeds[min(i, len(particle_speeds)-1)],
                             colorscale="Viridis", cmin=0.0, cmax=max(p90, 1e-6), opacity=0.95),
