@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# COOLING_FACTORS_BUILD = 2026-09-03-v25
+
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
 # SENSOR_RADAR_ROUNDED_BUILD = 2026-09-03-v12
@@ -504,6 +506,33 @@ div.stButton > button[kind="secondary"]:hover {
   border-color: rgba(174, 228, 255, 0.27) !important;
 }
 
+/* Compact temperature summary shown above Cooling Influence Factors */
+.factor-temp-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 2px 0 16px 0;
+}
+.factor-temp-card {
+  background: rgba(11, 39, 63, 0.68);
+  border: 1px solid rgba(174, 228, 255, 0.18);
+  border-radius: 14px;
+  padding: 11px 13px;
+}
+.factor-temp-label {
+  color: #9fc3d9;
+  font-size: 10.5px;
+  font-weight: 650;
+  margin-bottom: 3px;
+}
+.factor-temp-value {
+  color: #f4fbff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
 /* Cooling-factor screen */
 .cooling-factor-title {
   display: flex;
@@ -646,6 +675,21 @@ div[class*="st-key-sl_work"] [data-testid="stSelectSlider"] p,
 div[class*="st-key-sl_work"] [data-testid="stSelectSlider"] span {
   font-size: 12px !important;
   line-height: 1.1 !important;
+  font-weight: 500 !important;
+}
+
+/* v25: Streamlit SelectSlider renders the visible value/endpoints inside BaseWeb divs.
+   Target the BaseWeb slider itself so the text size is actually reduced. */
+.st-key-sl_ext [data-baseweb="slider"] *,
+.st-key-sl_serv [data-baseweb="slider"] *,
+.st-key-sl_meet [data-baseweb="slider"] *,
+.st-key-sl_work [data-baseweb="slider"] *,
+div[class*="st-key-sl_ext"] [data-baseweb="slider"] *,
+div[class*="st-key-sl_serv"] [data-baseweb="slider"] *,
+div[class*="st-key-sl_meet"] [data-baseweb="slider"] *,
+div[class*="st-key-sl_work"] [data-baseweb="slider"] * {
+  font-size: 12px !important;
+  line-height: 1.05 !important;
   font-weight: 500 !important;
 }
 
@@ -1137,6 +1181,23 @@ elif st.session_state.app_view == "HOME":
 # 7. SCREEN 2: COOLING INFLUENCE FACTORS
 # ============================================================
 elif st.session_state.app_view == "HEAT_LOAD":
+    # Keep the two temperatures visible while users tune the cooling factors.
+    st.markdown(
+        f"""
+        <div class="factor-temp-summary">
+            <div class="factor-temp-card">
+                <div class="factor-temp-label">현재 온도</div>
+                <div class="factor-temp-value">{avg_room_temp:.1f} °C</div>
+            </div>
+            <div class="factor-temp-card">
+                <div class="factor-temp-label">목표 온도</div>
+                <div class="factor-temp-value">{st.session_state.target_temp:.1f} °C</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # The title uses a small wall-mounted AC SVG instead of a flame emoji.
     st.markdown(
         """
