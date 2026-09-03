@@ -626,6 +626,29 @@ div[class*="st-key-sl_work"] [data-testid="stThumbValue"],
   font-weight: 400 !important;
 }
 
+
+/* v24: make selected stage + endpoint labels about the same size as the 5단계 helper text. */
+.st-key-sl_ext [data-testid="stSelectSlider"] p,
+.st-key-sl_ext [data-testid="stSelectSlider"] span,
+.st-key-sl_serv [data-testid="stSelectSlider"] p,
+.st-key-sl_serv [data-testid="stSelectSlider"] span,
+.st-key-sl_meet [data-testid="stSelectSlider"] p,
+.st-key-sl_meet [data-testid="stSelectSlider"] span,
+.st-key-sl_work [data-testid="stSelectSlider"] p,
+.st-key-sl_work [data-testid="stSelectSlider"] span,
+div[class*="st-key-sl_ext"] [data-testid="stSelectSlider"] p,
+div[class*="st-key-sl_ext"] [data-testid="stSelectSlider"] span,
+div[class*="st-key-sl_serv"] [data-testid="stSelectSlider"] p,
+div[class*="st-key-sl_serv"] [data-testid="stSelectSlider"] span,
+div[class*="st-key-sl_meet"] [data-testid="stSelectSlider"] p,
+div[class*="st-key-sl_meet"] [data-testid="stSelectSlider"] span,
+div[class*="st-key-sl_work"] [data-testid="stSelectSlider"] p,
+div[class*="st-key-sl_work"] [data-testid="stSelectSlider"] span {
+  font-size: 12px !important;
+  line-height: 1.1 !important;
+  font-weight: 500 !important;
+}
+
 .cooling-load-card {
   background: linear-gradient(180deg, rgba(11, 38, 62, 0.94) 0%, rgba(13, 47, 75, 0.92) 100%);
   border: 1px solid rgba(174, 228, 255, 0.20);
