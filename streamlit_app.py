@@ -332,32 +332,56 @@ def load_case_info():
 
 @st.cache_data
 def load_sensor_config():
+    # Ground truth defaults (5 optimal sensors from QR/PCA basis)
+    default_meta = {
+        887:  {"code": "S1", "name": "Sensor 1", "x": 2.75, "y": 6.75, "z": 1.50, "zone": "Office North"},
+        672:  {"code": "S2", "name": "Sensor 2", "x": 2.75, "y": 2.75, "z": 1.50, "zone": "Office South"},
+        63:   {"code": "S3", "name": "Sensor 3", "x": 1.75, "y": 4.25, "z": 2.50, "zone": "Ceiling Center"},
+        1036: {"code": "S4", "name": "Sensor 4", "x": 1.25, "y": 1.25, "z": 2.00, "zone": "Server Pod"},
+        1129: {"code": "S5", "name": "Sensor 5", "x": 1.75, "y": 5.50, "z": 2.00, "zone": "Meeting Room"},
+    }
+
     p = Path("selected_sensors.csv")
     if p.exists():
         try:
             df = pd.read_csv(p)
-            df.columns = [str(c).strip() for c in df.columns]
-            meta = {}
+            cols_clean = {c: re.sub(r"[^a-zA-Z0-9]", "", str(c)).lower() for c in df.columns}
+            df = df.rename(columns=cols_clean)
+
+            x_col = next((c for c in df.columns if c in ["xm", "x", "xcoord"]), None)
+            y_col = next((c for c in df.columns if c in ["ym", "y", "ycoord"]), None)
+            z_col = next((c for c in df.columns if c in ["zm", "z", "zcoord"]), None)
+            node_col = next((c for c in df.columns if "node" in c), None)
+
+            fallback_order = [887, 672, 63, 1036, 1129]
+            parsed_meta = {}
+
             for i, row in df.iterrows():
-                nid = int(row.get("Node_Number", row.get("Node Num", i)))
-                meta[nid] = {
+                if i >= 5:
+                    break
+                d_nid = fallback_order[i]
+                d_spec = default_meta[d_nid]
+
+                nid = int(row[node_col]) if node_col and not pd.isna(row[node_col]) else d_nid
+                x_val = float(row[x_col]) if x_col and not pd.isna(row[x_col]) else d_spec["x"]
+                y_val = float(row[y_col]) if y_col and not pd.isna(row[y_col]) else d_spec["y"]
+                z_val = float(row[z_col]) if z_col and not pd.isna(row[z_col]) else d_spec["z"]
+
+                parsed_meta[nid] = {
                     "code": f"S{i+1}",
-                    "name": str(row.get("Name", f"Sensor {i+1}")),
-                    "x": float(row.get("X [m]", row.get("X_m", 2.0))),
-                    "y": float(row.get("Y [m]", row.get("Y_m", 4.0))),
-                    "z": float(row.get("Z [m]", row.get("Z_m", 1.5))),
-                    "zone": str(row.get("Zone", f"Zone {i+1}")),
+                    "name": f"Sensor {i+1}",
+                    "x": x_val,
+                    "y": y_val,
+                    "z": z_val,
+                    "zone": d_spec["zone"],
                 }
-            return meta
+
+            if len(parsed_meta) == 5:
+                return parsed_meta
         except Exception:
             pass
-    return {
-        887: {"code": "S1", "name": "Sensor 1", "x": 2.75, "y": 6.75, "z": 1.50, "zone": "Office North"},
-        672: {"code": "S2", "name": "Sensor 2", "x": 2.75, "y": 2.75, "z": 1.50, "zone": "Office South"},
-        63: {"code": "S3", "name": "Sensor 3", "x": 1.75, "y": 4.25, "z": 2.50, "zone": "Ceiling Center"},
-        1036: {"code": "S4", "name": "Sensor 4", "x": 1.25, "y": 1.25, "z": 2.00, "zone": "Server Pod"},
-        1129: {"code": "S5", "name": "Sensor 5", "x": 1.75, "y": 5.50, "z": 2.00, "zone": "Meeting Room"},
-    }
+
+    return default_meta
 
 
 @st.cache_resource
@@ -365,14 +389,12 @@ def load_surrogate_model():
     p = Path("best_deploy.pt")
     if p.exists():
         try:
-            ckpt = torch.load(p, map_location="cpu")
-            return ckpt
+            return torch.load(p, map_location="cpu")
         except Exception:
             pass
     return None
 
 
-# FIXED: Using @st.cache_resource and converting to a pure dictionary to prevent UnserializableReturnValueError
 @st.cache_resource
 def load_reconstruction_basis():
     p = Path("sensor_reconstruction_basis.npz")
@@ -443,7 +465,7 @@ dp_options = (
 
 
 # ============================================================
-# 4. REAL DYNAMIC SPATIAL RECONSTRUCTION ENGINE
+# 4. DYNAMIC SPATIAL RECONSTRUCTION ENGINE
 # ============================================================
 gx = np.linspace(0.25, 3.75, 35)
 gy = np.linspace(0.25, 8.75, 35)
@@ -458,22 +480,17 @@ work_shift = stage_to_watt.get(st.session_state.get("p_work", "보통"), 0.0)
 match = re.search(r"\d+", str(st.session_state.selected_dp))
 dp_id = int(match.group(0)) if match else 0
 
-if basis_assets is not None and "basis" in basis_assets:
-    modes = basis_assets["basis"][:, :5]
-    coeffs = np.sin(np.linspace(dp_id * 0.1, (dp_id + 5) * 0.1, 5))
-    recon_1d = 22.0 + np.dot(modes, coeffs)
-    coords = basis_assets.get("coords", np.vstack([grid_x.ravel(), grid_y.ravel()]).T)
-    field_current_grid = griddata(coords, recon_1d, (grid_x, grid_y), method="linear", fill_value=23.5)
-else:
-    base_dist = 22.0 + (dp_id % 3) * 0.5
-    server_plume = (1.5 + serv_shift) * np.exp(-((grid_x - 1.25) ** 2 + (grid_y - 1.25) ** 2) / 2.0)
-    solar_drift = (1.2 + ext_shift) * np.exp(-((grid_x - 2.75) ** 2 + (grid_y - 6.75) ** 2) / 3.0)
-    meet_load = (1.0 + meet_shift) * np.exp(-((grid_x - 1.75) ** 2 + (grid_y - 5.50) ** 2) / 2.0)
-    z_strat = (st.session_state.z_plane - 1.5) * 0.6
-    field_current_grid = base_dist + server_plume + solar_drift + meet_load + z_strat
+# Base field calculation incorporating thermal plumes at respective sensor zones
+base_dist = 22.0 + (dp_id % 3) * 0.5
+server_plume = (1.5 + serv_shift) * np.exp(-((grid_x - 1.25) ** 2 + (grid_y - 1.25) ** 2) / 2.0)
+solar_drift = (1.2 + ext_shift) * np.exp(-((grid_x - 2.75) ** 2 + (grid_y - 6.75) ** 2) / 3.0)
+meet_load = (1.0 + meet_shift) * np.exp(-((grid_x - 1.75) ** 2 + (grid_y - 5.50) ** 2) / 2.0)
+z_strat = (st.session_state.z_plane - 1.5) * 0.6
 
+field_current_grid = base_dist + server_plume + solar_drift + meet_load + z_strat
 avg_room_temp = float(np.nanmean(field_current_grid))
 
+# Compute live virtual readings for the 5 sensor locations
 sensor_readings = {}
 for nid, meta in ROA_NODES_META.items():
     dist = (grid_x - meta["x"]) ** 2 + (grid_y - meta["y"]) ** 2
@@ -498,7 +515,7 @@ def make_mobile_heatmap(grid_data, height=225):
     sy = [meta["y"] for meta in ROA_NODES_META.values()]
     codes = [meta["code"] for meta in ROA_NODES_META.values()]
     hover_texts = [
-        f"<b>{meta['code']}: {meta['name']}</b><br>Zone: {meta['zone']}<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
+        f"<b>{meta['code']}: {meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: ({meta['x']:.2f}, {meta['y']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
         for nid, meta in ROA_NODES_META.items()
     ]
 
@@ -640,7 +657,7 @@ elif st.session_state.app_view == "CONTROL":
 
 
 # ============================================================
-# 8. SCREEN 3: SPACE HEAT LOAD (Triggers Neural Evaluation)
+# 8. SCREEN 3: SPACE HEAT LOAD (Triggers Evaluation)
 # ============================================================
 elif st.session_state.app_view == "HEAT_LOAD":
     st.markdown('<div class="section-title">🔥 공간 열부하 (Space Heat Load)</div>', unsafe_allow_html=True)
