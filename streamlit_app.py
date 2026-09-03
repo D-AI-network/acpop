@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v38
+# FACTOR_UI_BUILD = 2026-09-03-v39
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -1962,7 +1962,14 @@ def make_mobile_heatmap(grid_data, height=340):
             x=grid_len_axis,
             y=grid_wid_axis,
             surfacecolor=surface_data,
-            colorscale="Turbo",
+            colorscale=[
+                    [0.00, "#8ee7ff"],
+                    [0.18, "#5cc8ff"],
+                    [0.38, "#43d8b1"],
+                    [0.58, "#b7ef4a"],
+                    [0.78, "#ffb347"],
+                    [1.00, "#e53935"],
+                ],
             cmin=18.0,
             cmax=28.0,
             showscale=True,
@@ -2144,7 +2151,14 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
             marker=dict(
                 size=2.4,
                 color=pt,
-                colorscale="Turbo",
+                colorscale=[
+                    [0.00, "#8ee7ff"],
+                    [0.18, "#5cc8ff"],
+                    [0.38, "#43d8b1"],
+                    [0.58, "#b7ef4a"],
+                    [0.78, "#ffb347"],
+                    [1.00, "#e53935"],
+                ],
                 cmin=18.0,
                 cmax=28.0,
                 opacity=0.58,
