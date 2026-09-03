@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-# FACTOR_UI_BUILD = 2026-09-03-v29
+# FACTOR_UI_BUILD = 2026-09-03-v28
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
 # SENSOR_RADAR_ROUNDED_BUILD = 2026-09-03-v12
 
 import base64
+import io
 import os
 import re
+import tempfile
 import time
+import zipfile
 from pathlib import Path
 
 import streamlit as st
@@ -18,6 +21,38 @@ import pandas as pd
 import plotly.graph_objects as go
 from scipy.interpolate import griddata
 import torch
+
+# ------------------------------------------------------------------
+# Real PopField inference backend.
+# The Streamlit UI imports the exact training/deployment architecture
+# and inference utilities instead of treating best_deploy.pt as a raw dict.
+# ------------------------------------------------------------------
+try:
+    from demo_v3_hackathon_enhanced import (
+        COND_COLS,
+        load_case_info as popfield_load_case_info,
+        load_checkpoint as popfield_load_checkpoint,
+        optimize_hvac as popfield_optimize_hvac,
+        predict_conditions as popfield_predict_conditions,
+    )
+    POPFIELD_BACKEND_IMPORT_ERROR = None
+except Exception as exc:
+    COND_COLS = [
+        "P80 - Inlet L",
+        "P81 - Inlet M",
+        "P82 - Inlet R",
+        "P83 - external",
+        "P84 - meeting",
+        "P85 - server",
+        "P86 - working",
+        "P87 - CMM",
+        "P88 - AirTemp",
+    ]
+    popfield_load_case_info = None
+    popfield_load_checkpoint = None
+    popfield_optimize_hvac = None
+    popfield_predict_conditions = None
+    POPFIELD_BACKEND_IMPORT_ERROR = repr(exc)
 
 SENSOR_ICON_SVG_B64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgdmlld0JveD0iMCAwIDcyIDcyIj4KICA8cmVjdCB4PSIxOCIgeT0iOCIgd2lkdGg9IjM2IiBoZWlnaHQ9IjE0IiByeD0iNyIgZmlsbD0iIzEyM2I1ZCIvPgogIDxjaXJjbGUgY3g9IjM2IiBjeT0iMTUiIHI9IjIuNiIgZmlsbD0iIzlmZTRmZiIvPgogIDxwYXRoIGQ9Ik0yOSAzMCBRMzYgMjQgNDMgMzAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0yNCAzOCBRMzYgMjkgNDggMzgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0xOSA0NyBRMzYgMzQgNTMgNDciIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4="
 
@@ -814,12 +849,8 @@ div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
   font-family: 'Outfit', 'Noto Sans KR', sans-serif;
   font-size: 20px;
   font-weight: 800;
+  color: #f5fbff;
 }
-.cooling-load-level.level-1 { color: #66d9ff; }
-.cooling-load-level.level-2 { color: #52c9ef; }
-.cooling-load-level.level-3 { color: #8edbcb; }
-.cooling-load-level.level-4 { color: #ffad66; }
-.cooling-load-level.level-5 { color: #ff6b7a; }
 .cooling-load-segments {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -942,63 +973,6 @@ div[data-testid="stSelectSlider"] [aria-valuenow] * {
   font-weight: 800 !important;
 }
 
-
-/* ============================================================
-   v29: force the visible 5-step slider texts to 8px BOLD.
-   Streamlit versions may expose select_slider as stSlider or stSelectSlider,
-   so both are targeted. This is scoped only to the four cooling-factor keys.
-   ============================================================ */
-.st-key-sl_ext [data-testid="stSlider"] *,
-.st-key-sl_ext [data-testid="stSelectSlider"] *,
-.st-key-sl_serv [data-testid="stSlider"] *,
-.st-key-sl_serv [data-testid="stSelectSlider"] *,
-.st-key-sl_meet [data-testid="stSlider"] *,
-.st-key-sl_meet [data-testid="stSelectSlider"] *,
-.st-key-sl_work [data-testid="stSlider"] *,
-.st-key-sl_work [data-testid="stSelectSlider"] *,
-div[class*="st-key-sl_ext"] [data-testid="stSlider"] *,
-div[class*="st-key-sl_ext"] [data-testid="stSelectSlider"] *,
-div[class*="st-key-sl_serv"] [data-testid="stSlider"] *,
-div[class*="st-key-sl_serv"] [data-testid="stSelectSlider"] *,
-div[class*="st-key-sl_meet"] [data-testid="stSlider"] *,
-div[class*="st-key-sl_meet"] [data-testid="stSelectSlider"] *,
-div[class*="st-key-sl_work"] [data-testid="stSlider"] *,
-div[class*="st-key-sl_work"] [data-testid="stSelectSlider"] * {
-  font-size: 8px !important;
-  line-height: 1 !important;
-  font-weight: 800 !important;
-  letter-spacing: -0.2px !important;
-}
-
-/* Restore only the four factor names. */
-.st-key-sl_ext [data-testid="stWidgetLabel"] *,
-.st-key-sl_serv [data-testid="stWidgetLabel"] *,
-.st-key-sl_meet [data-testid="stWidgetLabel"] *,
-.st-key-sl_work [data-testid="stWidgetLabel"] *,
-div[class*="st-key-sl_ext"] [data-testid="stWidgetLabel"] *,
-div[class*="st-key-sl_serv"] [data-testid="stWidgetLabel"] *,
-div[class*="st-key-sl_meet"] [data-testid="stWidgetLabel"] *,
-div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] * {
-  font-size: 15px !important;
-  line-height: 1.25 !important;
-  font-weight: 500 !important;
-  letter-spacing: -0.25px !important;
-}
-
-/* Directly hit BaseWeb slider labels / selected value as a final fallback. */
-.st-key-sl_ext [data-baseweb="slider"] *,
-.st-key-sl_serv [data-baseweb="slider"] *,
-.st-key-sl_meet [data-baseweb="slider"] *,
-.st-key-sl_work [data-baseweb="slider"] *,
-div[class*="st-key-sl_ext"] [data-baseweb="slider"] *,
-div[class*="st-key-sl_serv"] [data-baseweb="slider"] *,
-div[class*="st-key-sl_meet"] [data-baseweb="slider"] *,
-div[class*="st-key-sl_work"] [data-baseweb="slider"] * {
-  font-size: 8px !important;
-  line-height: 1 !important;
-  font-weight: 800 !important;
-}
-
 </style>
 """,
     unsafe_allow_html=True,
@@ -1020,35 +994,107 @@ ROA_NODES_META = {
 ROA_NODE_IDS = list(ROA_NODES_META.keys())
 
 
-@st.cache_data
-def load_case_info():
-    candidates = [
-        Path("Case Info 200 DesignPoints - 최종본.xlsx"),
-        Path("Case Info 200 DesignPoints.xlsx"),
-    ]
-    for p in candidates:
+def _first_existing_path(candidates):
+    for candidate in candidates:
+        p = Path(candidate)
         if p.exists():
-            try:
-                df = pd.read_excel(p, skiprows=1)
-                df.columns = [str(c).strip() for c in df.columns]
-                return df
-            except Exception:
-                pass
+            return p
     return None
 
 
-@st.cache_resource
-def load_surrogate_model():
-    p = Path("best_deploy.pt")
-    if p.exists():
+CASE_INFO_PATH = _first_existing_path([
+    "Case Info 200 DesignPoints - 최종본.xlsx",
+    "Case Info 200 DesignPoints.xlsx",
+])
+
+CHECKPOINT_PATH = _first_existing_path([
+    "best_deploy.pt",
+    "best.pt",
+])
+
+# Optional. If this archive is uploaded to the repo, HOME uses the ACTUAL
+# selected CFD field and its real spatial mean. Without it, HOME falls back
+# to a PopField estimate under the selected DP's original operating condition.
+FIELD_ZIP_PATH = _first_existing_path([
+    "Field data.zip",
+    "Field data (1).zip",
+    "field_data.zip",
+])
+
+
+@st.cache_data(show_spinner=False)
+def load_case_info():
+    if CASE_INFO_PATH is None:
+        return None
+
+    # Use the exact parser from the training/deployment code whenever possible.
+    if popfield_load_case_info is not None:
         try:
-            return torch.load(p, map_location="cpu")
+            return popfield_load_case_info(CASE_INFO_PATH)
         except Exception:
             pass
-    return None
+
+    # Robust local fallback: row 0 is the header, row 1 contains units,
+    # and actual design points begin at row 2.
+    try:
+        raw = pd.read_excel(CASE_INFO_PATH, sheet_name=0, header=None)
+        header = raw.iloc[0].astype(str).tolist()
+        df = raw.iloc[2:].copy()
+        df.columns = header
+        df = df.dropna(how="all").reset_index(drop=True)
+        if "Name" in df.columns:
+            df["dp_id"] = (
+                df["Name"].astype(str)
+                .str.extract(r"(?i)DP\s*(\d+)", expand=False)
+                .astype(float)
+                .astype("Int64")
+            )
+        for c in COND_COLS:
+            if c in df.columns:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+        return df
+    except Exception:
+        return None
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
+def load_popfield_backend():
+    if POPFIELD_BACKEND_IMPORT_ERROR is not None:
+        return {
+            "ok": False,
+            "error": f"demo_v3_hackathon_enhanced.py import failed: {POPFIELD_BACKEND_IMPORT_ERROR}",
+        }
+    if CHECKPOINT_PATH is None:
+        return {
+            "ok": False,
+            "error": "best_deploy.pt (or best.pt) was not found in the repository root.",
+        }
+
+    try:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        ckpt, model, scalers, coords = popfield_load_checkpoint(CHECKPOINT_PATH, device)
+        coords = np.asarray(coords, dtype=np.float32)
+        coords_norm_t = torch.from_numpy(
+            scalers["coord"].transform(coords).astype(np.float32)
+        ).to(device)
+        return {
+            "ok": True,
+            "checkpoint": ckpt,
+            "model": model,
+            "scalers": scalers,
+            "coords": coords,
+            "coords_norm_t": coords_norm_t,
+            "device": device,
+            "checkpoint_path": str(CHECKPOINT_PATH),
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"Checkpoint/model load failed: {type(exc).__name__}: {exc}",
+        }
+
+
+@st.cache_resource(show_spinner=False)
 def load_reconstruction_basis():
     p = Path("sensor_reconstruction_basis.npz")
     if p.exists():
@@ -1061,7 +1107,6 @@ def load_reconstruction_basis():
 
 
 case_info_df = load_case_info()
-model_assets = load_surrogate_model()
 basis_assets = load_reconstruction_basis()
 
 
@@ -1198,40 +1243,297 @@ dp_options = (
 
 
 # ============================================================
-# 4. 2D SPATIAL GRID & THERMAL SIMULATION ENGINE
+# 4. REAL CURRENT FIELD + POPFIELD INFERENCE ENGINE
 # ============================================================
-# Horizontal axis = Length (0.25 to 8.75 m) | Vertical axis = Width (0.25 to 3.75 m)
-grid_len_axis = np.linspace(0.25, 8.75, 45)
-grid_wid_axis = np.linspace(0.25, 3.75, 25)
-mesh_len, mesh_wid = np.meshgrid(grid_len_axis, grid_wid_axis)
+STAGE_OPTS = ["매우 낮음", "낮음", "보통", "높음", "매우 높음"]
+LOAD_COL_MAP = {
+    "external": "P83 - external",
+    "meeting": "P84 - meeting",
+    "server": "P85 - server",
+    "working": "P86 - working",
+}
 
-stage_to_watt = {"매우 낮음": -0.8, "낮음": -0.4, "보통": 0.0, "높음": 0.8, "매우 높음": 1.6}
-ext_shift = stage_to_watt.get(st.session_state.get("p_ext", "보통"), 0.0)
-meet_shift = stage_to_watt.get(st.session_state.get("p_meet", "보통"), 0.0)
-serv_shift = stage_to_watt.get(st.session_state.get("p_serv", "보통"), 0.0)
-work_shift = stage_to_watt.get(st.session_state.get("p_work", "보통"), 0.0)
+
+def _resolve_field_column(columns, prefix):
+    for c in columns:
+        if str(c).strip().lower().startswith(prefix.lower()):
+            return c
+    raise KeyError(f"Field column starting with {prefix!r} was not found")
+
+
+@st.cache_data(show_spinner=False)
+def load_actual_cfd_case(zip_path_str: str, dp_id: int):
+    """Load only one DP from Field data.zip instead of unpacking all 200 cases."""
+    if not zip_path_str:
+        return None
+    zip_path = Path(zip_path_str)
+    if not zip_path.exists():
+        return None
+
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            target_name = None
+            for name in zf.namelist():
+                m = re.search(r"dp\s*(\d+)\.csv$", Path(name).name, flags=re.IGNORECASE)
+                if m and int(m.group(1)) == int(dp_id):
+                    target_name = name
+                    break
+            if target_name is None:
+                return None
+
+            raw = zf.read(target_name).decode("utf-8-sig", errors="replace")
+            raw_lines = raw.splitlines()
+            header_idx = next(
+                i for i, line in enumerate(raw_lines)
+                if line.strip().lower().startswith("node number")
+            )
+            df = pd.read_csv(
+                io.StringIO("\n".join(raw_lines[header_idx:])),
+                skipinitialspace=True,
+            )
+            df.columns = [str(c).strip() for c in df.columns]
+
+            xcol = _resolve_field_column(df.columns, "X [")
+            ycol = _resolve_field_column(df.columns, "Y [")
+            zcol = _resolve_field_column(df.columns, "Z [")
+            tcol = _resolve_field_column(df.columns, "Temperature")
+            racol = _resolve_field_column(df.columns, "RA temp")
+            ucol = _resolve_field_column(df.columns, "Velocity u")
+            vcol = _resolve_field_column(df.columns, "Velocity v")
+            wcol = _resolve_field_column(df.columns, "Velocity w")
+
+            coords = df[[xcol, ycol, zcol]].to_numpy(np.float32)
+            temp_c = df[tcol].to_numpy(np.float32) - 273.15
+            velocity = df[[ucol, vcol, wcol]].to_numpy(np.float32)
+            ra_c = float(np.nanmean(df[racol].to_numpy(np.float32)) - 273.15)
+
+            return {
+                "coords": coords,
+                "temp_c": temp_c,
+                "velocity": velocity,
+                "ra_temp_c": ra_c,
+                "mean_temp_c": float(np.nanmean(temp_c)),
+                "source": f"Actual CFD · DP {int(dp_id)}",
+            }
+    except Exception:
+        return None
+
+
+def _selected_case_row(df, selected_dp_id: int):
+    if df is None or len(df) == 0:
+        return None
+    if "dp_id" in df.columns:
+        hit = df[pd.to_numeric(df["dp_id"], errors="coerce") == int(selected_dp_id)]
+        if len(hit):
+            return hit.iloc[0]
+    if "Name" in df.columns:
+        nums = df["Name"].astype(str).str.extract(r"(?i)DP\s*(\d+)", expand=False)
+        hit = df[pd.to_numeric(nums, errors="coerce") == int(selected_dp_id)]
+        if len(hit):
+            return hit.iloc[0]
+    return df.iloc[0]
+
+
+def _predict_case_field_with_popfield(selected_dp_id: int):
+    backend = load_popfield_backend()
+    if not backend.get("ok", False):
+        return None
+
+    row = _selected_case_row(case_info_df, selected_dp_id)
+    if row is None or any(c not in row.index for c in COND_COLS):
+        return None
+
+    try:
+        cond = np.asarray([[float(row[c]) for c in COND_COLS]], dtype=np.float32)
+        pred_field, pred_ra = popfield_predict_conditions(
+            backend["model"],
+            cond,
+            backend["scalers"]["cond"],
+            backend["coords_norm_t"],
+            backend["scalers"]["field"],
+            backend["scalers"]["ra"],
+            backend["device"],
+        )
+        return {
+            "coords": backend["coords"],
+            "temp_c": np.asarray(pred_field[0, :, 0], dtype=np.float32),
+            "velocity": np.asarray(pred_field[0, :, 1:4], dtype=np.float32),
+            "ra_temp_c": float(pred_ra[0]),
+            "mean_temp_c": float(np.mean(pred_field[0, :, 0])),
+            "source": f"PopField estimate · DP {int(selected_dp_id)}",
+        }
+    except Exception:
+        return None
+
+
+def _observed_five_stage_map(df: pd.DataFrame, col: str):
+    """Map the five UI stages only to heat-load values actually observed in Case Info."""
+    values = np.sort(pd.to_numeric(df[col], errors="coerce").dropna().unique().astype(float))
+    if len(values) == 0:
+        raise ValueError(f"No observed values available for {col}")
+
+    # Five evenly distributed indices. If fewer than five levels exist,
+    # repeated observed levels are used rather than inventing unseen W values.
+    idx = np.rint(np.linspace(0, len(values) - 1, 5)).astype(int)
+    selected = values[idx]
+    return dict(zip(STAGE_OPTS, [float(v) for v in selected]))
+
+
+def _requested_heat_loads_from_ui():
+    if case_info_df is None:
+        raise RuntimeError("Case Info Excel could not be loaded.")
+
+    maps = {
+        key: _observed_five_stage_map(case_info_df, col)
+        for key, col in LOAD_COL_MAP.items()
+    }
+    return {
+        "external": maps["external"][st.session_state.get("p_ext", "보통")],
+        "meeting": maps["meeting"][st.session_state.get("p_meet", "보통")],
+        "server": maps["server"][st.session_state.get("p_serv", "보통")],
+        "working": maps["working"][st.session_state.get("p_work", "보통")],
+    }, maps
+
+
+def _temperature_plane_grid(coords, temp_c, z_plane, x_axis, y_axis):
+    coords = np.asarray(coords, dtype=float)
+    temp_c = np.asarray(temp_c, dtype=float)
+    x_axis = np.asarray(x_axis, dtype=float)
+    y_axis = np.asarray(y_axis, dtype=float)
+    gx, gy = np.meshgrid(x_axis, y_axis)
+
+    z_values = np.unique(coords[:, 2])
+    z_use = float(z_values[np.argmin(np.abs(z_values - float(z_plane)))])
+    mask = np.isclose(coords[:, 2], z_use, atol=1e-6)
+    pts = coords[mask, :2]
+    vals = temp_c[mask]
+
+    if len(vals) < 3:
+        return np.full(gx.shape, float(np.nanmean(temp_c)), dtype=float)
+
+    grid = griddata(pts, vals, (gx, gy), method="linear")
+    if np.isnan(grid).any():
+        nearest = griddata(pts, vals, (gx, gy), method="nearest")
+        grid = np.where(np.isnan(grid), nearest, grid)
+    return np.asarray(grid, dtype=float)
+
+
+def _direction_label(rec):
+    active = []
+    if int(round(float(rec["Inlet_L"]))) == 1:
+        active.append(("Left", "L"))
+    if int(round(float(rec["Inlet_M"]))) == 1:
+        active.append(("Middle", "M"))
+    if int(round(float(rec["Inlet_R"]))) == 1:
+        active.append(("Right", "R"))
+    if len(active) == 1:
+        return f"{active[0][0]} ({active[0][1]})"
+    if not active:
+        return "None"
+    return " / ".join(code for _, code in active)
+
+
+def _demo_status_from_row(rec, target_temp):
+    p95_limit = float(target_temp) + 2.0
+    strict = (
+        float(rec["zone_range_C"]) <= 2.0
+        and float(rec["hot_fraction"]) <= 0.05
+        and float(rec["cold_fraction"]) <= 0.05
+        and float(rec["p95_temp_C"]) <= p95_limit
+    )
+    if strict:
+        return "FEASIBLE"
+
+    # Same near-feasible margins used by the deployment demo:
+    # +0.25 C zone range, +1 percentage point hot/cold, +0.25 C P95.
+    near = (
+        float(rec["zone_range_C"]) <= 2.25
+        and float(rec["hot_fraction"]) <= 0.06
+        and float(rec["cold_fraction"]) <= 0.06
+        and float(rec["p95_temp_C"]) <= p95_limit + 0.25
+    )
+    return "NEAR_FEASIBLE" if near else "INFEASIBLE"
+
 
 match = re.search(r"\d+", str(st.session_state.selected_dp))
 dp_id = int(match.group(0)) if match else 0
 
-# Base thermal field
-base_dist = 22.0 + (dp_id % 3) * 0.5
+# Prefer the true CFD field when Field data.zip is available.
+current_field = (
+    load_actual_cfd_case(str(FIELD_ZIP_PATH), dp_id)
+    if FIELD_ZIP_PATH is not None
+    else None
+)
 
-# Physical heat source plumes mapped to respective sensor locations
-server_plume = (1.6 + serv_shift) * np.exp(-((mesh_len - 1.25) ** 2 + (mesh_wid - 1.25) ** 2) / 2.0)
-solar_drift = (1.3 + ext_shift) * np.exp(-((mesh_len - 6.75) ** 2 + (mesh_wid - 2.75) ** 2) / 3.0)
-meet_load = (1.1 + meet_shift) * np.exp(-((mesh_len - 5.50) ** 2 + (mesh_wid - 1.75) ** 2) / 2.0)
-z_strat = (st.session_state.z_plane - 1.5) * 0.6
+# GitHub deployment does not require the original Field CSV archive.
+# In that case, use the trained PopField model rather than a hand-crafted synthetic field.
+if current_field is None:
+    current_field = _predict_case_field_with_popfield(dp_id)
 
-field_current_grid = base_dist + server_plume + solar_drift + meet_load + z_strat
-avg_room_temp = float(np.nanmean(field_current_grid))
+# Last-resort fallback keeps the UI bootable if repository assets are incomplete.
+# It is explicitly marked as fallback and is NEVER used for the AI optimization result.
+if current_field is None:
+    fallback_x = np.linspace(0.25, 8.75, 45)
+    fallback_y = np.linspace(0.25, 3.75, 25)
+    fallback_mx, fallback_my = np.meshgrid(fallback_x, fallback_y)
+    fallback_temp = (
+        22.0
+        + 1.6 * np.exp(-((fallback_mx - 1.25) ** 2 + (fallback_my - 1.25) ** 2) / 2.0)
+        + 1.3 * np.exp(-((fallback_mx - 6.75) ** 2 + (fallback_my - 2.75) ** 2) / 3.0)
+    )
+    fallback_coords = np.stack(
+        [fallback_mx.ravel(), fallback_my.ravel(), np.full(fallback_mx.size, 1.5)],
+        axis=-1,
+    )
+    current_field = {
+        "coords": fallback_coords,
+        "temp_c": fallback_temp.ravel(),
+        "velocity": np.zeros((fallback_mx.size, 3), dtype=np.float32),
+        "ra_temp_c": float(np.mean(fallback_temp)),
+        "mean_temp_c": float(np.mean(fallback_temp)),
+        "source": "Fallback demo field (repository assets incomplete)",
+    }
 
-# Evaluate live virtual readings at each sensor position
+current_coords = np.asarray(current_field["coords"], dtype=np.float32)
+current_temp_nodes = np.asarray(current_field["temp_c"], dtype=np.float32)
+avg_room_temp = float(current_field["mean_temp_c"])
+current_field_source = str(current_field["source"])
+
+# Use the actual/model coordinate envelope rather than the old hand-crafted 9m x 4m crop.
+x_min, x_max = float(np.min(current_coords[:, 0])), float(np.max(current_coords[:, 0]))
+y_min, y_max = float(np.min(current_coords[:, 1])), float(np.max(current_coords[:, 1]))
+grid_len_axis = np.linspace(x_min, x_max, 48)
+grid_wid_axis = np.linspace(y_min, y_max, 44)
+mesh_len, mesh_wid = np.meshgrid(grid_len_axis, grid_wid_axis)
+
+field_current_grid = _temperature_plane_grid(
+    current_coords,
+    current_temp_nodes,
+    st.session_state.z_plane,
+    grid_len_axis,
+    grid_wid_axis,
+)
+
+# Sensor values now come from the real/model field by NODE ID.
+# Plot positions also use the node coordinates stored in the CFD/model geometry.
+sensor_plot_meta = {}
 sensor_readings = {}
 for nid, meta in ROA_NODES_META.items():
-    dist = (mesh_len - meta["x_plot"]) ** 2 + (mesh_wid - meta["y_plot"]) ** 2
-    idx = np.unravel_index(np.argmin(dist), mesh_len.shape)
-    sensor_readings[nid] = float(field_current_grid[idx])
+    m = dict(meta)
+    if 0 <= int(nid) < len(current_coords):
+        m["x_plot"] = float(current_coords[int(nid), 0])
+        m["y_plot"] = float(current_coords[int(nid), 1])
+        m["z"] = float(current_coords[int(nid), 2])
+        sensor_readings[nid] = float(current_temp_nodes[int(nid)])
+    else:
+        dist = (
+            (current_coords[:, 0] - float(meta["x_plot"])) ** 2
+            + (current_coords[:, 1] - float(meta["y_plot"])) ** 2
+            + (current_coords[:, 2] - float(meta["z"])) ** 2
+        )
+        idx = int(np.argmin(dist))
+        sensor_readings[nid] = float(current_temp_nodes[idx])
+    sensor_plot_meta[nid] = m
 
 
 def make_mobile_heatmap(grid_data, height=340):
@@ -1251,11 +1553,11 @@ def make_mobile_heatmap(grid_data, height=340):
     )
 
     # Invisible hover targets plus custom navy sensor-shaped icons.
-    sx_plot = [meta["x_plot"] for meta in ROA_NODES_META.values()]
-    sy_plot = [meta["y_plot"] for meta in ROA_NODES_META.values()]
+    sx_plot = [meta["x_plot"] for meta in sensor_plot_meta.values()]
+    sy_plot = [meta["y_plot"] for meta in sensor_plot_meta.values()]
     hover_texts = [
         f"<b>{meta['name']}</b><br>Zone: {meta['zone']}<br>Coords: (L={meta['x_plot']:.2f}, W={meta['y_plot']:.2f})m<br>Live: {sensor_readings.get(nid, 0.0):.2f}°C"
-        for nid, meta in ROA_NODES_META.items()
+        for nid, meta in sensor_plot_meta.items()
     ]
 
     fig.add_trace(
@@ -1292,8 +1594,8 @@ def make_mobile_heatmap(grid_data, height=340):
     fig.update_layout(
         title=dict(text="", font=dict(size=1)),
         showlegend=False,
-        xaxis=dict(range=[0.0, 9.0], showgrid=False, zeroline=False, showticklabels=False),
-        yaxis=dict(range=[0.0, 4.0], showgrid=False, zeroline=False, showticklabels=False),
+        xaxis=dict(range=[x_min - 0.25, x_max + 0.25], showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(range=[y_min - 0.25, y_max + 0.25], showgrid=False, zeroline=False, showticklabels=False),
         margin=dict(l=0, r=6, t=0, b=0),
         height=height,
         plot_bgcolor="rgba(0,0,0,0)",
@@ -1355,6 +1657,13 @@ elif st.session_state.app_view == "HOME":
         """,
         unsafe_allow_html=True,
     )
+
+    if current_field_source.startswith("Actual CFD"):
+        st.caption(f"Current Field source: {current_field_source}")
+    elif current_field_source.startswith("PopField"):
+        st.caption("Current Field source: PopField estimate (original CFD archive not present)")
+    else:
+        st.warning("Current Field is using a fallback demo field because deployment assets are incomplete.")
 
     new_target = st.number_input(
         "목표 온도 (°C)",
@@ -1430,7 +1739,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
         unsafe_allow_html=True,
     )
 
-    stage_opts = ["매우 낮음", "낮음", "보통", "높음", "매우 높음"]
+    stage_opts = STAGE_OPTS
 
     # Old sessions are already compatible because 낮음/보통/높음 remain valid options.
     c1, c2 = st.columns(2)
@@ -1518,7 +1827,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
         <div class="cooling-load-card">
             <div class="cooling-load-top">
                 <div class="cooling-load-label">종합 열환경 수준</div>
-                <div class="cooling-load-level level-{burden_index}">{burden_label}</div>
+                <div class="cooling-load-level">{burden_label}</div>
             </div>
             <div class="cooling-load-segments">{segments_html}</div>
         </div>
@@ -1532,52 +1841,116 @@ elif st.session_state.app_view == "HEAT_LOAD":
     )
 
     if st.button("AI 최적 냉방 찾기", type="primary", use_container_width=True, key="btn_run_cooling_opt"):
-        with st.spinner("54개 HVAC 후보 가상시험 및 CFD 대리모델 추론 중..."):
-            time.sleep(0.35)
+        backend = load_popfield_backend()
 
-        target = st.session_state.target_temp
-        policy = st.session_state.policy
-        total_load_intensity = ext_shift + meet_shift + serv_shift + work_shift
+        if not backend.get("ok", False):
+            st.error(
+                "PopField 모델을 실행할 수 없습니다. "
+                + str(backend.get("error", "Unknown model loading error"))
+            )
+        elif case_info_df is None:
+            st.error("Case Info Excel을 불러오지 못했습니다.")
+        else:
+            try:
+                target = float(st.session_state.target_temp)
+                policy = st.session_state.policy
+                loads, stage_load_maps = _requested_heat_loads_from_ui()
 
-        if "Comfort" in policy:
-            vane_opt = "Middle (M)" if total_load_intensity < 2.0 else "Right (R)"
-            flow_opt, temp_opt, q_opt = "50 CMM", "10 °C", 18.4
-            status_opt = "FEASIBLE"
-            mean_temp = target - 0.2
-            zone_spread = 1.35
-            hot_frac, cold_frac = 1.0, 0.5
-        elif "Eco" in policy:
-            vane_opt = "Middle (M)"
-            flow_opt, temp_opt, q_opt = "20 CMM", "14 °C", 9.2
-            status_opt = "NEAR_FEASIBLE" if total_load_intensity <= 1.0 else "INFEASIBLE"
-            mean_temp = target + 0.5 + (0.3 * total_load_intensity)
-            zone_spread = 2.45 + (0.2 * total_load_intensity)
-            hot_frac, cold_frac = 5.8 + (1.2 * total_load_intensity), 0.2
-        else:  # Balanced
-            vane_opt = "Middle (M)"
-            flow_opt, temp_opt, q_opt = "40 CMM", "12 °C", 13.8
-            status_opt = "FEASIBLE" if total_load_intensity <= 3.0 else "NEAR_FEASIBLE"
-            mean_temp = target + (0.1 * total_load_intensity)
-            zone_spread = 1.60
-            hot_frac, cold_frac = 1.8, 0.6
+                runtime_dir = Path(tempfile.gettempdir()) / "acpop_streamlit_runtime"
+                runtime_dir.mkdir(parents=True, exist_ok=True)
 
-        st.session_state.optimized_results = {
-            "status": status_opt,
-            "vane": vane_opt,
-            "flow": flow_opt,
-            "temp": temp_opt,
-            "mean_temp": mean_temp,
-            "p95_temp": mean_temp + 0.65,
-            "zone_spread": zone_spread,
-            "hot_fraction": max(0.0, hot_frac),
-            "cold_fraction": max(0.0, cold_frac),
-            "q_proxy": q_opt,
-            "policy_used": policy,
-        }
+                with st.spinner("HVAC 후보 전체를 PopField로 가상시험 중..."):
+                    opt_df = popfield_optimize_hvac(
+                        model=backend["model"],
+                        case_df=case_info_df,
+                        loads=loads,
+                        cond_scaler=backend["scalers"]["cond"],
+                        coords=backend["coords"],
+                        coords_norm_t=backend["coords_norm_t"],
+                        field_scaler=backend["scalers"]["field"],
+                        ra_scaler=backend["scalers"]["ra"],
+                        device=backend["device"],
+                        save_dir=runtime_dir,
+                        zone_json=None,
+                        target_temp_c=target,
+                        comfort_band_c=2.0,
+                        max_zone_range_c=2.0,
+                        max_hot_fraction=0.05,
+                        max_cold_fraction=0.05,
+                        max_p95_temp_c=target + 2.0,
+                        energy_weight=0.35,
+                    )
 
-        st.session_state.has_run_optimization = True
-        st.session_state.app_view = "RESULTS"
-        st.rerun()
+                    feasible_df = opt_df[opt_df["comfort_constraint_met"].astype(bool)].copy()
+                    if len(feasible_df):
+                        # Balanced policy from the original deployment optimizer:
+                        # minimize the model's combined comfort + cooling-load score.
+                        rec = feasible_df.sort_values(
+                            ["combined_score", "comfort_raw"]
+                        ).iloc[0]
+                    else:
+                        # Constraint-first optimizer already puts the least-violating
+                        # action at the top when no fully feasible action exists.
+                        rec = opt_df.iloc[0]
+
+                    cond = np.asarray([[
+                        float(rec["Inlet_L"]),
+                        float(rec["Inlet_M"]),
+                        float(rec["Inlet_R"]),
+                        float(loads["external"]),
+                        float(loads["meeting"]),
+                        float(loads["server"]),
+                        float(loads["working"]),
+                        float(rec["CMM"]),
+                        float(rec["AirTemp_C"]),
+                    ]], dtype=np.float32)
+
+                    pred_field, pred_ra = popfield_predict_conditions(
+                        backend["model"],
+                        cond,
+                        backend["scalers"]["cond"],
+                        backend["coords_norm_t"],
+                        backend["scalers"]["field"],
+                        backend["scalers"]["ra"],
+                        backend["device"],
+                    )
+
+                pred_temp_nodes = np.asarray(pred_field[0, :, 0], dtype=np.float32)
+                field_post_grid = _temperature_plane_grid(
+                    backend["coords"],
+                    pred_temp_nodes,
+                    st.session_state.z_plane,
+                    grid_len_axis,
+                    grid_wid_axis,
+                )
+
+                status_opt = _demo_status_from_row(rec, target)
+                st.session_state.optimized_results = {
+                    "status": status_opt,
+                    "vane": _direction_label(rec),
+                    "flow": f"{float(rec['CMM']):.0f} CMM",
+                    "temp": f"{float(rec['AirTemp_C']):.0f} °C",
+                    "mean_temp": float(rec["mean_temp_C"]),
+                    "p95_temp": float(rec["p95_temp_C"]),
+                    "zone_spread": float(rec["zone_range_C"]),
+                    "hot_fraction": float(rec["hot_fraction"]) * 100.0,
+                    "cold_fraction": float(rec["cold_fraction"]) * 100.0,
+                    "q_proxy": float(rec["estimated_sensible_cooling_kw"]),
+                    "policy_used": policy,
+                    "field_post_grid": np.asarray(field_post_grid, dtype=np.float32),
+                    "pred_ra_temp_c": float(pred_ra[0]),
+                    "num_candidates": int(len(opt_df)),
+                    "mapped_loads_W": {k: float(v) for k, v in loads.items()},
+                    "checkpoint_used": str(backend["checkpoint_path"]),
+                    "model_inference_used": True,
+                }
+
+                st.session_state.has_run_optimization = True
+                st.session_state.app_view = "RESULTS"
+                st.rerun()
+
+            except Exception as exc:
+                st.error(f"PopField 최적화 실행 중 오류: {type(exc).__name__}: {exc}")
 
 
 # ============================================================
@@ -1601,12 +1974,13 @@ elif st.session_state.app_view == "RESULTS":
         res = st.session_state.optimized_results
         target = st.session_state.target_temp
 
-        if "Comfort" in res["policy_used"]:
-            field_post_grid = field_current_grid - 0.80 * (field_current_grid - target) - 0.2
-        elif "Eco" in res["policy_used"]:
-            field_post_grid = field_current_grid - 0.45 * (field_current_grid - target)
+        if "field_post_grid" in res:
+            # This is the actual PopField output for the selected HVAC action.
+            field_post_grid = np.asarray(res["field_post_grid"], dtype=float)
         else:
-            field_post_grid = field_current_grid - 0.68 * (field_current_grid - target)
+            # Only possible for stale browser session state created by the older app.
+            field_post_grid = np.asarray(field_current_grid, dtype=float)
+            st.warning("이전 버전의 임시 결과가 남아 있습니다. 새 최적화를 한 번 실행해 주세요.")
 
         if res["status"] == "FEASIBLE":
             badge_bg, badge_border, badge_text, badge_desc = (
@@ -1652,6 +2026,12 @@ elif st.session_state.app_view == "RESULTS":
         """,
             unsafe_allow_html=True,
         )
+
+        if res.get("model_inference_used", False):
+            st.caption(
+                f"PopField inference · {int(res.get('num_candidates', 0))} HVAC candidates · "
+                f"{Path(res.get('checkpoint_used', 'best_deploy.pt')).name}"
+            )
 
         st.markdown('<div class="section-title">공간 쾌적성 및 편차 지표 (Diagnostics)</div>', unsafe_allow_html=True)
         st.markdown(
