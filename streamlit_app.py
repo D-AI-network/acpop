@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-# CFD_RETRIEVAL_FINAL_V3 = 2026-09-03
+# CFD_RETRIEVAL_FINAL_V4 = 2026-09-03
+# Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
 # FACTOR_UI_BUILD = 2026-09-03-v28
@@ -997,10 +998,16 @@ ROA_NODES_META = {
 ROA_NODE_IDS = list(ROA_NODES_META.keys())
 
 
+APP_ROOT = Path(__file__).resolve().parent
+
+
 def _first_existing_path(candidates):
+    """Resolve deployment assets relative to the Streamlit app file, not process CWD."""
     for candidate in candidates:
         p = Path(candidate)
-        if p.exists():
+        if not p.is_absolute():
+            p = APP_ROOT / p
+        if p.exists() and p.is_file():
             return p
     return None
 
@@ -1016,46 +1023,97 @@ CHECKPOINT_PATH = _first_existing_path([
     "best.pt",
 ])
 
-# Optional. If this archive is uploaded to the repo, HOME uses the ACTUAL
-# selected CFD field and its real spatial mean. Without it, HOME falls back
-# to a PopField estimate under the selected DP's original operating condition.
-def _first_valid_zip_path(candidates):
-    """Return the first candidate that is a real readable ZIP archive.
 
-    GitHub/Streamlit deployments can contain a same-named Git LFS pointer or a
-    partially uploaded file.  Existence alone is therefore not enough.
+def _count_dp_csvs_in_zip(path: Path) -> int:
+    """Return the number of distinct dpN.csv CFD cases in a valid archive."""
+    if not path.exists() or not path.is_file() or not zipfile.is_zipfile(path):
+        return 0
+    try:
+        ids = set()
+        with zipfile.ZipFile(path, "r") as zf:
+            for name in zf.namelist():
+                m = re.search(r"dp\s*(\d+)\.csv$", Path(name).name, flags=re.IGNORECASE)
+                if m:
+                    ids.add(int(m.group(1)))
+        return len(ids)
+    except Exception:
+        return 0
+
+
+def _discover_cfd_zip():
+    """Find the real CFD archive regardless of browser/GitHub filename changes.
+
+    We first test common filenames, including the literal URL-encoded filename
+    ``Field%20data.zip``.  Then every *.zip under the repository root is inspected.
+    The valid archive containing the largest number of dpN.csv files wins.
     """
-    invalid = []
-    for candidate in candidates:
-        p = Path(candidate)
-        if not p.exists() or not p.is_file():
-            continue
+    preferred_names = [
+        "Field data.zip",
+        "field_data.zip",
+        "Field%20data.zip",
+        "Field data (1).zip",
+        "Field data (1)(1).zip",
+    ]
+
+    candidates = []
+    seen = set()
+
+    def add_candidate(p: Path):
         try:
-            if zipfile.is_zipfile(p):
-                with zipfile.ZipFile(p, "r") as zf:
-                    # Reading the central directory is enough to reject broken files.
-                    _ = zf.namelist()
-                return p, None
+            key = str(p.resolve())
+        except Exception:
+            key = str(p)
+        if key not in seen:
+            seen.add(key)
+            candidates.append(p)
 
-            # Give a useful diagnostic for the most common deployment failure.
-            head = p.read_bytes()[:256]
-            if b"git-lfs.github.com/spec/v1" in head:
-                invalid.append(f"{p.name}: Git LFS pointer, not the actual ZIP")
-            elif head.lstrip().startswith((b"<html", b"<!DOCTYPE html", b"<!doctype html")):
-                invalid.append(f"{p.name}: HTML file, not the actual ZIP")
-            else:
-                invalid.append(f"{p.name}: file exists but is not a valid ZIP")
-        except Exception as e:
-            invalid.append(f"{p.name}: {type(e).__name__}")
-    return None, "; ".join(invalid) if invalid else None
+    for name in preferred_names:
+        p = APP_ROOT / name
+        if p.exists() and p.is_file():
+            add_candidate(p)
+
+    # GitHub/Streamlit may preserve a renamed upload. Search all repo ZIPs instead
+    # of requiring one exact spelling. Avoid .git internals.
+    try:
+        for p in APP_ROOT.rglob("*.zip"):
+            if ".git" in p.parts:
+                continue
+            if p.is_file():
+                add_candidate(p)
+    except Exception:
+        pass
+
+    valid = []
+    diagnostics = []
+    for p in candidates:
+        try:
+            if not zipfile.is_zipfile(p):
+                head = p.read_bytes()[:256]
+                if b"git-lfs.github.com/spec/v1" in head:
+                    diagnostics.append(f"{p.name}: Git LFS pointer")
+                else:
+                    diagnostics.append(f"{p.name}: not a valid ZIP")
+                continue
+            n_dp = _count_dp_csvs_in_zip(p)
+            if n_dp <= 0:
+                diagnostics.append(f"{p.name}: ZIP has no dpN.csv")
+                continue
+            valid.append((n_dp, p))
+        except Exception as exc:
+            diagnostics.append(f"{p.name}: {type(exc).__name__}")
+
+    if valid:
+        # Prefer the archive with the most real CFD cases; 200 should win naturally.
+        valid.sort(key=lambda item: item[0], reverse=True)
+        n_dp, p = valid[0]
+        return p, None, int(n_dp)
+
+    if not candidates:
+        return None, f"no ZIP file found under {APP_ROOT.name}/", 0
+    return None, "; ".join(diagnostics) if diagnostics else "no CFD dpN.csv archive found", 0
 
 
-FIELD_ZIP_PATH, FIELD_ZIP_ERROR = _first_valid_zip_path([
-    "Field data.zip",
-    "Field data (1).zip",
-    "Field data (1)(1).zip",
-    "field_data.zip",
-])
+FIELD_ZIP_PATH, FIELD_ZIP_ERROR, FIELD_ZIP_DP_COUNT = _discover_cfd_zip()
 
 
 @st.cache_data(show_spinner=False)
@@ -1132,7 +1190,7 @@ def load_popfield_backend():
 
 @st.cache_resource(show_spinner=False)
 def load_reconstruction_basis():
-    p = Path("sensor_reconstruction_basis.npz")
+    p = APP_ROOT / "sensor_reconstruction_basis.npz"
     if p.exists():
         try:
             with np.load(p) as data:
@@ -1865,7 +1923,21 @@ elif st.session_state.app_view == "HOME":
             f"(입력 대비 {matched_mean_temp_c - float(st.session_state.current_temp_query):+.1f}°C)"
         )
     elif current_field_source.startswith("PopField"):
-        st.warning("Field data.zip이 없어 Current Field가 모델 추정값입니다. 실제 CFD 검색을 위해 데이터를 업로드하세요.")
+        if FIELD_ZIP_PATH is None:
+            st.warning(
+                "실제 CFD ZIP을 앱이 찾지 못했습니다. "
+                f"진단: {FIELD_ZIP_ERROR or 'unknown'}"
+            )
+        elif scenario_table is None or len(scenario_table) == 0:
+            st.warning(
+                f"CFD ZIP은 로드되었습니다 ({FIELD_ZIP_PATH.name}, {FIELD_ZIP_DP_COUNT} cases). "
+                "하지만 Case Info와 CFD 시나리오 인덱스를 연결하지 못해 모델 추정값을 표시합니다."
+            )
+        else:
+            st.warning(
+                f"CFD ZIP과 시나리오 표는 로드되었지만 DP {matched_dp_id} 실제 field를 읽지 못해 "
+                "모델 추정값을 표시합니다."
+            )
     else:
         st.warning("Current Field용 실제 CFD 자산을 불러오지 못했습니다.")
 
