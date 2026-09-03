@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from scipy.interpolate import griddata
 import torch
 
-SENSOR_ICON_SVG_B64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgdmlld0JveD0iMCAwIDcyIDcyIj4KICA8cmVjdCB4PSI4IiB5PSI3IiB3aWR0aD0iNTYiIGhlaWdodD0iMTUiIHJ4PSI3LjUiIGZpbGw9IiMxMjNiNWQiLz4KICA8cmVjdCB4PSIyMCIgeT0iMTkiIHdpZHRoPSIzMiIgaGVpZ2h0PSIxMyIgcng9IjYuNSIgZmlsbD0iIzEyM2I1ZCIvPgogIDxjaXJjbGUgY3g9IjM2IiBjeT0iMjUiIHI9IjIuNSIgZmlsbD0iIzhmZTNmZiIvPgogIDxwYXRoIGQ9Ik0yNSAzOCBRMzYgMzAgNDcgMzgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSI0LjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0xOCA0NSBRMzYgMzEgNTQgNDUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSI0LjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0xMSA1MyBRMzYgMzMgNjEgNTMiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSI0LjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4="
+SENSOR_ICON_SVG_B64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgdmlld0JveD0iMCAwIDcyIDcyIj4KICA8cmVjdCB4PSIxOCIgeT0iOCIgd2lkdGg9IjM2IiBoZWlnaHQ9IjE0IiByeD0iNyIgZmlsbD0iIzEyM2I1ZCIvPgogIDxjaXJjbGUgY3g9IjM2IiBjeT0iMTUiIHI9IjIuNiIgZmlsbD0iIzlmZTRmZiIvPgogIDxwYXRoIGQ9Ik0yOSAzMCBRMzYgMjQgNDMgMzAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0yNCAzOCBRMzYgMjkgNDggMzgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0xOSA0NyBRMzYgMzQgNTMgNDciIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4="
 
 # MERGED_HOME_BUILD = 2026-09-03-v8_HOME_CONTROL_COMBINED
 
@@ -163,6 +163,21 @@ html, body, [class*="css"] {
   padding: 10px 10px 4px 10px;
   margin: 0 0 18px 0;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.025);
+}
+.map-shell {
+  background: rgba(190, 215, 230, 0.10);
+  border: 1.4px solid rgba(190, 225, 240, 0.35);
+  border-radius: 24px;
+  overflow: hidden;
+  padding: 10px 10px 4px 10px;
+  box-shadow: inset 0 0 0 1px rgba(16, 53, 87, 0.15);
+}
+.map-shell [data-testid="stPlotlyChart"],
+.map-shell .js-plotly-plot,
+.map-shell .plot-container,
+.map-shell .svg-container {
+  border-radius: 18px !important;
+  overflow: hidden !important;
 }
 
 /* Compact room summary shown under Current Field */
@@ -423,19 +438,21 @@ div[data-testid="stPlotlyChart"] {
 
 /* Buttons */
 div.stButton > button[kind="primary"] {
-  background: linear-gradient(90deg, #84dcff 0%, #b8efff 100%) !important;
-  color: #0b2a43 !important;
-  border-radius: 13px !important;
+  background:
+    linear-gradient(180deg, #0a2340 0%, #0d2d4d 100%) padding-box,
+    linear-gradient(90deg, #5be0ff 0%, #2aa7ff 48%, #ff6278 100%) border-box !important;
+  color: #f6fcff !important;
+  border-radius: 16px !important;
   font-family: 'Noto Sans KR', 'Outfit', 'Inter', sans-serif !important;
   font-size: 15px !important;
   font-weight: 700 !important;
-  padding: 12px 18px !important;
-  border: 1px solid rgba(210, 245, 255, 0.62) !important;
-  box-shadow: 0 8px 18px rgba(53, 176, 228, 0.18) !important;
+  padding: 13px 18px !important;
+  border: 2px solid transparent !important;
+  box-shadow: 0 0 18px rgba(72, 202, 255, 0.22), 0 0 20px rgba(255, 98, 120, 0.12) !important;
 }
 
 div.stButton > button[kind="primary"] p {
-  color: #0b2a43 !important;
+  color: #f6fcff !important;
 }
 
 div.stButton > button[kind="secondary"] p {
@@ -698,26 +715,8 @@ for nid, meta in ROA_NODES_META.items():
     sensor_readings[nid] = float(field_current_grid[idx])
 
 
-def make_mobile_heatmap(grid_data, height=330):
-    # Mask only a few corner cells so the heatmap itself reads as a softly rounded rectangle.
+def make_mobile_heatmap(grid_data, height=340):
     heatmap_data = np.array(grid_data, dtype=float, copy=True)
-    rows, cols = heatmap_data.shape
-    radius = 3.2
-    corner_specs = [
-        (0, 0, 1, 1),
-        (0, cols - 1, 1, -1),
-        (rows - 1, 0, -1, 1),
-        (rows - 1, cols - 1, -1, -1),
-    ]
-    for r0, c0, rs, cs in corner_specs:
-        for dr in range(4):
-            for dc in range(4):
-                # Rounded quarter-circle cutout at each corner.
-                if (dr - radius) ** 2 + (dc - radius) ** 2 > radius ** 2:
-                    rr = r0 + rs * dr
-                    cc = c0 + cs * dc
-                    if 0 <= rr < rows and 0 <= cc < cols:
-                        heatmap_data[rr, cc] = np.nan
 
     fig = go.Figure(
         data=go.Heatmap(
@@ -861,11 +860,13 @@ elif st.session_state.app_view == "HOME":
         unsafe_allow_html=True,
     )
 
+    st.markdown("<div class='field-panel'><div class='map-shell'>", unsafe_allow_html=True)
     st.plotly_chart(
-        make_mobile_heatmap(field_current_grid, height=330),
+        make_mobile_heatmap(field_current_grid, height=340),
         use_container_width=True,
         config={"displayModeBar": False},
     )
+    st.markdown("</div></div>", unsafe_allow_html=True)
 
     if st.button("냉방 최적화", type="primary", use_container_width=True, key="btn_home_to_heat"):
         st.session_state.app_view = "HEAT_LOAD"
