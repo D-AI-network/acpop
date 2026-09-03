@@ -175,21 +175,23 @@ html, body, [class*="css"] {
   overflow: hidden !important;
 }
 
-/* Real Streamlit map card: unlike an open/close HTML div, this actually wraps the chart. */
+/* Real Streamlit map card: wrapped in a rounded frame that matches the optimization button style. */
 .st-key-temperature_map_card,
 div[class*="st-key-temperature_map_card"] {
-  background: #b9cbd7 !important;
-  border: 2px solid #536d7b !important;
+  background:
+    linear-gradient(180deg, #0a2340 0%, #0d2d4d 100%) padding-box,
+    linear-gradient(90deg, #5be0ff 0%, #2aa7ff 48%, #ff6278 100%) border-box !important;
+  border: 2px solid transparent !important;
   border-radius: 28px !important;
   padding: 12px 12px 6px 12px !important;
   margin: 8px 0 22px 0 !important;
   overflow: hidden !important;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.34) !important;
+  box-shadow: 0 0 18px rgba(72, 202, 255, 0.18), 0 0 18px rgba(255, 98, 120, 0.10) !important;
 }
 
 .st-key-temperature_map_card [data-testid="stPlotlyChart"],
 div[class*="st-key-temperature_map_card"] [data-testid="stPlotlyChart"] {
-  border-radius: 20px !important;
+  border-radius: 22px !important;
   overflow: hidden !important;
   margin: 0 !important;
 }
@@ -200,7 +202,7 @@ div[class*="st-key-temperature_map_card"] [data-testid="stPlotlyChart"] {
 div[class*="st-key-temperature_map_card"] .js-plotly-plot,
 div[class*="st-key-temperature_map_card"] .plot-container,
 div[class*="st-key-temperature_map_card"] .svg-container {
-  border-radius: 18px !important;
+  border-radius: 20px !important;
   overflow: hidden !important;
 }
 
@@ -875,7 +877,15 @@ elif st.session_state.app_view == "HOME":
         st.session_state.target_temp = float(new_target)
         st.rerun()
 
-    # Large rounded map card. The Current Field text heading is intentionally removed.
+    st.markdown(
+        """
+        <div class="home-field-head" style="margin-top:18px; margin-bottom:10px;">
+            <div class="home-field-title">Current Field</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     with st.container(key="temperature_map_card"):
         st.plotly_chart(
             make_mobile_heatmap(field_current_grid, height=350),
