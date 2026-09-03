@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v35
+# FACTOR_UI_BUILD = 2026-09-03-v36
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -1108,6 +1108,26 @@ div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] * {
   font-weight: 800 !important;
 }
 
+
+/* Center and simplify the optimization progress message */
+div[data-testid="stSpinner"] {
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+div[data-testid="stSpinner"] > div {
+  width: 100% !important;
+  justify-content: center !important;
+}
+div[data-testid="stSpinner"] p {
+  width: 100% !important;
+  text-align: center !important;
+  color: #eefaff !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.2px !important;
+}
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -2187,24 +2207,53 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
             f"온도={temps[idx]:.2f}°C"
         )
 
+    # High-visibility sensor glyph: white top bar + white circular body + navy center.
+    # Plotly 3D markers do not support arbitrary image icons, so this composite keeps
+    # the sensor readable while remaining fully rotatable in 3D.
     fig.add_trace(
         go.Scatter3d(
             x=sensor_x,
             y=sensor_y,
-            z=sensor_z,
-            mode="markers+text",
+            z=[z + 0.24 for z in sensor_z],
+            mode="text",
+            text=["▬"] * len(sensor_x),
+            textfont=dict(size=16, color="#ffffff"),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter3d(
+            x=sensor_x,
+            y=sensor_y,
+            z=[z + 0.10 for z in sensor_z],
+            mode="markers",
             marker=dict(
-                size=7,
-                color="#ff4b3e",
-                line=dict(color="#ffb4ad", width=1.2),
+                size=11,
+                color="#ffffff",
+                line=dict(color="#dff7ff", width=1.5),
                 symbol="circle",
                 opacity=1.0,
             ),
-            text=sensor_labels,
-            textposition="middle right",
-            textfont=dict(size=10, color="#f3fbff"),
             hovertext=sensor_hover,
             hoverinfo="text",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter3d(
+            x=sensor_x,
+            y=sensor_y,
+            z=[z + 0.10 for z in sensor_z],
+            mode="markers",
+            marker=dict(
+                size=3.4,
+                color="#153a59",
+                line=dict(width=0),
+                symbol="circle",
+                opacity=1.0,
+            ),
+            hoverinfo="skip",
             showlegend=False,
         )
     )
@@ -2548,7 +2597,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
                 runtime_dir = Path(tempfile.gettempdir()) / "acpop_streamlit_runtime"
                 runtime_dir.mkdir(parents=True, exist_ok=True)
 
-                with st.spinner("AI 최적화 필드 예측중입니다..."):
+                with st.spinner("AI 예측 중..."):
                     opt_df = popfield_optimize_hvac(
                         model=backend["model"],
                         case_df=case_info_df,
@@ -2817,10 +2866,10 @@ elif st.session_state.app_view == "RESULTS":
             )
 
         st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
-        if st.button("✅ 제어 명령 에어컨 전송 (BMS)", type="primary", use_container_width=True):
+        if st.button("제어 명령 에어컨 전송 (BMS)", type="primary", use_container_width=True):
             st.success("Carrier BMS 게이트웨이로 최적 제어 파라미터를 전송했습니다!")
 
-        if st.button("🔄 새로운 최적화 실행 (홈으로)", type="secondary", use_container_width=True):
+        if st.button("새로운 최적화 실행 (홈으로)", type="secondary", use_container_width=True):
             st.session_state.app_view = "HOME"
             st.rerun()
 
@@ -2847,6 +2896,6 @@ if st.session_state.app_view != "INTRO":
 
     with b_col3:
         btn_analysis_kind = "primary" if st.session_state.app_view == "RESULTS" else "secondary"
-        if st.button("📈 Analysis", type=btn_analysis_kind, use_container_width=True, key="btn_nav_analysis"):
+        if st.button("Analysis", type=btn_analysis_kind, use_container_width=True, key="btn_nav_analysis"):
             st.session_state.app_view = "RESULTS"
             st.rerun()
