@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 from scipy.interpolate import griddata
 import torch
 
-# SINGLE_FILE_INTRO_BUILD = 2026-09-03-v5
+# HOME_NAVY_BUILD = 2026-09-03-v7_CURRENT_FIELD
 
 # ============================================================
 # 1. PAGE CONFIGURATION & MOBILE UI CSS
@@ -31,17 +31,19 @@ st.markdown(
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap');
 
 :root {
-  --ink: #0b1b2b;
-  --frost: #eef4f9;
-  --surface: #ffffff;
-  --cool: #0077b6;
-  --cool-deep: #023e8a;
-  --cool-soft: #e0f2fe;
-  --teal-btn: #0096c7;
-  --teal-hover: #0077b6;
-  --ember: #e2603f;
-  --mist: #64748b;
-  --line: #e2e8f0;
+  --navy-bg: #102a43;
+  --navy-shell: #143552;
+  --navy-surface: #183f5f;
+  --navy-surface-2: #1d496b;
+  --sky: #aee4ff;
+  --sky-strong: #d9f3ff;
+  --cool: #38bdf8;
+  --cool-deep: #1689c9;
+  --cool-soft: rgba(56, 189, 248, 0.14);
+  --green: #59e391;
+  --mist: #9dbfd4;
+  --line: rgba(174, 228, 255, 0.16);
+  --line-strong: rgba(174, 228, 255, 0.28);
 }
 
 html, body, [class*="css"] {
@@ -49,18 +51,18 @@ html, body, [class*="css"] {
 }
 
 .stApp {
-  background: var(--frost) !important;
+  background: #0d243a !important;
 }
 
 /* Smartphone Shell Container */
 .block-container {
   max-width: 440px !important;
-  padding: 1.1rem 1.1rem 2rem 1.1rem !important;
-  margin: 1.2rem auto !important;
-  background: var(--surface) !important;
-  border: 1.2px solid #cbd5e1 !important;
+  padding: 1.05rem 1.05rem 2rem 1.05rem !important;
+  margin: 1.1rem auto !important;
+  background: linear-gradient(180deg, #173a59 0%, #102c47 100%) !important;
+  border: 1.2px solid rgba(133, 202, 245, 0.20) !important;
   border-radius: 36px !important;
-  box-shadow: 0 20px 45px -12px rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 22px 48px -16px rgba(0, 8, 20, 0.48) !important;
 }
 
 #MainMenu, footer, header[data-testid="stHeader"] {
@@ -68,13 +70,27 @@ html, body, [class*="css"] {
   height: 0;
 }
 
+/* Make Streamlit text readable on the navy theme */
+.block-container p,
+.block-container label,
+.block-container span,
+.block-container [data-testid="stWidgetLabel"] p,
+.block-container [data-testid="stCaptionContainer"] p {
+  color: var(--sky-strong);
+}
+
+.block-container [data-testid="stCaptionContainer"] p {
+  color: var(--mist) !important;
+}
+
 /* Top Device Notch */
 .phone-notch {
   width: 86px;
   height: 15px;
-  background: #0f172a;
+  background: #07192b;
+  border: 1px solid rgba(56, 189, 248, 0.16);
   border-radius: 10px;
-  margin: 0 auto 12px auto;
+  margin: 0 auto 18px auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,61 +99,85 @@ html, body, [class*="css"] {
 .notch-cam {
   width: 5px;
   height: 5px;
-  background: #334155;
+  background: #37536a;
   border-radius: 50%;
 }
 .notch-speaker {
   width: 22px;
   height: 3px;
-  background: #334155;
+  background: #37536a;
   border-radius: 2px;
 }
 
-/* Header Branding */
-.app-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--cool);
-  background: rgba(0, 119, 182, 0.08);
-  padding: 3px 8px;
-  border-radius: 20px;
-  margin-bottom: 5px;
-}
+/* Old badge removed */
+.app-brand,
 .app-brand-icon {
-  background: var(--cool);
-  color: #ffffff;
-  border-radius: 50%;
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-}
-.app-title {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--ink);
-  margin: 0;
-  letter-spacing: -0.6px;
-  line-height: 1.1;
-}
-.brand-spectrum {
-  width: 48px;
-  height: 3.5px;
-  background: linear-gradient(90deg, #0077b6 0%, #e2603f 100%);
-  border-radius: 3px;
-  margin-top: 6px;
-  margin-bottom: 14px;
+  display: none !important;
 }
 
-/* Status Cards */
+/* Main app header shown from HOME onward */
+.app-title {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  font-size: 27px;
+  font-weight: 800;
+  color: var(--sky) !important;
+  margin: 0;
+  letter-spacing: -0.55px;
+  line-height: 1.08;
+}
+.brand-spectrum {
+  width: 54px;
+  height: 3px;
+  background: linear-gradient(90deg, #38bdf8 0%, #8fe3ff 100%);
+  border-radius: 999px;
+  margin-top: 7px;
+  margin-bottom: 17px;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.24);
+}
+
+/* HOME - Current Field becomes the hero */
+.home-field-head {
+  margin: 2px 0 12px 0;
+}
+.home-field-kicker {
+  color: #6fd2ff;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.home-field-title {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  color: #f0f9ff;
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -0.65px;
+  line-height: 1.05;
+  margin: 0;
+}
+.home-field-meta {
+  margin-top: 6px;
+  color: var(--mist);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.home-field-meta b {
+  color: #8edbff;
+  font-weight: 700;
+}
+.field-panel {
+  background: rgba(8, 30, 50, 0.28);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 10px 10px 4px 10px;
+  margin: 0 0 14px 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.025);
+}
+
+/* Kept for result cards and diagnostics */
 .status-card {
-  background: #f8fafc;
+  background: var(--navy-surface);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px 18px;
@@ -153,11 +193,11 @@ html, body, [class*="css"] {
   font-family: 'JetBrains Mono', monospace;
   font-size: 34px;
   font-weight: 800;
-  color: var(--ink);
+  color: #f2fbff;
   line-height: 1.1;
 }
 .status-target {
-  color: var(--cool);
+  color: #68cbff;
   font-size: 12.5px;
   font-weight: 600;
   margin-top: 4px;
@@ -165,16 +205,16 @@ html, body, [class*="css"] {
 
 .section-title {
   font-family: 'Space Grotesk', 'Inter', sans-serif;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 800;
-  color: var(--ink);
-  margin-bottom: 6px;
+  color: #e8f7ff !important;
+  margin-bottom: 7px;
 }
 
 .helper-desc {
   font-size: 11.5px;
-  color: var(--mist);
-  line-height: 1.45;
+  color: var(--mist) !important;
+  line-height: 1.5;
   text-align: center;
   margin-top: 10px;
   margin-bottom: 14px;
@@ -183,16 +223,16 @@ html, body, [class*="css"] {
 
 /* Optimal HVAC Dispatch Card */
 .optimal-dispatch-box {
-  background: #ffffff;
-  border: 2px solid #0077b6;
+  background: #173b59;
+  border: 1.5px solid rgba(56, 189, 248, 0.44);
   border-radius: 16px;
   padding: 18px 20px;
   margin-top: 14px;
   margin-bottom: 14px;
-  box-shadow: 0 4px 14px rgba(0, 119, 182, 0.08);
+  box-shadow: 0 7px 20px rgba(2, 20, 38, 0.22);
 }
 .optimal-dispatch-box h4 {
-  color: #0077b6 !important;
+  color: #7ed7ff !important;
   font-family: 'Space Grotesk', 'Inter', sans-serif;
   font-size: 17px;
   font-weight: 800;
@@ -206,11 +246,11 @@ html, body, [class*="css"] {
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: #1e293b;
+  color: #d9efff;
   margin: 8px 0;
 }
 .optimal-dispatch-box .dispatch-row b {
-  color: #0f172a;
+  color: #f2fbff;
   font-weight: 700;
 }
 
@@ -240,7 +280,7 @@ html, body, [class*="css"] {
   margin-bottom: 8px;
 }
 .metric-cell {
-  background: #f8fafc;
+  background: #173b59;
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px 12px;
@@ -255,7 +295,7 @@ html, body, [class*="css"] {
   font-family: 'JetBrains Mono', monospace;
   font-size: 16px;
   font-weight: 800;
-  color: var(--ink);
+  color: #f1fbff;
   margin-top: 2px;
 }
 
@@ -263,49 +303,63 @@ html, body, [class*="css"] {
 [data-testid="stSlider"],
 [data-testid="stSelectSlider"],
 [data-testid="stRadio"] {
-  background: #ffffff;
+  background: rgba(18, 51, 78, 0.70);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 10px 14px 6px 14px;
   margin-bottom: 8px;
 }
 
+/* Selectbox / expander surfaces */
+[data-testid="stExpander"] {
+  border-color: var(--line) !important;
+  background: rgba(18, 51, 78, 0.55) !important;
+  border-radius: 14px !important;
+}
+
 /* Bottom Nav Container */
 .bottom-nav {
   margin-top: 16px;
-  padding-top: 8px;
+  padding-top: 9px;
   border-top: 1px solid var(--line);
 }
 
 /* Buttons */
 div.stButton > button[kind="primary"] {
-  background-color: var(--cool) !important;
+  background: linear-gradient(90deg, #1687ca 0%, #20a8e5 100%) !important;
   color: #ffffff !important;
-  border-radius: 12px !important;
+  border-radius: 13px !important;
   font-size: 14.5px !important;
   font-weight: 800 !important;
   padding: 11px 18px !important;
-  border: none !important;
-  box-shadow: 0 4px 12px rgba(0, 119, 182, 0.25) !important;
+  border: 1px solid rgba(126, 215, 255, 0.24) !important;
+  box-shadow: 0 6px 16px rgba(5, 48, 82, 0.28) !important;
+}
+
+div.stButton > button[kind="primary"] p,
+div.stButton > button[kind="secondary"] p {
+  color: #ffffff !important;
 }
 
 div.stButton > button[kind="secondary"] {
-  background-color: var(--teal-btn) !important;
-  color: #ffffff !important;
-  border-radius: 12px !important;
+  background: #1a4666 !important;
+  color: #e6f6ff !important;
+  border-radius: 13px !important;
   font-size: 14px !important;
   font-weight: 800 !important;
   padding: 10px 16px !important;
-  border: none !important;
-  box-shadow: 0 2px 8px rgba(0, 150, 199, 0.18) !important;
+  border: 1px solid rgba(174, 228, 255, 0.15) !important;
+  box-shadow: none !important;
 }
 
 div.stButton > button[kind="secondary"]:hover {
-  background-color: var(--teal-hover) !important;
+  background: #205474 !important;
+  border-color: rgba(174, 228, 255, 0.27) !important;
 }
 
-div.stButton > button[kind="secondary"] p {
-  color: #ffffff !important;
+/* Info/success boxes stay readable in the dark shell */
+[data-testid="stAlert"] {
+  border-radius: 13px !important;
 }
 </style>
 """,
@@ -549,7 +603,7 @@ def make_mobile_heatmap(grid_data, height=225):
             colorscale="Turbo",
             zmin=18.0,
             zmax=28.0,
-            colorbar=dict(title="°C", thickness=7, len=0.9, x=1.02, tickfont=dict(size=9.5)),
+            colorbar=dict(title=dict(text="°C", font=dict(size=10, color="#d9f3ff")), thickness=7, len=0.9, x=1.02, tickfont=dict(size=9.5, color="#b7d7e8"), outlinecolor="rgba(174,228,255,0.18)"),
         )
     )
 
@@ -601,10 +655,7 @@ if st.session_state.app_view != "INTRO":
     <div class="notch-cam"></div>
     <div class="notch-speaker"></div>
 </div>
-<div class="app-brand">
-    <span class="app-brand-icon">❄️</span> Coollins AI Smart Cooling
-</div>
-<div class="app-title">Coollins</div>
+<div class="app-title">AI Smart Cooling</div>
 <div class="brand-spectrum"></div>
 """,
         unsafe_allow_html=True,
@@ -637,17 +688,25 @@ if st.session_state.app_view == "INTRO":
 elif st.session_state.app_view == "HOME":
     st.markdown(
         f"""
-    <div class="status-card">
-        <div class="status-label">현재 공간 상태</div>
-        <div class="status-temp">{avg_room_temp:.1f} °C</div>
-        <div class="status-target">목표 {st.session_state.target_temp:.1f}°C • 냉방 최적화 필요</div>
+    <div class="home-field-head">
+        <div class="home-field-kicker">LIVE SPATIAL TEMPERATURE</div>
+        <div class="home-field-title">Current Field</div>
+        <div class="home-field-meta">
+            센서 기반 공간 온도 분포 · <b>Z = {st.session_state.z_plane:g}m</b>
+        </div>
     </div>
-    <div class="section-title">Current Field (Z = {st.session_state.z_plane:g}m)</div>
+    <div class="field-panel">
     """,
         unsafe_allow_html=True,
     )
 
-    st.plotly_chart(make_mobile_heatmap(field_current_grid), use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(
+        make_mobile_heatmap(field_current_grid),
+        use_container_width=True,
+        config={"displayModeBar": False},
+    )
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if st.button("AI 냉방 최적화 시작", type="primary", use_container_width=True):
         st.session_state.app_view = "CONTROL"
@@ -656,7 +715,7 @@ elif st.session_state.app_view == "HOME":
     st.markdown(
         """
     <div class="helper-desc">
-        입력한 공간 조건을 바탕으로 Coollins가 HVAC 후보를 가상시험하고 목표 온도와 쾌적 조건을 만족하는 운전안을 찾습니다.
+        센서로 측정된 공간 온도 분포를 확인한 뒤 최적 냉방 제어를 시작할 수 있습니다.
     </div>
     """,
         unsafe_allow_html=True,
