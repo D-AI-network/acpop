@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v32
+# FACTOR_UI_BUILD = 2026-09-03-v33
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -466,6 +466,17 @@ div[data-testid="stPlotlyChart"] {
   object-fit: contain;
   flex: 0 0 auto;
 }
+.results-title-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: #61cfff;
+  font-size: 17px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
 .field-map-title {
   font-family: 'Outfit', 'Inter', sans-serif;
   color: #e8f7ff !important;
@@ -490,7 +501,14 @@ div[class*="st-key-field_comparison_card"] {
 div[class*="st-key-field_comparison_card"] [data-testid="stPlotlyChart"] {
   border-radius: 16px !important;
   overflow: hidden !important;
-  margin-bottom: 4px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.st-key-field_comparison_card .js-plotly-plot,
+div[class*="st-key-field_comparison_card"] .js-plotly-plot,
+.st-key-current_field_card .js-plotly-plot,
+div[class*="st-key-current_field_card"] .js-plotly-plot {
+  width: 100% !important;
 }
 
 .field-map-divider {
@@ -807,9 +825,9 @@ div[class*="st-key-sl_work"] [data-testid="stSelectSlider"] div,
 .st-key-sl_serv [data-testid="stSelectSlider"] p,
 .st-key-sl_meet [data-testid="stSelectSlider"] p,
 .st-key-sl_work [data-testid="stSelectSlider"] p {
-  font-size: 10px !important;
+  font-size: 9px !important;
   line-height: 1.0 !important;
-  font-weight: 450 !important;
+  font-weight: 700 !important;
 }
 
 /* Restore only the four factor names so they remain visually dominant. */
@@ -839,9 +857,9 @@ div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
 .st-key-sl_serv [data-testid="stTickBar"] *,
 .st-key-sl_meet [data-testid="stTickBar"] *,
 .st-key-sl_work [data-testid="stTickBar"] * {
-  font-size: 10px !important;
+  font-size: 9px !important;
   line-height: 1.0 !important;
-  font-weight: 450 !important;
+  font-weight: 700 !important;
 }
 
 
@@ -855,7 +873,7 @@ div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
 [data-testid="stSelectSlider"] [data-testid="stTickBar"] *,
 [data-testid="stSelectSlider"] [data-testid="stTickBarMin"],
 [data-testid="stSelectSlider"] [data-testid="stTickBarMax"] {
-  font-size: 8px !important;
+  font-size: 9px !important;
   line-height: 1 !important;
   font-weight: 800 !important;
 }
@@ -994,7 +1012,7 @@ div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
 div[data-testid="stSelectSlider"] *,
 div[data-testid="stSelectSlider"] *::before,
 div[data-testid="stSelectSlider"] *::after {
-  font-size: 8px !important;
+  font-size: 9px !important;
   line-height: 1 !important;
   font-weight: 800 !important;
   letter-spacing: -0.15px !important;
@@ -1019,7 +1037,7 @@ div[data-testid="stSelectSlider"] [data-testid="stTickBarMin"],
 div[data-testid="stSelectSlider"] [data-testid="stTickBarMax"],
 div[data-testid="stSelectSlider"] [data-baseweb="slider"] *,
 div[data-testid="stSelectSlider"] [aria-valuenow] * {
-  font-size: 8px !important;
+  font-size: 9px !important;
   line-height: 1 !important;
   font-weight: 800 !important;
 }
@@ -1899,7 +1917,6 @@ def make_mobile_heatmap(grid_data, height=340):
     """Interactive 3D spatial-temperature surface used by HOME and RESULTS."""
     surface_data = np.asarray(grid_data, dtype=float)
 
-    # Plotly Surface: X/Y are room coordinates, Z height visualizes temperature.
     fig = go.Figure()
 
     fig.add_trace(
@@ -1914,10 +1931,10 @@ def make_mobile_heatmap(grid_data, height=340):
             showscale=True,
             colorbar=dict(
                 title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
-                thickness=7,
-                len=0.62,
-                x=0.96,
-                tickfont=dict(size=9, color="#b7d7e8"),
+                thickness=8,
+                len=0.72,
+                x=0.965,
+                tickfont=dict(size=9, color="#d9f3ff"),
                 outlinecolor="rgba(174,228,255,0.18)",
             ),
             hovertemplate=(
@@ -1927,18 +1944,17 @@ def make_mobile_heatmap(grid_data, height=340):
                 "<extra></extra>"
             ),
             lighting=dict(
-                ambient=0.72,
-                diffuse=0.75,
-                specular=0.16,
-                roughness=0.88,
+                ambient=0.78,
+                diffuse=0.72,
+                specular=0.10,
+                roughness=0.92,
             ),
         )
     )
 
-    # Keep the sensors visible in the 3D field.
     sx_plot = [meta["x_plot"] for meta in sensor_plot_meta.values()]
     sy_plot = [meta["y_plot"] for meta in sensor_plot_meta.values()]
-    sz_plot = [sensor_readings.get(nid, np.nan) for nid in sensor_plot_meta.keys()]
+    sz_plot = [sensor_readings.get(nid, np.nan) + 0.15 for nid in sensor_plot_meta.keys()]
     hover_texts = [
         (
             f"<b>{meta['name']}</b><br>"
@@ -1956,10 +1972,11 @@ def make_mobile_heatmap(grid_data, height=340):
             z=sz_plot,
             mode="markers",
             marker=dict(
-                size=5,
-                color="#0b3555",
-                line=dict(color="#9fe4ff", width=1.2),
-                symbol="diamond",
+                size=6,
+                color="#ff575f",
+                line=dict(color="#ffd2d6", width=1.3),
+                symbol="circle",
+                opacity=0.98,
             ),
             hovertext=hover_texts,
             hoverinfo="text",
@@ -1970,10 +1987,12 @@ def make_mobile_heatmap(grid_data, height=340):
     fig.update_layout(
         title=dict(text="", font=dict(size=1)),
         showlegend=False,
+        autosize=True,
         height=height,
         margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         scene=dict(
+            domain=dict(x=[0.00, 0.91], y=[0.00, 1.00]),
             bgcolor="rgba(0,0,0,0)",
             xaxis=dict(
                 title="",
@@ -1998,9 +2017,10 @@ def make_mobile_heatmap(grid_data, height=340):
                 showticklabels=False,
             ),
             aspectmode="manual",
-            aspectratio=dict(x=1.7, y=0.86, z=0.55),
+            aspectratio=dict(x=2.15, y=1.25, z=0.34),
             camera=dict(
-                eye=dict(x=1.45, y=-1.55, z=1.10),
+                projection=dict(type="orthographic"),
+                eye=dict(x=0.0, y=-2.15, z=0.78),
                 center=dict(x=0.0, y=0.0, z=-0.08),
             ),
         ),
@@ -2143,10 +2163,6 @@ elif st.session_state.app_view == "HEAT_LOAD":
         unsafe_allow_html=True,
     )
 
-    if matched_scenario is not None and current_field_source.startswith("Actual CFD"):
-        st.caption(
-            f"현재 입력과 가장 가까운 CFD: DP {matched_dp_id} · 실제 평균 {matched_mean_temp_c:.1f}°C"
-        )
 
     # The title uses a small wall-mounted AC SVG instead of a flame emoji.
     st.markdown(
@@ -2221,6 +2237,14 @@ elif st.session_state.app_view == "HEAT_LOAD":
     burden_score = sum(factor_values.values()) / len(factor_values)
     burden_index = max(1, min(5, int(round(burden_score))))
     burden_label = stage_opts[burden_index - 1]
+    burden_color_map = {
+        "매우 낮음": "#66d9ff",
+        "낮음": "#7bd6ef",
+        "보통": "#8edbcb",
+        "높음": "#ffad66",
+        "매우 높음": "#ff6b7a",
+    }
+    burden_label_color = burden_color_map.get(burden_label, "#f5fbff")
     # 주요 영향 요인은 '높음(4)' 또는 '매우 높음(5)'으로 설정된 항목만 별도 표시합니다.
     factor_icons = {
         "외부 열환경": "☀️",
@@ -2247,14 +2271,14 @@ elif st.session_state.app_view == "HEAT_LOAD":
             for name, level in major_factors
         )
     else:
-        major_chips_html = '<span class="major-factor-empty">현재 높음 이상으로 설정된 영향 요인이 없습니다.</span>'
+        major_chips_html = '<span class="major-factor-empty">현재 열환경 수준에 영향 요인이 없습니다.</span>'
 
     st.markdown(
         f"""
         <div class="cooling-load-card">
             <div class="cooling-load-top">
                 <div class="cooling-load-label">종합 열환경 수준</div>
-                <div class="cooling-load-level">{burden_label}</div>
+                <div class="cooling-load-level" style="color:{burden_label_color};">{burden_label}</div>
             </div>
             <div class="cooling-load-segments">{segments_html}</div>
         </div>
@@ -2302,7 +2326,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
                 runtime_dir = Path(tempfile.gettempdir()) / "acpop_streamlit_runtime"
                 runtime_dir.mkdir(parents=True, exist_ok=True)
 
-                with st.spinner("HVAC 후보 전체를 PopField로 가상시험 중..."):
+                with st.spinner("AI 최적화 필드 예측중입니다..."):
                     opt_df = popfield_optimize_hvac(
                         model=backend["model"],
                         case_df=case_info_df,
@@ -2429,7 +2453,7 @@ elif st.session_state.app_view == "RESULTS":
             st.rerun()
     else:
         st.markdown(
-            f'<div class="section-title results-title-row"><img class="results-title-icon" src="data:image/png;base64,{RESULT_TITLE_SNOWFLAKE_B64}" alt="snowflake">AI 최적화 필드 예측</div>',
+            '<div class="section-title results-title-row"><span class="results-title-glyph">❄</span>AI 최적화 필드 예측</div>',
             unsafe_allow_html=True,
         )
 
@@ -2450,23 +2474,23 @@ elif st.session_state.app_view == "RESULTS":
 
         if res["status"] == "FEASIBLE":
             badge_bg, badge_border, badge_text, badge_desc = (
-                "rgba(117, 218, 174, 0.16)",
-                "#6dd3a0",
-                "✅ 목표 온도 달성 가능",
+                "rgba(118, 205, 170, 0.12)",
+                "#7ad9a6",
+                "✓ 목표 온도 달성 가능",
                 f"목표 {target:.1f}℃ 및 쾌적 지표를 만족하는 냉방 설정입니다.",
             )
         elif res["status"] == "NEAR_FEASIBLE":
             badge_bg, badge_border, badge_text, badge_desc = (
                 "rgba(242, 193, 91, 0.14)",
                 "#e7b95d",
-                "⚠️ 목표 온도 근접 달성",
+                "• 목표 온도 근접 달성",
                 "대부분의 기준을 만족하지만 일부 공간에 경미한 편차가 있습니다.",
             )
         else:
             badge_bg, badge_border, badge_text, badge_desc = (
                 "rgba(255, 120, 132, 0.14)",
                 "#ff7f8d",
-                "❌ 목표 온도 달성 어려움",
+                "✕ 목표 온도 달성 어려움",
                 "현재 냉방 설정 후보만으로는 목표 온도를 만족하기 어렵습니다.",
             )
 
@@ -2497,7 +2521,7 @@ elif st.session_state.app_view == "RESULTS":
             <div class="dispatch-row">💨 <b>바람 방향:</b> {vane_display}</div>
             <div class="dispatch-row">🌀 <b>풍량:</b> {res['flow']}</div>
             <div class="dispatch-row">❄️ <b>공급 공기 온도:</b> {res['temp']}</div>
-            <div class="dispatch-row">◈ <b>냉방 출력 추정치:</b> {float(res['q_proxy']):.2f} kW</div>
+            <div class="dispatch-row">⚙️ <b>냉방 출력 추정치:</b> {float(res['q_proxy']):.2f} kW</div>
         </div>
         """,
             unsafe_allow_html=True,
@@ -2534,7 +2558,7 @@ elif st.session_state.app_view == "RESULTS":
         with st.container(key="field_comparison_card"):
             st.markdown('<div class="field-map-title">Current Field</div>', unsafe_allow_html=True)
             st.plotly_chart(
-                make_mobile_heatmap(result_current_grid, height=245),
+                make_mobile_heatmap(result_current_grid, height=305),
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
@@ -2543,7 +2567,7 @@ elif st.session_state.app_view == "RESULTS":
 
             st.markdown('<div class="field-map-title">Predicted Field</div>', unsafe_allow_html=True)
             st.plotly_chart(
-                make_mobile_heatmap(field_post_grid, height=245),
+                make_mobile_heatmap(field_post_grid, height=305),
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
