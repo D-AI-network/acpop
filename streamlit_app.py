@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v39
+# FACTOR_UI_BUILD = 2026-09-03-v40
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -485,11 +485,13 @@ div[data-testid="stPlotlyChart"] {
   margin: 13px 0 8px 0;
 }
 .field-map-title.current-title {
-  font-size: 23px;
+  font-size: 24px;
   line-height: 1.05;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.6px;
+  font-weight: 800;
+  color: #f4fbff !important;
   margin-top: 15px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 /* Current Field + Predicted Field grouped in one result card. */
@@ -2105,8 +2107,8 @@ def make_mobile_heatmap(grid_data, height=340):
     return fig
 
 
-def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
-    """True 3D CFD field: XYZ node cloud + room wireframe + selected sensors."""
+def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
+    """Reference-style 3D CFD field: colored XYZ node cloud + white room frame + compact sensor diamonds."""
     coords_xyz = np.asarray(coords_xyz, dtype=float)
     temp_nodes = np.asarray(temp_nodes, dtype=float).reshape(-1)
 
@@ -2125,8 +2127,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
     if len(coords) == 0:
         return make_mobile_heatmap(field_current_grid, height=height)
 
-    # Downsample deterministically for mobile responsiveness while preserving
-    # the full 3D spatial envelope.
+    # Deterministic downsampling keeps the visual dense but responsive on mobile.
     if len(coords) > max_points:
         pick = np.linspace(0, len(coords) - 1, max_points, dtype=int)
         pc = coords[pick]
@@ -2138,10 +2139,19 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
     xmin, ymin, zmin = np.min(coords, axis=0)
     xmax, ymax, zmax = np.max(coords, axis=0)
 
+    temp_scale = [
+        [0.00, "#77ddff"],  # 18 C - sky blue
+        [0.17, "#42bfff"],
+        [0.35, "#13b9c8"],
+        [0.52, "#42d879"],
+        [0.68, "#b6e33d"],
+        [0.82, "#ff9f2f"],
+        [1.00, "#e6372f"],  # 28 C - red
+    ]
+
     fig = go.Figure()
 
-    # CFD nodes: temperature is encoded by color; the points themselves show
-    # the actual 3D room volume rather than a raised 2D sheet.
+    # 3D CFD nodes
     fig.add_trace(
         go.Scatter3d(
             x=pc[:, 0],
@@ -2149,26 +2159,20 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
             z=pc[:, 2],
             mode="markers",
             marker=dict(
-                size=2.4,
+                size=2.15,
                 color=pt,
-                colorscale=[
-                    [0.00, "#8ee7ff"],
-                    [0.18, "#5cc8ff"],
-                    [0.38, "#43d8b1"],
-                    [0.58, "#b7ef4a"],
-                    [0.78, "#ffb347"],
-                    [1.00, "#e53935"],
-                ],
+                colorscale=temp_scale,
                 cmin=18.0,
                 cmax=28.0,
-                opacity=0.58,
+                opacity=0.72,
                 colorbar=dict(
-                    title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
+                    title=dict(text="°C", font=dict(size=11, color="#eefaff")),
                     thickness=8,
                     len=0.70,
                     x=0.965,
-                    tickfont=dict(size=9, color="#d9f3ff"),
-                    outlinecolor="rgba(174,228,255,0.18)",
+                    tickvals=[18, 20, 22, 24, 26, 28],
+                    tickfont=dict(size=9, color="#dff4ff"),
+                    outlinecolor="rgba(174,228,255,0.20)",
                 ),
             ),
             hovertemplate=(
@@ -2182,7 +2186,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
         )
     )
 
-    # Room bounding-box wireframe.
+    # Bright white room wireframe, matching the visual reference.
     corners = {
         "000": (xmin, ymin, zmin), "100": (xmax, ymin, zmin),
         "010": (xmin, ymax, zmin), "110": (xmax, ymax, zmin),
@@ -2201,15 +2205,14 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
             go.Scatter3d(
                 x=[xa, xb], y=[ya, yb], z=[za, zb],
                 mode="lines",
-                line=dict(color="rgba(151, 205, 232, 0.42)", width=2),
+                line=dict(color="rgba(235,248,255,0.88)", width=2.2),
                 hoverinfo="skip",
                 showlegend=False,
             )
         )
 
-    # Selected sensor positions: use the nearest real CFD node to each canonical
-    # sensor location and display a red sphere, like the reference 3D layout.
-    sensor_x, sensor_y, sensor_z, sensor_labels, sensor_hover = [], [], [], [], []
+    # Locate sensors at the nearest real CFD nodes.
+    sensor_x, sensor_y, sensor_z, sensor_hover = [], [], [], []
     for nid, meta in ROA_NODES_META.items():
         target = np.asarray(
             [float(meta["x_plot"]), float(meta["y_plot"]), float(meta["z"])],
@@ -2221,24 +2224,24 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
         sensor_x.append(float(sx))
         sensor_y.append(float(sy))
         sensor_z.append(float(sz))
-        sensor_labels.append(str(meta.get("code", meta.get("name", ""))))
         sensor_hover.append(
             f"<b>{meta['name']}</b><br>"
             f"X={sx:.2f}m, Y={sy:.2f}m, Z={sz:.2f}m<br>"
             f"온도={temps[idx]:.2f}°C"
         )
 
-    # Small white diamond sensor markers for cleaner 3D visibility.
+    # Sensor icon: compact white diamond with a navy/blue center dot.
+    # Using two Scatter3d traces preserves rotation and hover behavior.
     fig.add_trace(
         go.Scatter3d(
             x=sensor_x,
             y=sensor_y,
-            z=[z + 0.05 for z in sensor_z],
+            z=[z + 0.04 for z in sensor_z],
             mode="markers",
             marker=dict(
-                size=4.0,
+                size=6.0,
                 color="#ffffff",
-                line=dict(color="#eafaff", width=0.8),
+                line=dict(color="#0b2038", width=1.1),
                 symbol="diamond",
                 opacity=1.0,
             ),
@@ -2247,7 +2250,25 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
             showlegend=False,
         )
     )
+    fig.add_trace(
+        go.Scatter3d(
+            x=sensor_x,
+            y=sensor_y,
+            z=[z + 0.045 for z in sensor_z],
+            mode="markers",
+            marker=dict(
+                size=2.1,
+                color="#0b5ea8",
+                line=dict(color="#0b2038", width=0.4),
+                symbol="circle",
+                opacity=1.0,
+            ),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
 
+    # Axis colors mirror the reference image: X red, Y green, Z cyan.
     fig.update_layout(
         height=height,
         margin=dict(l=0, r=0, t=0, b=0),
@@ -2257,36 +2278,41 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
             domain=dict(x=[0.00, 0.91], y=[0.00, 1.00]),
             bgcolor="rgba(0,0,0,0)",
             xaxis=dict(
-                title=dict(text="X (m)", font=dict(size=9, color="#7faec8")),
+                title=dict(text="X (m)", font=dict(size=10, color="#ff5b45")),
                 showbackground=False,
                 showgrid=False,
                 zeroline=False,
-                tickfont=dict(size=8, color="#6f9db8"),
-                color="#6f9db8",
+                tickfont=dict(size=8, color="#ff694f"),
+                color="#ff694f",
+                linecolor="#ff694f",
             ),
             yaxis=dict(
-                title=dict(text="Y (m)", font=dict(size=9, color="#7faec8")),
+                title=dict(text="Y (m)", font=dict(size=10, color="#67d34a")),
                 showbackground=False,
                 showgrid=False,
                 zeroline=False,
-                tickfont=dict(size=8, color="#6f9db8"),
-                color="#6f9db8",
+                tickfont=dict(size=8, color="#67d34a"),
+                color="#67d34a",
+                linecolor="#67d34a",
             ),
             zaxis=dict(
-                title=dict(text="Z (m)", font=dict(size=9, color="#7faec8")),
+                title=dict(text="Z (m)", font=dict(size=10, color="#7cd7ff")),
                 showbackground=False,
                 showgrid=False,
                 zeroline=False,
-                tickfont=dict(size=8, color="#6f9db8"),
-                color="#6f9db8",
+                tickfont=dict(size=8, color="#7cd7ff"),
+                color="#7cd7ff",
+                linecolor="#7cd7ff",
             ),
-            aspectmode="data",
+            aspectmode="manual",
+            aspectratio=dict(x=1.85, y=1.0, z=0.72),
             camera=dict(
-                eye=dict(x=1.42, y=-1.58, z=1.02),
-                center=dict(x=0.0, y=0.0, z=-0.05),
+                eye=dict(x=1.55, y=-1.75, z=1.18),
+                center=dict(x=0.0, y=0.0, z=-0.04),
             ),
         ),
     )
+
     return fig
 
 
@@ -2841,7 +2867,7 @@ elif st.session_state.app_view == "RESULTS":
         with st.container(key="field_comparison_card"):
             st.markdown('<div class="field-map-title current-title">Current Field</div>', unsafe_allow_html=True)
             st.plotly_chart(
-                make_true_3d_field(result_current_coords, result_current_nodes, height=380),
+                make_true_3d_field(result_current_coords, result_current_nodes, height=405),
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
@@ -2850,7 +2876,7 @@ elif st.session_state.app_view == "RESULTS":
 
             st.markdown('<div class="field-map-title current-title">Predicted Field</div>', unsafe_allow_html=True)
             st.plotly_chart(
-                make_true_3d_field(result_pred_coords, result_pred_nodes, height=380),
+                make_true_3d_field(result_pred_coords, result_pred_nodes, height=405),
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
