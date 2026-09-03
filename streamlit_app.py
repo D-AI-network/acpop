@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v37
+# FACTOR_UI_BUILD = 2026-09-03-v38
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -2214,7 +2214,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
             f"온도={temps[idx]:.2f}°C"
         )
 
-    # Small white sensor dots. Keep them visible without covering the 3D field.
+    # Small white diamond sensor markers for cleaner 3D visibility.
     fig.add_trace(
         go.Scatter3d(
             x=sensor_x,
@@ -2222,10 +2222,10 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
             z=[z + 0.05 for z in sensor_z],
             mode="markers",
             marker=dict(
-                size=4.5,
+                size=4.0,
                 color="#ffffff",
-                line=dict(color="#dff7ff", width=0.7),
-                symbol="circle",
+                line=dict(color="#eafaff", width=0.8),
+                symbol="diamond",
                 opacity=1.0,
             ),
             hovertext=sensor_hover,
@@ -2834,7 +2834,7 @@ elif st.session_state.app_view == "RESULTS":
 
             st.markdown('<div class="field-map-divider"></div>', unsafe_allow_html=True)
 
-            st.markdown('<div class="field-map-title">Predicted Field</div>', unsafe_allow_html=True)
+            st.markdown('<div class="field-map-title current-title">Predicted Field</div>', unsafe_allow_html=True)
             st.plotly_chart(
                 make_true_3d_field(result_pred_coords, result_pred_nodes, height=380),
                 use_container_width=True,
