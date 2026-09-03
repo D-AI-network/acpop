@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v36
+# FACTOR_UI_BUILD = 2026-09-03-v37
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -195,7 +195,7 @@ html, body, [class*="css"] {
 .home-field-title {
   font-family: 'Outfit', 'Inter', sans-serif;
   color: #f3fbff;
-  font-size: 29px;
+  font-size: 32px;
   font-weight: 600;
   letter-spacing: -0.9px;
   line-height: 1.02;
@@ -483,6 +483,13 @@ div[data-testid="stPlotlyChart"] {
   font-size: 15px;
   font-weight: 800;
   margin: 13px 0 8px 0;
+}
+.field-map-title.current-title {
+  font-size: 23px;
+  line-height: 1.05;
+  letter-spacing: -0.5px;
+  margin-top: 15px;
+  margin-bottom: 10px;
 }
 
 /* Current Field + Predicted Field grouped in one result card. */
@@ -2207,53 +2214,22 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=3200):
             f"온도={temps[idx]:.2f}°C"
         )
 
-    # High-visibility sensor glyph: white top bar + white circular body + navy center.
-    # Plotly 3D markers do not support arbitrary image icons, so this composite keeps
-    # the sensor readable while remaining fully rotatable in 3D.
+    # Small white sensor dots. Keep them visible without covering the 3D field.
     fig.add_trace(
         go.Scatter3d(
             x=sensor_x,
             y=sensor_y,
-            z=[z + 0.24 for z in sensor_z],
-            mode="text",
-            text=["▬"] * len(sensor_x),
-            textfont=dict(size=16, color="#ffffff"),
-            hoverinfo="skip",
-            showlegend=False,
-        )
-    )
-    fig.add_trace(
-        go.Scatter3d(
-            x=sensor_x,
-            y=sensor_y,
-            z=[z + 0.10 for z in sensor_z],
+            z=[z + 0.05 for z in sensor_z],
             mode="markers",
             marker=dict(
-                size=11,
+                size=4.5,
                 color="#ffffff",
-                line=dict(color="#dff7ff", width=1.5),
+                line=dict(color="#dff7ff", width=0.7),
                 symbol="circle",
                 opacity=1.0,
             ),
             hovertext=sensor_hover,
             hoverinfo="text",
-            showlegend=False,
-        )
-    )
-    fig.add_trace(
-        go.Scatter3d(
-            x=sensor_x,
-            y=sensor_y,
-            z=[z + 0.10 for z in sensor_z],
-            mode="markers",
-            marker=dict(
-                size=3.4,
-                color="#153a59",
-                line=dict(width=0),
-                symbol="circle",
-                opacity=1.0,
-            ),
-            hoverinfo="skip",
             showlegend=False,
         )
     )
@@ -2849,7 +2825,7 @@ elif st.session_state.app_view == "RESULTS":
         )
 
         with st.container(key="field_comparison_card"):
-            st.markdown('<div class="field-map-title">Current Field</div>', unsafe_allow_html=True)
+            st.markdown('<div class="field-map-title current-title">Current Field</div>', unsafe_allow_html=True)
             st.plotly_chart(
                 make_true_3d_field(result_current_coords, result_current_nodes, height=380),
                 use_container_width=True,
@@ -2869,7 +2845,7 @@ elif st.session_state.app_view == "RESULTS":
         if st.button("제어 명령 에어컨 전송 (BMS)", type="primary", use_container_width=True):
             st.success("Carrier BMS 게이트웨이로 최적 제어 파라미터를 전송했습니다!")
 
-        if st.button("새로운 최적화 실행 (홈으로)", type="secondary", use_container_width=True):
+        if st.button("새로운 최적화 실행", type="secondary", use_container_width=True):
             st.session_state.app_view = "HOME"
             st.rerun()
 
