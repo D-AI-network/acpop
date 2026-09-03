@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-# CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
 # FACTOR_UI_BUILD = 2026-09-03-v28
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
@@ -1005,7 +1004,6 @@ def _first_existing_path(candidates):
 
 CASE_INFO_PATH = _first_existing_path([
     "Case Info 200 DesignPoints - 최종본.xlsx",
-    "Case Info 200 DesignPoints - 최종본 (1).xlsx",
     "Case Info 200 DesignPoints.xlsx",
 ])
 
@@ -1020,7 +1018,6 @@ CHECKPOINT_PATH = _first_existing_path([
 FIELD_ZIP_PATH = _first_existing_path([
     "Field data.zip",
     "Field data (1).zip",
-    "Field data (1)(1).zip",
     "field_data.zip",
 ])
 
@@ -1138,11 +1135,6 @@ st.session_state.z_plane = 1.5
 if "target_temp" not in st.session_state:
     st.session_state.target_temp = 24.0
 
-# User-described CURRENT room temperature used to retrieve the closest real CFD case.
-# This is deliberately separate from the HOME widget key so it survives navigation.
-if "current_temp_query" not in st.session_state:
-    st.session_state.current_temp_query = None
-
 # Optimization policy is intentionally fixed in the simplified UI.
 st.session_state.policy = "Balanced (균형)"
 
@@ -1152,15 +1144,6 @@ if "heat_input_mode" not in st.session_state:
 for k, v in {"p_ext": "보통", "p_meet": "보통", "p_serv": "보통", "p_work": "보통"}.items():
     if k not in st.session_state:
         st.session_state[k] = v
-
-# One-time migration: initialize the qualitative factors near the supplied DP 0 (Current)
-# condition so the first HOME field starts from the official current CFD scenario.
-if "cfd_retrieval_defaults_v1" not in st.session_state:
-    st.session_state.p_ext = "매우 낮음"
-    st.session_state.p_meet = "낮음"
-    st.session_state.p_serv = "매우 낮음"
-    st.session_state.p_work = "낮음"
-    st.session_state.cfd_retrieval_defaults_v1 = True
 
 if "has_run_optimization" not in st.session_state:
     st.session_state.has_run_optimization = False
@@ -1383,19 +1366,17 @@ def _predict_case_field_with_popfield(selected_dp_id: int):
         return None
 
 
-def _five_stage_query_map(df: pd.DataFrame, col: str):
-    """Map five qualitative UI stages across the observed CFD load range.
-
-    These values are used ONLY to retrieve the closest real CFD scenario. The
-    eventual PopField optimization uses the matched scenario's ACTUAL heat loads,
-    so we never pretend that an interpolated qualitative value is measured CFD.
-    """
-    values = pd.to_numeric(df[col], errors="coerce").dropna().astype(float)
+def _observed_five_stage_map(df: pd.DataFrame, col: str):
+    """Map the five UI stages only to heat-load values actually observed in Case Info."""
+    values = np.sort(pd.to_numeric(df[col], errors="coerce").dropna().unique().astype(float))
     if len(values) == 0:
         raise ValueError(f"No observed values available for {col}")
-    lo, hi = float(values.min()), float(values.max())
-    stage_values = np.linspace(lo, hi, len(STAGE_OPTS))
-    return dict(zip(STAGE_OPTS, [float(v) for v in stage_values]))
+
+    # Five evenly distributed indices. If fewer than five levels exist,
+    # repeated observed levels are used rather than inventing unseen W values.
+    idx = np.rint(np.linspace(0, len(values) - 1, 5)).astype(int)
+    selected = values[idx]
+    return dict(zip(STAGE_OPTS, [float(v) for v in selected]))
 
 
 def _requested_heat_loads_from_ui():
@@ -1403,7 +1384,7 @@ def _requested_heat_loads_from_ui():
         raise RuntimeError("Case Info Excel could not be loaded.")
 
     maps = {
-        key: _five_stage_query_map(case_info_df, col)
+        key: _observed_five_stage_map(case_info_df, col)
         for key, col in LOAD_COL_MAP.items()
     }
     return {
@@ -1412,119 +1393,6 @@ def _requested_heat_loads_from_ui():
         "server": maps["server"][st.session_state.get("p_serv", "보통")],
         "working": maps["working"][st.session_state.get("p_work", "보통")],
     }, maps
-
-
-@st.cache_data(show_spinner=False)
-def load_cfd_temperature_index(zip_path_str: str, file_mtime_ns: int, file_size: int):
-    """Read all 200 CFD CSVs once and cache per-case spatial temperature statistics."""
-    del file_mtime_ns, file_size  # included only to invalidate Streamlit cache when file changes
-    zip_path = Path(zip_path_str)
-    rows = []
-    if not zip_path.exists():
-        return pd.DataFrame(columns=["dp_id", "mean_temp_c", "p95_temp_c", "min_temp_c", "max_temp_c"])
-
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        for name in zf.namelist():
-            m = re.search(r"dp\s*(\d+)\.csv$", Path(name).name, flags=re.IGNORECASE)
-            if not m:
-                continue
-            dp_case = int(m.group(1))
-            try:
-                raw = zf.read(name).decode("utf-8-sig", errors="replace")
-                raw_lines = raw.splitlines()
-                header_idx = next(
-                    i for i, line in enumerate(raw_lines)
-                    if line.strip().lower().startswith("node number")
-                )
-                df = pd.read_csv(io.StringIO("\n".join(raw_lines[header_idx:])), skipinitialspace=True)
-                df.columns = [str(c).strip() for c in df.columns]
-                tcol = _resolve_field_column(df.columns, "Temperature")
-                temp_c = pd.to_numeric(df[tcol], errors="coerce").to_numpy(np.float64) - 273.15
-                temp_c = temp_c[np.isfinite(temp_c)]
-                if len(temp_c) == 0:
-                    continue
-                rows.append({
-                    "dp_id": dp_case,
-                    "mean_temp_c": float(np.mean(temp_c)),
-                    "p95_temp_c": float(np.percentile(temp_c, 95)),
-                    "min_temp_c": float(np.min(temp_c)),
-                    "max_temp_c": float(np.max(temp_c)),
-                })
-            except Exception:
-                continue
-    return pd.DataFrame(rows).sort_values("dp_id").reset_index(drop=True)
-
-
-def _build_cfd_scenario_table():
-    if FIELD_ZIP_PATH is None or case_info_df is None:
-        return None
-    stat = FIELD_ZIP_PATH.stat()
-    idx = load_cfd_temperature_index(str(FIELD_ZIP_PATH), int(stat.st_mtime_ns), int(stat.st_size))
-    if idx is None or len(idx) == 0:
-        return None
-
-    cases = case_info_df.copy()
-    if "dp_id" not in cases.columns:
-        if "Name" not in cases.columns:
-            return None
-        cases["dp_id"] = pd.to_numeric(
-            cases["Name"].astype(str).str.extract(r"(?i)DP\s*(\d+)", expand=False),
-            errors="coerce",
-        )
-    cases["dp_id"] = pd.to_numeric(cases["dp_id"], errors="coerce")
-    for col in LOAD_COL_MAP.values():
-        if col in cases.columns:
-            cases[col] = pd.to_numeric(cases[col], errors="coerce")
-    return cases.merge(idx, on="dp_id", how="inner")
-
-
-def _find_nearest_cfd_scenario(query_temp_c: float, query_loads: dict):
-    """Retrieve the real CFD case closest to temperature + four heat-load descriptors.
-
-    Distance is normalized by the observed spread of each variable. Temperature
-    receives total weight 4, roughly balancing the four heat-load dimensions.
-    """
-    table = _build_cfd_scenario_table()
-    if table is None or len(table) == 0:
-        return None
-
-    required = ["mean_temp_c", *LOAD_COL_MAP.values()]
-    valid = table.dropna(subset=required).copy()
-    if len(valid) == 0:
-        return None
-
-    temp_std = max(float(valid["mean_temp_c"].std(ddof=0)), 1.0)
-    score_sq = 4.0 * ((valid["mean_temp_c"].astype(float) - float(query_temp_c)) / temp_std) ** 2
-
-    query_by_col = {
-        LOAD_COL_MAP["external"]: float(query_loads["external"]),
-        LOAD_COL_MAP["meeting"]: float(query_loads["meeting"]),
-        LOAD_COL_MAP["server"]: float(query_loads["server"]),
-        LOAD_COL_MAP["working"]: float(query_loads["working"]),
-    }
-    for col, q in query_by_col.items():
-        scale = max(float(valid[col].astype(float).std(ddof=0)), 1.0)
-        score_sq = score_sq + ((valid[col].astype(float) - q) / scale) ** 2
-
-    valid["retrieval_score"] = np.sqrt(score_sq)
-    best = valid.sort_values(["retrieval_score", "dp_id"]).iloc[0]
-    matched_loads = {
-        key: float(best[col]) for key, col in LOAD_COL_MAP.items()
-    }
-    return {
-        "dp_id": int(best["dp_id"]),
-        "name": str(best.get("Name", f"DP {int(best['dp_id'])}")),
-        "mean_temp_c": float(best["mean_temp_c"]),
-        "retrieval_score": float(best["retrieval_score"]),
-        "temperature_gap_c": float(best["mean_temp_c"] - float(query_temp_c)),
-        "query_loads": {k: float(v) for k, v in query_loads.items()},
-        "matched_loads": matched_loads,
-        "row": best,
-    }
-
-
-def _sync_current_temp_from_home_widget():
-    st.session_state.current_temp_query = float(st.session_state.home_current_temp_widget)
 
 
 def _temperature_plane_grid(coords, temp_c, z_plane, x_axis, y_axis):
@@ -1587,46 +1455,32 @@ def _demo_status_from_row(rec, target_temp):
     return "NEAR_FEASIBLE" if near else "INFEASIBLE"
 
 
-# ------------------------------------------------------------
-# Retrieve CURRENT FIELD from the 200 real CFD scenarios.
-# Query = user current mean temperature + four qualitative heat-load settings.
-# ------------------------------------------------------------
-query_loads_for_current, _stage_maps_for_current = _requested_heat_loads_from_ui()
-scenario_table = _build_cfd_scenario_table()
+match = re.search(r"\d+", str(st.session_state.selected_dp))
+dp_id = int(match.group(0)) if match else 0
 
-# Initialize the current-temperature input from DP 0 (Current) once, if possible.
-if st.session_state.current_temp_query is None:
-    default_current_temp = 24.0
-    if scenario_table is not None and len(scenario_table):
-        dp0 = scenario_table[pd.to_numeric(scenario_table["dp_id"], errors="coerce") == 0]
-        if len(dp0):
-            default_current_temp = float(dp0.iloc[0]["mean_temp_c"])
-        else:
-            default_current_temp = float(scenario_table.iloc[0]["mean_temp_c"])
-    st.session_state.current_temp_query = float(default_current_temp)
-
-matched_scenario = _find_nearest_cfd_scenario(
-    float(st.session_state.current_temp_query),
-    query_loads_for_current,
+# Prefer the true CFD field when Field data.zip is available.
+current_field = (
+    load_actual_cfd_case(str(FIELD_ZIP_PATH), dp_id)
+    if FIELD_ZIP_PATH is not None
+    else None
 )
 
-current_field = None
-if matched_scenario is not None and FIELD_ZIP_PATH is not None:
-    current_field = load_actual_cfd_case(str(FIELD_ZIP_PATH), int(matched_scenario["dp_id"]))
-    if current_field is not None:
-        current_field["source"] = f"Actual CFD · DP {int(matched_scenario['dp_id'])} (nearest scenario)"
-
-# Deployment can still boot without the raw archive, but this is explicitly a fallback.
-# The real nearest-scenario workflow requires Field data.zip in the repository.
+# GitHub deployment does not require the original Field CSV archive.
+# In that case, use the trained PopField model rather than a hand-crafted synthetic field.
 if current_field is None:
-    fallback_dp = int(matched_scenario["dp_id"]) if matched_scenario is not None else 0
-    current_field = _predict_case_field_with_popfield(fallback_dp)
+    current_field = _predict_case_field_with_popfield(dp_id)
 
+# Last-resort fallback keeps the UI bootable if repository assets are incomplete.
+# It is explicitly marked as fallback and is NEVER used for the AI optimization result.
 if current_field is None:
     fallback_x = np.linspace(0.25, 8.75, 45)
     fallback_y = np.linspace(0.25, 3.75, 25)
     fallback_mx, fallback_my = np.meshgrid(fallback_x, fallback_y)
-    fallback_temp = np.full_like(fallback_mx, float(st.session_state.current_temp_query), dtype=float)
+    fallback_temp = (
+        22.0
+        + 1.6 * np.exp(-((fallback_mx - 1.25) ** 2 + (fallback_my - 1.25) ** 2) / 2.0)
+        + 1.3 * np.exp(-((fallback_mx - 6.75) ** 2 + (fallback_my - 2.75) ** 2) / 3.0)
+    )
     fallback_coords = np.stack(
         [fallback_mx.ravel(), fallback_my.ravel(), np.full(fallback_mx.size, 1.5)],
         axis=-1,
@@ -1635,24 +1489,17 @@ if current_field is None:
         "coords": fallback_coords,
         "temp_c": fallback_temp.ravel(),
         "velocity": np.zeros((fallback_mx.size, 3), dtype=np.float32),
-        "ra_temp_c": float(st.session_state.current_temp_query),
-        "mean_temp_c": float(st.session_state.current_temp_query),
-        "source": "Fallback field (required deployment assets missing)",
+        "ra_temp_c": float(np.mean(fallback_temp)),
+        "mean_temp_c": float(np.mean(fallback_temp)),
+        "source": "Fallback demo field (repository assets incomplete)",
     }
 
 current_coords = np.asarray(current_field["coords"], dtype=np.float32)
 current_temp_nodes = np.asarray(current_field["temp_c"], dtype=np.float32)
 avg_room_temp = float(current_field["mean_temp_c"])
 current_field_source = str(current_field["source"])
-matched_dp_id = int(matched_scenario["dp_id"]) if matched_scenario is not None else 0
-matched_mean_temp_c = float(matched_scenario["mean_temp_c"]) if matched_scenario is not None else avg_room_temp
-matched_actual_loads = (
-    dict(matched_scenario["matched_loads"])
-    if matched_scenario is not None
-    else dict(query_loads_for_current)
-)
 
-# Use the actual/model coordinate envelope rather than a hand-crafted crop.
+# Use the actual/model coordinate envelope rather than the old hand-crafted 9m x 4m crop.
 x_min, x_max = float(np.min(current_coords[:, 0])), float(np.max(current_coords[:, 0]))
 y_min, y_max = float(np.min(current_coords[:, 1])), float(np.max(current_coords[:, 1]))
 grid_len_axis = np.linspace(x_min, x_max, 48)
@@ -1667,7 +1514,8 @@ field_current_grid = _temperature_plane_grid(
     grid_wid_axis,
 )
 
-# Sensor values come from the retrieved real CFD field by NODE ID.
+# Sensor values now come from the real/model field by NODE ID.
+# Plot positions also use the node coordinates stored in the CFD/model geometry.
 sensor_plot_meta = {}
 sensor_readings = {}
 for nid, meta in ROA_NODES_META.items():
@@ -1800,28 +1648,22 @@ if st.session_state.app_view == "INTRO":
     )
 
 elif st.session_state.app_view == "HOME":
-    # Editable CURRENT temperature is a retrieval query, not a synthetic temperature shift.
-    if "home_current_temp_widget" not in st.session_state:
-        st.session_state.home_current_temp_widget = float(st.session_state.current_temp_query)
-    st.number_input(
-        "현재 공간 평균 온도 (°C)",
-        min_value=15.0,
-        max_value=40.0,
-        step=0.1,
-        format="%.1f",
-        key="home_current_temp_widget",
-        on_change=_sync_current_temp_from_home_widget,
+    st.markdown(
+        f"""
+        <div class="avg-temp-card">
+            <div class="avg-temp-label">현재 공간 평균 온도</div>
+            <div class="avg-temp-value">{avg_room_temp:.1f} °C</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    if matched_scenario is not None and current_field_source.startswith("Actual CFD"):
-        st.caption(
-            f"가장 가까운 실제 CFD: DP {matched_dp_id} · 실제 평균 {matched_mean_temp_c:.1f}°C "
-            f"(입력 대비 {matched_mean_temp_c - float(st.session_state.current_temp_query):+.1f}°C)"
-        )
+    if current_field_source.startswith("Actual CFD"):
+        st.caption(f"Current Field source: {current_field_source}")
     elif current_field_source.startswith("PopField"):
-        st.warning("Field data.zip이 없어 Current Field가 모델 추정값입니다. 실제 CFD 검색을 위해 데이터를 업로드하세요.")
+        st.caption("Current Field source: PopField estimate (original CFD archive not present)")
     else:
-        st.warning("Current Field용 실제 CFD 자산을 불러오지 못했습니다.")
+        st.warning("Current Field is using a fallback demo field because deployment assets are incomplete.")
 
     new_target = st.number_input(
         "목표 온도 (°C)",
@@ -1867,8 +1709,8 @@ elif st.session_state.app_view == "HEAT_LOAD":
         f"""
         <div class="factor-temp-summary">
             <div class="factor-temp-card">
-                <div class="factor-temp-label">현재 온도 입력</div>
-                <div class="factor-temp-value">{float(st.session_state.current_temp_query):.1f} °C</div>
+                <div class="factor-temp-label">현재 온도</div>
+                <div class="factor-temp-value">{avg_room_temp:.1f} °C</div>
             </div>
             <div class="factor-temp-card">
                 <div class="factor-temp-label">목표 온도</div>
@@ -1878,11 +1720,6 @@ elif st.session_state.app_view == "HEAT_LOAD":
         """,
         unsafe_allow_html=True,
     )
-
-    if matched_scenario is not None and current_field_source.startswith("Actual CFD"):
-        st.caption(
-            f"현재 입력과 가장 가까운 CFD: DP {matched_dp_id} · 실제 평균 {matched_mean_temp_c:.1f}°C"
-        )
 
     # The title uses a small wall-mounted AC SVG instead of a flame emoji.
     st.markdown(
@@ -2017,23 +1854,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
             try:
                 target = float(st.session_state.target_temp)
                 policy = st.session_state.policy
-                query_loads, stage_load_maps = _requested_heat_loads_from_ui()
-                retrieval = _find_nearest_cfd_scenario(
-                    float(st.session_state.current_temp_query),
-                    query_loads,
-                )
-                if retrieval is None or FIELD_ZIP_PATH is None:
-                    raise RuntimeError(
-                        "실제 CFD scenario retrieval에는 GitHub 루트의 Field data.zip이 필요합니다."
-                    )
-
-                matched_current = load_actual_cfd_case(str(FIELD_ZIP_PATH), int(retrieval["dp_id"]))
-                if matched_current is None:
-                    raise RuntimeError(f"dp{int(retrieval['dp_id'])}.csv를 Field data.zip에서 읽지 못했습니다.")
-
-                # Critical consistency rule: the Current Field and the optimization share
-                # the matched scenario's ACTUAL four heat loads. Only HVAC actions change.
-                loads = dict(retrieval["matched_loads"])
+                loads, stage_load_maps = _requested_heat_loads_from_ui()
 
                 runtime_dir = Path(tempfile.gettempdir()) / "acpop_streamlit_runtime"
                 runtime_dir.mkdir(parents=True, exist_ok=True)
@@ -2122,22 +1943,6 @@ elif st.session_state.app_view == "HEAT_LOAD":
                     "mapped_loads_W": {k: float(v) for k, v in loads.items()},
                     "checkpoint_used": str(backend["checkpoint_path"]),
                     "model_inference_used": True,
-                    "matched_dp_id": int(retrieval["dp_id"]),
-                    "current_temp_query_c": float(st.session_state.current_temp_query),
-                    "matched_mean_temp_c": float(retrieval["mean_temp_c"]),
-                    "retrieval_score": float(retrieval["retrieval_score"]),
-                    "query_loads_W": {k: float(v) for k, v in query_loads.items()},
-                    "matched_loads_W": {k: float(v) for k, v in loads.items()},
-                    "field_current_grid": np.asarray(
-                        _temperature_plane_grid(
-                            matched_current["coords"],
-                            matched_current["temp_c"],
-                            st.session_state.z_plane,
-                            grid_len_axis,
-                            grid_wid_axis,
-                        ),
-                        dtype=np.float32,
-                    ),
                 }
 
                 st.session_state.has_run_optimization = True
@@ -2168,10 +1973,6 @@ elif st.session_state.app_view == "RESULTS":
 
         res = st.session_state.optimized_results
         target = st.session_state.target_temp
-        result_current_grid = np.asarray(
-            res.get("field_current_grid", field_current_grid),
-            dtype=float,
-        )
 
         if "field_post_grid" in res:
             # This is the actual PopField output for the selected HVAC action.
@@ -2259,13 +2060,8 @@ elif st.session_state.app_view == "RESULTS":
             unsafe_allow_html=True,
         )
 
-        matched_id_text = res.get("matched_dp_id", "-")
-        matched_mean_text = float(res.get("matched_mean_temp_c", np.nan))
-        st.caption(
-            f"현재 공간 필드 · 실제 CFD DP {matched_id_text} · 평균 {matched_mean_text:.1f}°C "
-            f"(Z={st.session_state.z_plane:g}m)"
-        )
-        st.plotly_chart(make_mobile_heatmap(result_current_grid, height=185), use_container_width=True, config={"displayModeBar": False})
+        st.caption(f"현재 공간 필드 (Current Field, Z={st.session_state.z_plane:g}m)")
+        st.plotly_chart(make_mobile_heatmap(field_current_grid, height=185), use_container_width=True, config={"displayModeBar": False})
 
         st.caption(f"제어 후 예측 필드 (Predicted Spatial Temperature Map, Z={st.session_state.z_plane:g}m)")
         st.plotly_chart(make_mobile_heatmap(field_post_grid, height=185), use_container_width=True, config={"displayModeBar": False})
