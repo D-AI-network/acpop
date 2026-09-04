@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v64
+# FACTOR_UI_BUILD = 2026-09-04-v65
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -1382,12 +1382,6 @@ ROA_NODES_META = {
 }
 ROA_NODE_IDS = list(ROA_NODES_META.keys())
 
-# Fallback only: the normal path below uses the learned sensor basis.
-# A nested 5 -> 10 -> 20 -> 30 hierarchy is derived from that basis so
-# sensor activation can change without changing any UI/CSS/layout.
-FALLBACK_SENSOR_META = {int(k): dict(v) for k, v in ROA_NODES_META.items()}
-ADAPTIVE_SENSOR_COUNTS = (5, 10, 20, 30)
-
 
 APP_ROOT = Path(__file__).resolve().parent
 
@@ -1599,117 +1593,6 @@ def load_reconstruction_basis():
         except Exception:
             pass
     return None
-
-
-def _adaptive_sensor_budget(reference_temp_c, target_temp_c, temp_nodes):
-    """
-    Select the active sensor budget from thermal error + spatial imbalance.
-
-    30 -> far from target / strongly non-uniform
-    20 -> moderately far / non-uniform
-    10 -> near target but still settling
-     5 -> close to target and spatially balanced
-    """
-    values = np.asarray(temp_nodes, dtype=float).reshape(-1)
-    values = values[np.isfinite(values)]
-    if values.size == 0:
-        return 30
-
-    error_c = abs(float(reference_temp_c) - float(target_temp_c))
-    spread_c = float(np.nanpercentile(values, 95) - np.nanpercentile(values, 5))
-
-    if error_c >= 2.5 or spread_c >= 3.0:
-        return 30
-    if error_c >= 1.2 or spread_c >= 2.0:
-        return 20
-    if error_c >= 0.4 or spread_c >= 1.0:
-        return 10
-    return 5
-
-
-def _nested_sensor_indices_from_basis(assets, k, n_nodes, max_k=30):
-    """
-    Build one nested sensor hierarchy from sensor_reconstruction_basis.npz.
-
-    The validated selected_sensor_idx set is kept first (normally the 5-sensor
-    core from the sensor study). Additional sensors are appended from one
-    pivoted-QR ranking of the learned PCA basis. Therefore:
-        sensors(5) ⊂ sensors(10) ⊂ sensors(20) ⊂ sensors(30)
-    """
-    k = int(max(1, min(int(k), int(n_nodes))))
-    max_k = int(max(k, min(int(max_k), int(n_nodes))))
-
-    ordered = []
-
-    if assets is not None:
-        core = np.asarray(assets.get("selected_sensor_idx", []), dtype=np.int64).reshape(-1)
-        for nid in core.tolist():
-            nid = int(nid)
-            if 0 <= nid < int(n_nodes) and nid not in ordered:
-                ordered.append(nid)
-
-        basis = np.asarray(assets.get("temperature_basis", []), dtype=np.float32)
-        if basis.ndim == 2 and basis.shape[0] == int(n_nodes) and basis.shape[1] > 0:
-            try:
-                from scipy.linalg import qr
-                use_rank = min(max_k, basis.shape[1])
-                _q, _r, piv = qr(
-                    basis[:, :use_rank].T,
-                    pivoting=True,
-                    mode="economic",
-                )
-                for nid in np.asarray(piv, dtype=np.int64).tolist():
-                    nid = int(nid)
-                    if 0 <= nid < int(n_nodes) and nid not in ordered:
-                        ordered.append(nid)
-                    if len(ordered) >= max_k:
-                        break
-            except Exception:
-                pass
-
-    for nid in FALLBACK_SENSOR_META.keys():
-        nid = int(nid)
-        if 0 <= nid < int(n_nodes) and nid not in ordered:
-            ordered.append(nid)
-
-    if len(ordered) < k:
-        step = max(1, int(n_nodes) // max(k, 1))
-        for nid in range(0, int(n_nodes), step):
-            if nid not in ordered:
-                ordered.append(int(nid))
-            if len(ordered) >= k:
-                break
-
-    return np.asarray(ordered[:k], dtype=np.int64)
-
-
-def _adaptive_sensor_meta(coords, temp_nodes, reference_temp_c, target_temp_c, assets):
-    """Return active count and sensor metadata for the current field."""
-    coords = np.asarray(coords, dtype=float)
-    k = _adaptive_sensor_budget(
-        reference_temp_c=reference_temp_c,
-        target_temp_c=target_temp_c,
-        temp_nodes=temp_nodes,
-    )
-    idx = _nested_sensor_indices_from_basis(
-        assets=assets,
-        k=k,
-        n_nodes=len(coords),
-        max_k=max(ADAPTIVE_SENSOR_COUNTS),
-    )
-
-    meta = {}
-    for order, nid in enumerate(idx.tolist(), start=1):
-        nid = int(nid)
-        meta[nid] = {
-            "code": f"S{order}",
-            "name": f"Sensor {order}",
-            "x_plot": float(coords[nid, 0]),
-            "y_plot": float(coords[nid, 1]),
-            "z": float(coords[nid, 2]),
-            "zone": "Adaptive sensing",
-        }
-    return int(len(idx)), meta
 
 
 # Heavy/data assets are initialized only after the INTRO splash.
@@ -2403,18 +2286,9 @@ field_current_grid = _temperature_plane_grid(
 )
 
 # Sensor values come from the retrieved real CFD field by NODE ID.
-# Only the ACTIVE sensor set is changed; the existing UI is left untouched.
-active_sensor_count, active_sensor_meta = _adaptive_sensor_meta(
-    current_coords,
-    current_temp_nodes,
-    float(st.session_state.current_temp_query),
-    float(st.session_state.target_temp),
-    basis_assets,
-)
-
 sensor_plot_meta = {}
 sensor_readings = {}
-for nid, meta in active_sensor_meta.items():
+for nid, meta in ROA_NODES_META.items():
     m = dict(meta)
     if 0 <= int(nid) < len(current_coords):
         m["x_plot"] = float(current_coords[int(nid), 0])
@@ -2457,10 +2331,9 @@ def field_view_selector(key: str) -> str:
     )
 
 
-def make_2d_heatmap(grid_data, height=315, sensor_meta=None):
+def make_2d_heatmap(grid_data, height=315):
     """Classic top-down 2D temperature map used when the user selects 2D."""
     heatmap_data = np.asarray(grid_data, dtype=float)
-    plot_sensor_meta = sensor_plot_meta if sensor_meta is None else sensor_meta
 
     temp_scale = [
         [0.00, "#8ee7ff"],
@@ -2499,11 +2372,11 @@ def make_2d_heatmap(grid_data, height=315, sensor_meta=None):
         )
     )
 
-    sx = [meta["x_plot"] for meta in plot_sensor_meta.values()]
-    sy = [meta["y_plot"] for meta in plot_sensor_meta.values()]
+    sx = [meta["x_plot"] for meta in sensor_plot_meta.values()]
+    sy = [meta["y_plot"] for meta in sensor_plot_meta.values()]
 
     sensor_hover = []
-    for nid, meta in plot_sensor_meta.items():
+    for nid, meta in sensor_plot_meta.items():
         ix = int(np.argmin(np.abs(grid_len_axis - float(meta["x_plot"]))))
         iy = int(np.argmin(np.abs(grid_wid_axis - float(meta["y_plot"]))))
         sampled = float(heatmap_data[iy, ix])
@@ -2722,7 +2595,7 @@ def make_mobile_heatmap(grid_data, height=340):
     return fig
 
 
-def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, sensor_meta=None):
+def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
     """
     Clean 3D room-style temperature map.
 
@@ -2732,7 +2605,6 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, sens
     """
     coords_xyz = np.asarray(coords_xyz, dtype=float)
     temp_nodes = np.asarray(temp_nodes, dtype=float).reshape(-1)
-    plot_sensor_meta = sensor_plot_meta if sensor_meta is None else sensor_meta
 
     valid = (
         coords_xyz.ndim == 2
@@ -2854,7 +2726,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, sens
     # Plotly Scatter3d cannot use arbitrary image markers, so the silhouette is
     # composed from a small white circular body plus a white upward tip.
     sensor_x, sensor_y, sensor_z, sensor_hover = [], [], [], []
-    for nid, meta in plot_sensor_meta.items():
+    for nid, meta in ROA_NODES_META.items():
         target = np.asarray(
             [float(meta["x_plot"]), float(meta["y_plot"]), float(meta["z"])],
             dtype=float,
@@ -3041,9 +2913,9 @@ if st.session_state.app_view == "HOME":
     with st.container(key="temperature_map_card"):
         home_field_view = field_view_selector("home_field_view")
         if home_field_view == "3D":
-            home_fig = make_true_3d_field(current_coords, current_temp_nodes, height=410, sensor_meta=active_sensor_meta)
+            home_fig = make_true_3d_field(current_coords, current_temp_nodes, height=410)
         else:
-            home_fig = make_2d_heatmap(field_current_grid, height=315, sensor_meta=active_sensor_meta)
+            home_fig = make_2d_heatmap(field_current_grid, height=315)
 
         st.plotly_chart(
             home_fig,
@@ -3408,45 +3280,6 @@ elif st.session_state.app_view == "RESULTS":
 
         res = st.session_state.optimized_results
 
-        # --------------------------------------------------------
-        # Adaptive sensor summary for the RESULT screen.
-        # This does not change the model or any existing result metric.
-        # --------------------------------------------------------
-        _result_current_coords = np.asarray(
-            res.get("field_current_coords", current_coords),
-            dtype=float,
-        )
-        _result_current_nodes = np.asarray(
-            res.get("field_current_temp_nodes", current_temp_nodes),
-            dtype=float,
-        )
-        _result_pred_coords = np.asarray(
-            res.get("field_post_coords", _result_current_coords),
-            dtype=float,
-        )
-        _result_pred_nodes = np.asarray(
-            res.get("field_post_temp_nodes", _result_current_nodes),
-            dtype=float,
-        )
-
-        _result_before_mean = float(np.nanmean(_result_current_nodes))
-        _result_after_mean = float(np.nanmean(_result_pred_nodes))
-
-        result_before_sensor_count, result_before_sensor_meta = _adaptive_sensor_meta(
-            _result_current_coords,
-            _result_current_nodes,
-            _result_before_mean,
-            float(st.session_state.target_temp),
-            basis_assets,
-        )
-        result_after_sensor_count, result_after_sensor_meta = _adaptive_sensor_meta(
-            _result_pred_coords,
-            _result_pred_nodes,
-            _result_after_mean,
-            float(st.session_state.target_temp),
-            basis_assets,
-        )
-
         vane_map = {
             "Left (L)": "좌측 (L)",
             "Middle (M)": "중앙 (M)",
@@ -3554,253 +3387,350 @@ elif st.session_state.app_view == "RESULTS":
 
         st.markdown(recommendation_html, unsafe_allow_html=True)
 
-        # Adaptive sensor result summary.
-        _before_nodes = [int(n) for n in result_before_sensor_meta.keys()]
-        _after_nodes = [int(n) for n in result_after_sensor_meta.keys()]
-        _sensor_delta = int(result_before_sensor_count - result_after_sensor_count)
-        if _sensor_delta > 0:
-            _sensor_change_text = f"{_sensor_delta}개 비활성화"
-        elif _sensor_delta < 0:
-            _sensor_change_text = f"{abs(_sensor_delta)}개 추가 활성화"
+
+        # --------------------------------------------------------
+        # Adaptive Sensor Plan
+        # Dense sensing first -> reduce active monitoring sensors
+        # only after the predicted spatial field becomes stable.
+        # --------------------------------------------------------
+        current_sensor_count = 30
+        zone_spread_now = float(res.get("zone_spread", 99.0))
+        hot_now = float(res.get("hot_fraction", 100.0))
+        cold_now = float(res.get("cold_fraction", 100.0))
+        status_now = str(res.get("status", "INFEASIBLE"))
+
+        # Transparent demo policy for the hackathon UI.
+        # This adjusts ACTIVE MONITORING sensors, not physically installed sensors.
+        if (
+            status_now == "FEASIBLE"
+            and zone_spread_now <= 1.20
+            and max(hot_now, cold_now) <= 2.0
+        ):
+            recommended_sensor_count = 14
+            sensor_stage = "안정 운전"
+            sensor_reason = "공간 온도장이 충분히 안정되어 핵심 센서만 유지합니다."
+        elif (
+            status_now == "FEASIBLE"
+            and zone_spread_now <= 1.90
+            and max(hot_now, cold_now) <= 5.0
+        ):
+            recommended_sensor_count = 20
+            sensor_stage = "안정화 단계"
+            sensor_reason = "온도 편차가 감소해 중복 모니터링 센서를 일부 비활성화합니다."
+        elif (
+            status_now in ("FEASIBLE", "NEAR_FEASIBLE")
+            and zone_spread_now <= 2.60
+        ):
+            recommended_sensor_count = 24
+            sensor_stage = "안정화 진행"
+            sensor_reason = "아직 일부 공간 변동이 남아 있어 센서를 비교적 많이 유지합니다."
         else:
-            _sensor_change_text = "센서 수 유지"
+            recommended_sensor_count = 30
+            sensor_stage = "정밀 모니터링"
+            sensor_reason = "온도 불균형 또는 목표 미달 가능성이 있어 전체 센서를 유지합니다."
 
-        _before_node_text = ", ".join(f"Node {n}" for n in _before_nodes)
-        _after_node_text = ", ".join(f"Node {n}" for n in _after_nodes)
+        deactivated_sensor_count = current_sensor_count - recommended_sensor_count
 
-        _adaptive_sensor_html = (
-            f'<div style="margin:10px 0 14px 0;padding:14px 15px;'
-            f'border-radius:18px;background:rgba(7,40,67,0.72);'
-            f'border:1px solid rgba(121,195,232,0.22);">'
-            f'<div style="color:#eaf8ff;font-family:Outfit,\'Noto Sans KR\',sans-serif;'
-            f'font-size:15px;font-weight:800;margin-bottom:9px;">Adaptive Sensor Plan</div>'
-            f'<div style="display:flex;align-items:center;justify-content:space-between;'
-            f'gap:10px;margin-bottom:10px;">'
-            f'<div style="color:#9bcce5;font-size:11px;font-weight:700;">활성 센서 변화</div>'
-            f'<div style="color:#f5fbff;font-family:\'JetBrains Mono\',monospace;'
-            f'font-size:20px;font-weight:800;white-space:nowrap;">'
-            f'{result_before_sensor_count} → {result_after_sensor_count}</div>'
-            f'</div>'
-            f'<div style="color:#6fdcff;font-size:11px;font-weight:750;margin-bottom:11px;">'
-            f'{_sensor_change_text} · 최종 권장 활성 센서 {result_after_sensor_count}개</div>'
-            f'<div style="color:#9fc3d9;font-size:10px;font-weight:700;margin-bottom:3px;">'
-            f'Current sensor nodes ({result_before_sensor_count})</div>'
-            f'<div style="color:#dff5ff;font-family:\'JetBrains Mono\',monospace;'
-            f'font-size:9px;line-height:1.55;word-break:break-word;margin-bottom:9px;">'
-            f'{_before_node_text}</div>'
-            f'<div style="color:#9fc3d9;font-size:10px;font-weight:700;margin-bottom:3px;">'
-            f'Recommended sensor nodes ({result_after_sensor_count})</div>'
-            f'<div style="color:#f5fbff;font-family:\'JetBrains Mono\',monospace;'
-            f'font-size:9px;line-height:1.55;word-break:break-word;">'
-            f'{_after_node_text}</div>'
-            f'</div>'
+        # 30 schematic positions for UI visualization only.
+        sensor_points = [
+            (15, 18), (29, 18), (43, 18), (57, 18), (71, 18), (85, 18),
+            (15, 34), (29, 34), (43, 34), (57, 34), (71, 34), (85, 34),
+            (15, 50), (29, 50), (43, 50), (57, 50), (71, 50), (85, 50),
+            (15, 66), (29, 66), (43, 66), (57, 66), (71, 66), (85, 66),
+            (15, 82), (29, 82), (43, 82), (57, 82), (71, 82), (85, 82),
+        ]
+
+        # Coverage-first retention order for the visual mock.
+        sensor_priority = [
+            0, 5, 24, 29, 14, 15, 8, 9, 20, 21,
+            2, 3, 26, 27, 12, 17, 6, 11, 18, 23,
+            7, 10, 19, 22, 1, 4, 25, 28, 13, 16,
+        ]
+        active_after = set(sensor_priority[:recommended_sensor_count])
+
+        before_dots = "".join(
+            f'<circle cx="{x}" cy="{y}" r="2.9" fill="#70e8ff" '
+            f'stroke="#d8f8ff" stroke-width="0.55" '
+            f'style="filter:drop-shadow(0 0 3px rgba(87,222,255,.82));"/>'
+            for x, y in sensor_points
         )
-        st.markdown(_adaptive_sensor_html, unsafe_allow_html=True)
 
-        airflow_color = "#69e6ff"
-        active_dirs = max(int(left_on) + int(middle_on) + int(right_on), 1)
-        left_opacity = 1.0 if left_on else 0.10
-        mid_opacity = 1.0 if middle_on else 0.10
-        right_opacity = 1.0 if right_on else 0.10
-        left_width = 5.6 if left_on else 1.6
-        mid_width = 6.4 if middle_on else 1.6
-        right_width = 5.6 if right_on else 1.6
-        boost = 1.0 + (flow_level - 1) * 0.14
-        room_note = f"풍량 {flow_cmm:.0f} CMM · 공급 공기 {supply_temp_c:.0f}°C · 예상 냉방 출력 {q_kw:.2f} kW"
+        after_dots = "".join(
+            (
+                f'<circle cx="{x}" cy="{y}" r="3.0" fill="#70e8ff" '
+                f'stroke="#e6fbff" stroke-width="0.65" '
+                f'style="filter:drop-shadow(0 0 3px rgba(87,222,255,.82));"/>'
+                if i in active_after
+                else
+                f'<circle cx="{x}" cy="{y}" r="2.65" fill="#415c72" '
+                f'opacity="0.55" stroke="#688197" stroke-width="0.35"/>'
+            )
+            for i, (x, y) in enumerate(sensor_points)
+        )
 
-        airflow_preview_html = f'''
-        <div style="
-            margin:8px 2px 6px 2px;
-            padding:12px 12px 6px 12px;
-            border-radius:24px;
-            background:linear-gradient(180deg, rgba(7,39,68,0.98), rgba(9,46,77,0.98));
-            border:1px solid rgba(99, 206, 255, 0.35);
-            box-shadow:0 10px 24px rgba(0,0,0,0.18);
-        ">
-            <div style="
-                text-align:center;
-                font-size:23px;
-                line-height:1.12;
-                font-weight:850;
-                letter-spacing:-0.02em;
-                color:#f5fbff;
-                margin:0 0 2px 0;
-            ">냉방 흐름 미리보기</div>
-            <svg viewBox="0 18 560 255" width="100%" height="320" preserveAspectRatio="xMidYMid meet" style="display:block; border-radius:16px;">
-                <defs>
-                    <linearGradient id="floorHeat" x1="0%" y1="100%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="#0f5dd8"/>
-                        <stop offset="45%" stop-color="#26b8ff"/>
-                        <stop offset="70%" stop-color="#72ea6f"/>
-                        <stop offset="86%" stop-color="#f6c04b"/>
-                        <stop offset="100%" stop-color="#ff7a39"/>
-                    </linearGradient>
-                    <linearGradient id="wallGlow" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stop-color="#113863"/>
-                        <stop offset="100%" stop-color="#0a2544"/>
-                    </linearGradient>
-                    <linearGradient id="acGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stop-color="#f0f6fb"/>
-                        <stop offset="100%" stop-color="#9ab7d3"/>
-                    </linearGradient>
-                    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur stdDeviation="5.5" result="coloredBlur"/>
-                        <feMerge>
-                            <feMergeNode in="coloredBlur"/>
-                            <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                    </filter>
-                    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur stdDeviation="2.4" result="b"/>
-                        <feMerge>
-                            <feMergeNode in="b"/>
-                            <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                    </filter>
-                </defs>
+        reduction_text = (
+            f"{deactivated_sensor_count}개 비활성화"
+            if deactivated_sensor_count > 0
+            else "전체 센서 유지"
+        )
 
-                <rect x="10" y="10" width="540" height="278" rx="22" fill="#0a2746" opacity="0.12"/>
+        adaptive_sensor_html = f"""
+        <style>
+          * {{ box-sizing: border-box; }}
+          body {{
+            margin: 0;
+            background: transparent;
+            font-family: Inter, "Noto Sans KR", Arial, sans-serif;
+            color: #f5fbff;
+          }}
+          .asp-shell {{
+            width: 100%;
+            border-radius: 22px;
+            padding: 18px 18px 16px;
+            background: linear-gradient(160deg, #0a2c4b 0%, #08243f 100%);
+            border: 1px solid rgba(81,194,242,.34);
+            box-shadow: 0 10px 24px rgba(0,0,0,.16);
+          }}
+          .asp-head {{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap:12px;
+          }}
+          .asp-title {{
+            font-size: 22px;
+            line-height: 1.1;
+            font-weight: 850;
+            letter-spacing: -0.025em;
+          }}
+          .asp-sub {{
+            margin-top: 5px;
+            font-size: 11px;
+            font-weight: 750;
+            color: #66dcff;
+          }}
+          .asp-stage {{
+            font-size: 10px;
+            font-weight: 800;
+            color: #9edbf5;
+            border: 1px solid rgba(102,220,255,.30);
+            border-radius: 999px;
+            padding: 6px 9px;
+            white-space: nowrap;
+            background: rgba(9,48,79,.70);
+          }}
+          .asp-count {{
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: 1fr 44px 1fr;
+            align-items: center;
+          }}
+          .asp-count-side {{ text-align:center; }}
+          .asp-num {{
+            font-size: 37px;
+            font-weight: 900;
+            line-height: 1;
+            color: #f7fdff;
+          }}
+          .asp-num.after {{
+            color: #6fe2ff;
+            text-shadow: 0 0 14px rgba(74,210,255,.18);
+          }}
+          .asp-caption {{
+            margin-top: 5px;
+            font-size: 9.5px;
+            font-weight: 750;
+            color: #a8cfdf;
+          }}
+          .asp-arrow {{
+            text-align:center;
+            font-size: 27px;
+            color:#77dcff;
+            font-weight:800;
+          }}
+          .asp-reason {{
+            margin: 12px auto 13px;
+            max-width: 94%;
+            text-align:center;
+            color:#b9d9e8;
+            font-size: 10.5px;
+            line-height:1.55;
+          }}
+          .asp-maps {{
+            display:grid;
+            grid-template-columns: 1fr 1fr;
+            gap:10px;
+            padding: 10px;
+            border-radius:16px;
+            background: rgba(4,25,45,.58);
+            border: 1px solid rgba(86,168,209,.18);
+          }}
+          .asp-map-title {{
+            display:flex;
+            justify-content:space-between;
+            align-items:baseline;
+            gap:4px;
+            padding: 0 3px 6px;
+          }}
+          .asp-map-title b {{ font-size:11px; color:#eafaff; }}
+          .asp-map-title span {{
+            font-size:8.5px;
+            color:#79bfdc;
+            font-weight:700;
+          }}
+          .room {{
+            width:100%;
+            height:126px;
+            display:block;
+            border-radius:11px;
+            background:linear-gradient(145deg,#0a223a,#0c2c49);
+            border:1px solid rgba(126,208,244,.15);
+          }}
+          .asp-legend {{
+            display:flex;
+            justify-content:center;
+            gap:18px;
+            margin-top:9px;
+            font-size:8.5px;
+            font-weight:700;
+            color:#9fc5d7;
+          }}
+          .legend-dot {{
+            display:inline-block;
+            width:8px;
+            height:8px;
+            border-radius:50%;
+            margin-right:5px;
+            vertical-align:-1px;
+          }}
+          .active-dot {{
+            background:#70e8ff;
+            box-shadow:0 0 6px rgba(112,232,255,.60);
+          }}
+          .sleep-dot {{ background:#516b80; opacity:.7; }}
+          .asp-result {{
+            margin-top:12px;
+            display:grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap:7px;
+          }}
+          .asp-result-item {{
+            min-height:55px;
+            padding:8px 6px;
+            border-radius:12px;
+            text-align:center;
+            background:rgba(15,57,86,.54);
+            border:1px solid rgba(110,190,229,.15);
+          }}
+          .asp-result-item strong {{
+            display:block;
+            font-size:9px;
+            color:#dff6ff;
+            margin-bottom:3px;
+          }}
+          .asp-result-item span {{
+            display:block;
+            font-size:7.5px;
+            line-height:1.35;
+            color:#84b3c9;
+          }}
+          .asp-foot {{
+            margin-top:9px;
+            text-align:center;
+            font-size:7.5px;
+            line-height:1.4;
+            color:#688fa4;
+          }}
+        </style>
 
-                <!-- room shell : stronger 3D top-down rectangular perspective -->
-                <!-- back wall -->
-                <polygon points="125,70 435,70 435,108 125,108"
-                         fill="url(#wallGlow)" opacity="0.84"/>
+        <div class="asp-shell">
+          <div class="asp-head">
+            <div>
+              <div class="asp-title">Adaptive Sensor Plan</div>
+              <div class="asp-sub">활성 센서 조정</div>
+            </div>
+            <div class="asp-stage">{sensor_stage}</div>
+          </div>
 
-                <!-- large floor plane -->
-                <polygon points="125,108 435,108 515,252 45,252"
-                         fill="url(#floorHeat)" opacity="0.96"/>
+          <div class="asp-count">
+            <div class="asp-count-side">
+              <div class="asp-num">{current_sensor_count}</div>
+              <div class="asp-caption">초기 정밀 모니터링</div>
+            </div>
+            <div class="asp-arrow">→</div>
+            <div class="asp-count-side">
+              <div class="asp-num after">{recommended_sensor_count}</div>
+              <div class="asp-caption">안정화 후 핵심 유지</div>
+            </div>
+          </div>
 
-                <!-- side walls -->
-                <polygon points="45,126 125,70 125,108 45,252"
-                         fill="#082b4e" opacity="0.84"/>
-                <polygon points="435,70 515,126 515,252 435,108"
-                         fill="#0d355b" opacity="0.84"/>
+          <div class="asp-reason">
+            <b style="color:#6de1ff;">{reduction_text}</b> · {sensor_reason}
+          </div>
 
-                <!-- stronger perspective wireframe -->
-                <polyline points="125,70 435,70 515,126 515,252 45,252 45,126 125,70"
-                          fill="none" stroke="rgba(235,249,255,0.76)" stroke-width="1.45"/>
-                <line x1="125" y1="70" x2="125" y2="108"
-                      stroke="rgba(235,249,255,0.68)" stroke-width="1.15"/>
-                <line x1="435" y1="70" x2="435" y2="108"
-                      stroke="rgba(235,249,255,0.68)" stroke-width="1.15"/>
-                <line x1="125" y1="108" x2="45" y2="252"
-                      stroke="rgba(235,249,255,0.60)" stroke-width="1.05"/>
-                <line x1="435" y1="108" x2="515" y2="252"
-                      stroke="rgba(235,249,255,0.60)" stroke-width="1.05"/>
-                <line x1="125" y1="108" x2="435" y2="108"
-                      stroke="rgba(235,249,255,0.62)" stroke-width="1.05"/>
+          <div class="asp-maps">
+            <div>
+              <div class="asp-map-title">
+                <b>Before</b><span>활성 센서 30개</span>
+              </div>
+              <svg class="room" viewBox="0 0 100 100">
+                <rect x="5" y="5" width="90" height="90" rx="5"
+                      fill="#092641" stroke="#315b77" stroke-width="1"/>
+                <rect x="30" y="35" width="40" height="22" rx="5"
+                      fill="#173c5d" opacity=".9"/>
+                <rect x="38" y="66" width="24" height="14" rx="3"
+                      fill="#173b59" opacity=".78"/>
+                <path d="M10 25 H90 M10 75 H90 M25 10 V90 M75 10 V90"
+                      stroke="#214964" stroke-width=".45" opacity=".5"/>
+                {before_dots}
+              </svg>
+            </div>
 
-                <!-- perspective floor grid -->
-                <g opacity="0.23" stroke="#d4f2ff" stroke-width="0.75">
-                    <line x1="170" y1="108" x2="122" y2="252"/>
-                    <line x1="215" y1="108" x2="202" y2="252"/>
-                    <line x1="260" y1="108" x2="282" y2="252"/>
-                    <line x1="305" y1="108" x2="362" y2="252"/>
-                    <line x1="350" y1="108" x2="442" y2="252"/>
-                    <line x1="395" y1="108" x2="502" y2="252"/>
+            <div>
+              <div class="asp-map-title">
+                <b>After</b><span>활성 센서 {recommended_sensor_count}개</span>
+              </div>
+              <svg class="room" viewBox="0 0 100 100">
+                <rect x="5" y="5" width="90" height="90" rx="5"
+                      fill="#092641" stroke="#315b77" stroke-width="1"/>
+                <rect x="30" y="35" width="40" height="22" rx="5"
+                      fill="#173c5d" opacity=".9"/>
+                <rect x="38" y="66" width="24" height="14" rx="3"
+                      fill="#173b59" opacity=".78"/>
+                <path d="M10 25 H90 M10 75 H90 M25 10 V90 M75 10 V90"
+                      stroke="#214964" stroke-width=".45" opacity=".5"/>
+                {after_dots}
+              </svg>
+            </div>
+          </div>
 
-                    <line x1="105" y1="140" x2="455" y2="140"/>
-                    <line x1="86" y1="172" x2="474" y2="172"/>
-                    <line x1="70" y1="204" x2="490" y2="204"/>
-                    <line x1="56" y1="232" x2="504" y2="232"/>
-                </g>
+          <div class="asp-legend">
+            <span><i class="legend-dot active-dot"></i>활성 센서</span>
+            <span><i class="legend-dot sleep-dot"></i>비활성 센서</span>
+          </div>
 
-                <!-- furniture : simplified top-down silhouettes -->
-                <g opacity="0.90">
-                    <!-- sofa -->
-                    <rect x="205" y="158" width="92" height="32" rx="8"
-                          fill="#164775"/>
-                    <rect x="213" y="151" width="76" height="11" rx="5"
-                          fill="#245e92"/>
-                    <rect x="198" y="162" width="10" height="26" rx="3"
-                          fill="#1d4d7b"/>
-                    <rect x="294" y="162" width="10" height="26" rx="3"
-                          fill="#1d4d7b"/>
+          <div class="asp-result">
+            <div class="asp-result-item">
+              <strong>빠른 초기 균형화</strong>
+              <span>초기에는 많은 센서로 공간 상태를 세밀하게 파악</span>
+            </div>
+            <div class="asp-result-item">
+              <strong>안정화 후 효율 운용</strong>
+              <span>중복 모니터링을 줄이고 핵심 센서 중심으로 운영</span>
+            </div>
+            <div class="asp-result-item">
+              <strong>변화 시 재활성화</strong>
+              <span>불균형이 다시 커지면 활성 센서 수를 확대</span>
+            </div>
+          </div>
 
-                    <!-- desk -->
-                    <polygon points="350,151 423,151 435,171 360,171"
-                             fill="#1b4a73"/>
-                    <line x1="360" y1="171" x2="354" y2="197"
-                          stroke="#1b4c7a" stroke-width="3"/>
-                    <line x1="426" y1="171" x2="432" y2="197"
-                          stroke="#1b4c7a" stroke-width="3"/>
-                </g>
-
-                <!-- AC unit -->
-                <g filter="url(#softGlow)">
-                    <rect x="206" y="77" width="148" height="29" rx="8"
-                          fill="url(#acGrad)" stroke="#d9ecff" stroke-width="1.2"/>
-                    <rect x="216" y="98" width="128" height="4" rx="2"
-                          fill="#0f2645"/>
-                    <line x1="232" y1="90" x2="248" y2="90"
-                          stroke="#91a9bf" stroke-width="2"/>
-                    <line x1="312" y1="90" x2="328" y2="90"
-                          stroke="#91a9bf" stroke-width="2"/>
-                </g>
-
-                <!-- airflow beams -->
-                <g fill="none" stroke-linecap="round" filter="url(#glow)">
-                    <path d="M246 102 C214 132, 170 178, 105 238"
-                          stroke="{airflow_color}"
-                          stroke-width="{left_width * boost:.2f}"
-                          opacity="{left_opacity}"/>
-                    <path d="M260 102 C231 134, 201 173, 158 222"
-                          stroke="{airflow_color}"
-                          stroke-width="{max(2.5, left_width-0.4) * boost:.2f}"
-                          opacity="{max(0.15, left_opacity-0.18)}"/>
-
-                    <path d="M279 102 C279 140, 280 183, 281 240"
-                          stroke="{airflow_color}"
-                          stroke-width="{mid_width * boost:.2f}"
-                          opacity="{mid_opacity}"/>
-                    <path d="M292 102 C294 141, 302 180, 316 224"
-                          stroke="{airflow_color}"
-                          stroke-width="{max(2.7, mid_width-0.8) * boost:.2f}"
-                          opacity="{max(0.15, mid_opacity-0.18)}"/>
-
-                    <path d="M309 102 C344 132, 389 178, 455 238"
-                          stroke="{airflow_color}"
-                          stroke-width="{right_width * boost:.2f}"
-                          opacity="{right_opacity}"/>
-                    <path d="M323 102 C353 130, 384 166, 415 214"
-                          stroke="{airflow_color}"
-                          stroke-width="{max(2.5, right_width-0.4) * boost:.2f}"
-                          opacity="{max(0.15, right_opacity-0.18)}"/>
-                </g>
-
-                <!-- arrow heads -->
-                <g fill="#e9fbff" stroke="#58ddff" stroke-width="1.2" opacity="1.0">
-                    {"<polygon points='118,246 108,239 112,252'/>" if left_on else ""}
-                    {"<polygon points='167,229 158,223 162,235'/>" if left_on else ""}
-                    {"<polygon points='282,248 274,238 290,238'/>" if middle_on else ""}
-                    {"<polygon points='315,232 308,223 321,226'/>" if middle_on else ""}
-                    {"<polygon points='444,246 450,237 458,250'/>" if right_on else ""}
-                    {"<polygon points='410,220 416,212 424,224'/>" if right_on else ""}
-                </g>
-
-                <!-- impact/cooling zones -->
-                <ellipse cx="118" cy="238"
-                         rx="{32 + flow_level*2}" ry="{14 + flow_level}"
-                         fill="#52d5ff" opacity="{0.16 + flow_level*0.03}"/>
-                <ellipse cx="281" cy="240"
-                         rx="{29 + flow_level*2}" ry="{13 + flow_level}"
-                         fill="#52d5ff" opacity="{0.14 + flow_level*0.028}"/>
-                <ellipse cx="444" cy="238"
-                         rx="{32 + flow_level*2}" ry="{14 + flow_level}"
-                         fill="#52d5ff" opacity="{0.16 + flow_level*0.03}"/>
-
-                <!-- legend chips -->
-                <g>
-                    <rect x="20" y="25" width="132" height="28" rx="14" fill="rgba(11,44,75,0.88)" stroke="rgba(99,216,255,0.28)"/>
-                    <circle cx="37" cy="39" r="5.5" fill="{airflow_color}"/>
-                    <text x="51" y="44" font-size="13.5" fill="#eaf8ff" font-weight="700">공기 흐름 방향</text>
-                    <rect x="370" y="25" width="170" height="28" rx="14" fill="rgba(11,44,75,0.88)" stroke="rgba(99,216,255,0.28)"/>
-                    <text x="383" y="44" font-size="13.5" fill="#a7d7ef">적용 방향: {vane_display}</text>
-                </g>
-            </svg>
+          <div class="asp-foot">
+            설치 센서를 제거하는 것이 아니라, 현재 모니터링에 사용하는 활성 센서 수를 조정하는 운영안입니다.
+          </div>
         </div>
-        '''
-        components.html(airflow_preview_html, height=350, scrolling=False)
+        """
+
+        components.html(adaptive_sensor_html, height=505, scrolling=False)
 
         st.markdown(
             """
@@ -3882,22 +3812,6 @@ elif st.session_state.app_view == "COMPARE":
     # Use the same definitions for BEFORE and AFTER so the comparison is fair.
     before_mean = float(np.nanmean(result_current_nodes))
     after_mean = float(np.nanmean(result_pred_nodes))
-
-    # Adaptive sensor activation for the displayed BEFORE/AFTER thermal states.
-    before_sensor_count, before_sensor_meta = _adaptive_sensor_meta(
-        result_current_coords,
-        result_current_nodes,
-        before_mean,
-        float(st.session_state.target_temp),
-        basis_assets,
-    )
-    after_sensor_count, after_sensor_meta = _adaptive_sensor_meta(
-        result_pred_coords,
-        result_pred_nodes,
-        after_mean,
-        float(st.session_state.target_temp),
-        basis_assets,
-    )
 
     before_p05 = float(np.nanpercentile(result_current_nodes, 5))
     before_p95 = float(np.nanpercentile(result_current_nodes, 95))
@@ -4135,10 +4049,9 @@ elif st.session_state.app_view == "COMPARE":
                 result_current_coords,
                 result_current_nodes,
                 height=430,
-                sensor_meta=before_sensor_meta,
             )
         else:
-            compare_fig = make_2d_heatmap(result_current_grid, height=330, sensor_meta=before_sensor_meta)
+            compare_fig = make_2d_heatmap(result_current_grid, height=330)
     else:
         st.markdown('<div class="compare-map-label">Predicted Field</div>', unsafe_allow_html=True)
         if compare_view == "3D":
@@ -4146,10 +4059,9 @@ elif st.session_state.app_view == "COMPARE":
                 result_pred_coords,
                 result_pred_nodes,
                 height=430,
-                sensor_meta=after_sensor_meta,
             )
         else:
-            compare_fig = make_2d_heatmap(result_pred_grid, height=330, sensor_meta=after_sensor_meta)
+            compare_fig = make_2d_heatmap(result_pred_grid, height=330)
 
     st.plotly_chart(
         compare_fig,
