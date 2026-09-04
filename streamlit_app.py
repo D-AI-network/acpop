@@ -3408,6 +3408,45 @@ elif st.session_state.app_view == "RESULTS":
 
         res = st.session_state.optimized_results
 
+        # --------------------------------------------------------
+        # Adaptive sensor summary for the RESULT screen.
+        # This does not change the model or any existing result metric.
+        # --------------------------------------------------------
+        _result_current_coords = np.asarray(
+            res.get("field_current_coords", current_coords),
+            dtype=float,
+        )
+        _result_current_nodes = np.asarray(
+            res.get("field_current_temp_nodes", current_temp_nodes),
+            dtype=float,
+        )
+        _result_pred_coords = np.asarray(
+            res.get("field_post_coords", _result_current_coords),
+            dtype=float,
+        )
+        _result_pred_nodes = np.asarray(
+            res.get("field_post_temp_nodes", _result_current_nodes),
+            dtype=float,
+        )
+
+        _result_before_mean = float(np.nanmean(_result_current_nodes))
+        _result_after_mean = float(np.nanmean(_result_pred_nodes))
+
+        result_before_sensor_count, result_before_sensor_meta = _adaptive_sensor_meta(
+            _result_current_coords,
+            _result_current_nodes,
+            _result_before_mean,
+            float(st.session_state.target_temp),
+            basis_assets,
+        )
+        result_after_sensor_count, result_after_sensor_meta = _adaptive_sensor_meta(
+            _result_pred_coords,
+            _result_pred_nodes,
+            _result_after_mean,
+            float(st.session_state.target_temp),
+            basis_assets,
+        )
+
         vane_map = {
             "Left (L)": "좌측 (L)",
             "Middle (M)": "중앙 (M)",
@@ -3514,6 +3553,94 @@ elif st.session_state.app_view == "RESULTS":
         )
 
         st.markdown(recommendation_html, unsafe_allow_html=True)
+
+        # Adaptive sensor result summary.
+        _before_nodes = [int(n) for n in result_before_sensor_meta.keys()]
+        _after_nodes = [int(n) for n in result_after_sensor_meta.keys()]
+        _sensor_delta = int(result_before_sensor_count - result_after_sensor_count)
+        if _sensor_delta > 0:
+            _sensor_change_text = f"{_sensor_delta}개 비활성화"
+        elif _sensor_delta < 0:
+            _sensor_change_text = f"{abs(_sensor_delta)}개 추가 활성화"
+        else:
+            _sensor_change_text = "센서 수 유지"
+
+        _before_node_text = ", ".join(f"Node {n}" for n in _before_nodes)
+        _after_node_text = ", ".join(f"Node {n}" for n in _after_nodes)
+
+        st.markdown(
+            f"""
+            <div style="
+                margin:10px 0 14px 0;
+                padding:14px 15px;
+                border-radius:18px;
+                background:rgba(7, 40, 67, 0.72);
+                border:1px solid rgba(121,195,232,0.22);
+            ">
+                <div style="
+                    color:#eaf8ff;
+                    font-family:'Outfit','Noto Sans KR',sans-serif;
+                    font-size:15px;
+                    font-weight:800;
+                    margin-bottom:9px;
+                ">Adaptive Sensor Plan</div>
+
+                <div style="
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    gap:10px;
+                    margin-bottom:10px;
+                ">
+                    <div style="color:#9bcce5;font-size:11px;font-weight:700;">활성 센서 변화</div>
+                    <div style="
+                        color:#f5fbff;
+                        font-family:'JetBrains Mono',monospace;
+                        font-size:20px;
+                        font-weight:800;
+                        white-space:nowrap;
+                    ">{result_before_sensor_count} → {result_after_sensor_count}</div>
+                </div>
+
+                <div style="
+                    color:#6fdcff;
+                    font-size:11px;
+                    font-weight:750;
+                    margin-bottom:11px;
+                ">{_sensor_change_text} · 최종 권장 활성 센서 {result_after_sensor_count}개</div>
+
+                <div style="
+                    color:#9fc3d9;
+                    font-size:10px;
+                    font-weight:700;
+                    margin-bottom:3px;
+                ">Current sensor nodes ({result_before_sensor_count})</div>
+                <div style="
+                    color:#dff5ff;
+                    font-family:'JetBrains Mono',monospace;
+                    font-size:9px;
+                    line-height:1.55;
+                    word-break:break-word;
+                    margin-bottom:9px;
+                ">{_before_node_text}</div>
+
+                <div style="
+                    color:#9fc3d9;
+                    font-size:10px;
+                    font-weight:700;
+                    margin-bottom:3px;
+                ">Recommended sensor nodes ({result_after_sensor_count})</div>
+                <div style="
+                    color:#f5fbff;
+                    font-family:'JetBrains Mono',monospace;
+                    font-size:9px;
+                    line-height:1.55;
+                    word-break:break-word;
+                ">{_after_node_text}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         airflow_color = "#69e6ff"
         active_dirs = max(int(left_on) + int(middle_on) + int(right_on), 1)
