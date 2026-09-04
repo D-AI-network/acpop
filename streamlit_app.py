@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v53
+# FACTOR_UI_BUILD = 2026-09-04-v54
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -1419,7 +1419,7 @@ basis_assets = None
 # ============================================================
 # 3. SESSION STATE & NAVIGATION ROUTER
 # ============================================================
-VALID_VIEWS = ["INTRO", "HOME", "HEAT_LOAD", "RESULTS"]
+VALID_VIEWS = ["INTRO", "HOME", "HEAT_LOAD", "RESULTS", "COMPARE"]
 
 if "app_view" not in st.session_state or st.session_state.app_view not in VALID_VIEWS:
     st.session_state.app_view = "INTRO"
@@ -3056,40 +3056,7 @@ elif st.session_state.app_view == "RESULTS":
         )
 
         res = st.session_state.optimized_results
-        target = st.session_state.target_temp
 
-        result_current_grid = np.asarray(
-            res.get("field_current_grid", field_current_grid),
-            dtype=float,
-        )
-        field_post_grid = np.asarray(
-            res.get("field_post_grid", field_current_grid),
-            dtype=float,
-        )
-
-        result_current_coords = np.asarray(
-            res.get("field_current_coords", current_coords),
-            dtype=float,
-        )
-        result_current_nodes = np.asarray(
-            res.get("field_current_temp_nodes", current_temp_nodes),
-            dtype=float,
-        )
-        result_pred_coords = np.asarray(
-            res.get("field_post_coords", result_current_coords),
-            dtype=float,
-        )
-        result_pred_nodes = np.asarray(
-            res.get("field_post_temp_nodes", result_current_nodes),
-            dtype=float,
-        )
-
-        if "field_post_temp_nodes" not in res:
-            st.warning("이전 결과가 남아 있어 3D 예측 필드를 새로 만들 수 없습니다. 냉방 최적화를 다시 실행해 주세요.")
-
-        # --------------------------------------------------------
-        # A. AI recommendation: this is available immediately
-        # --------------------------------------------------------
         vane_map = {
             "Left (L)": "좌측 (L)",
             "Middle (M)": "중앙 (M)",
@@ -3113,180 +3080,41 @@ elif st.session_state.app_view == "RESULTS":
             unsafe_allow_html=True,
         )
 
-        # --------------------------------------------------------
-        # B. BEFORE simulation: show only the current field
-        #    AFTER simulation: show Current + Predicted together
-        # --------------------------------------------------------
-        with st.container(key="field_comparison_card"):
-            st.markdown(
-                '<div class="field-map-title current-title">Current Field</div>',
-                unsafe_allow_html=True,
-            )
-
-            current_view = field_view_selector("result_current_view")
-            if current_view == "3D":
-                current_fig = make_true_3d_field(
-                    result_current_coords,
-                    result_current_nodes,
-                    height=420,
-                )
-            else:
-                current_fig = make_2d_heatmap(result_current_grid, height=315)
-
-            st.plotly_chart(
-                current_fig,
-                use_container_width=True,
-                config={"displayModeBar": False},
-            )
-
-            if st.session_state.show_control_simulation:
-                st.markdown(
-                    '<div class="field-map-divider"></div>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    '<div class="field-map-title current-title">Predicted Field</div>',
-                    unsafe_allow_html=True,
-                )
-
-                predicted_view = field_view_selector("result_predicted_view")
-                if predicted_view == "3D":
-                    predicted_fig = make_true_3d_field(
-                        result_pred_coords,
-                        result_pred_nodes,
-                        height=420,
-                    )
-                else:
-                    predicted_fig = make_2d_heatmap(field_post_grid, height=315)
-
-                st.plotly_chart(
-                    predicted_fig,
-                    use_container_width=True,
-                    config={"displayModeBar": False},
-                )
-
-        # --------------------------------------------------------
-        # C. Simulation action
-        # --------------------------------------------------------
-        if not st.session_state.show_control_simulation:
-            st.markdown(
-                """
-                <div style="
-                    text-align:center;
-                    color:#aee4ff;
-                    font-size:13px;
-                    line-height:1.55;
-                    margin:12px 6px 10px 6px;
-                ">
-                    AI가 추천한 냉방 설정을 적용했을 때의 공간 온도 변화를 미리 확인합니다.
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-            if st.button(
-                "AI 제어안 시뮬레이션",
-                type="primary",
-                use_container_width=True,
-                key="btn_control_simulation",
-            ):
-                st.session_state.show_control_simulation = True
-                st.rerun()
-
-        # --------------------------------------------------------
-        # D. AFTER simulation: reveal feasibility + diagnostics
-        # --------------------------------------------------------
-        else:
-            if res["status"] == "FEASIBLE":
-                badge_bg, badge_border, badge_text, badge_desc = (
-                    "rgba(118, 205, 170, 0.12)",
-                    "#7ad9a6",
-                    "✓ 목표 온도 달성 가능",
-                    f"추천 제어안을 적용하면 목표 {target:.1f}℃ 및 쾌적 지표를 만족할 것으로 예측됩니다.",
-                )
-            elif res["status"] == "NEAR_FEASIBLE":
-                badge_bg, badge_border, badge_text, badge_desc = (
-                    "rgba(242, 193, 91, 0.14)",
-                    "#e7b95d",
-                    "• 목표 온도 근접 달성",
-                    "추천 제어안 적용 시 대부분의 기준을 만족하지만 일부 공간에 경미한 편차가 남을 것으로 예측됩니다.",
-                )
-            else:
-                badge_bg, badge_border, badge_text, badge_desc = (
-                    "rgba(255, 120, 132, 0.14)",
-                    "#ff7f8d",
-                    "✕ 목표 온도 달성 어려움",
-                    "현재 후보 범위에서는 목표 온도를 충분히 만족하기 어려울 것으로 예측됩니다.",
-                )
-
-            st.markdown(
-                f"""
-            <div class="feasibility-box" style="background:{badge_bg}; border-color:{badge_border};">
-                <div class="feasibility-title" style="color:{badge_border};">{badge_text}</div>
-                <div class="feasibility-desc" style="color:#d8edf8;">{badge_desc}</div>
+        st.markdown(
+            """
+            <div style="
+                margin:18px 2px 12px 2px;
+                padding:15px 16px;
+                border-radius:18px;
+                background:rgba(7, 41, 70, 0.52);
+                border:1px solid rgba(102, 195, 240, 0.20);
+                color:#b9dff4;
+                font-size:13px;
+                line-height:1.65;
+                text-align:center;
+            ">
+                추천된 냉방 설정을 적용했을 때 공간 전체의 온도 분포가
+                어떻게 달라지는지 Before → After로 미리 확인합니다.
             </div>
             """,
-                unsafe_allow_html=True,
-            )
+            unsafe_allow_html=True,
+        )
 
-            st.markdown(
-                '<div class="section-title">시뮬레이션 결과</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f"""
-            <div class="metric-grid">
-                <div class="metric-cell">
-                    <div class="lbl">예측 평균 온도</div>
-                    <div class="metric-help">제어안 적용 후 공간 전체 평균</div>
-                    <div class="val">{res['mean_temp']:.2f} °C</div>
-                </div>
-                <div class="metric-cell">
-                    <div class="lbl">상위 5% 고온 기준</div>
-                    <div class="metric-help">가장 뜨거운 영역의 기준 온도</div>
-                    <div class="val">{res['p95_temp']:.2f} °C</div>
-                </div>
-            </div>
-            <div class="metric-grid">
-                <div class="metric-cell">
-                    <div class="lbl">공간 온도 편차 (ΔT)</div>
-                    <div class="metric-help">공간 내 온도 불균형 정도</div>
-                    <div class="val">{res['zone_spread']:.2f} °C</div>
-                </div>
-                <div class="metric-cell">
-                    <div class="lbl">과열 / 과냉 영역</div>
-                    <div class="metric-help">예측된 고온·저온 영역 비율</div>
-                    <div class="val">{res['hot_fraction']:.1f}% / {res['cold_fraction']:.1f}%</div>
-                </div>
-            </div>
-            """,
-                unsafe_allow_html=True,
-            )
+        if st.button(
+            "AI 제어안 시뮬레이션",
+            type="primary",
+            use_container_width=True,
+            key="btn_control_simulation",
+        ):
+            st.session_state.show_control_simulation = True
+            st.session_state.app_view = "COMPARE"
+            st.rerun()
 
-            st.markdown(
-                """
-                <div style="
-                    text-align:center;
-                    color:#8fb5ca;
-                    font-size:11px;
-                    line-height:1.5;
-                    margin:6px 8px 14px 8px;
-                ">
-                    이 결과는 실제 에어컨에 명령을 전송한 것이 아니라,
-                    AI 추천 제어안을 적용했을 때의 공간 온도를 예측한 시뮬레이션입니다.
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        # --------------------------------------------------------
-        # E. Restart
-        # --------------------------------------------------------
         if st.button(
             "새로운 최적화 실행",
             type="secondary",
             use_container_width=True,
-            key="btn_restart_optimization",
+            key="btn_restart_from_results",
         ):
             st.session_state.show_control_simulation = False
             st.session_state.app_view = "HOME"
@@ -3294,7 +3122,357 @@ elif st.session_state.app_view == "RESULTS":
 
 
 # ============================================================
-# 9. BOTTOM NAVIGATION BAR
+# 9. SCREEN 4: BEFORE → AFTER EFFECT COMPARISON
+# ============================================================
+elif st.session_state.app_view == "COMPARE":
+    if not st.session_state.has_run_optimization:
+        st.session_state.app_view = "RESULTS"
+        st.rerun()
+
+    res = st.session_state.optimized_results
+    target = float(st.session_state.target_temp)
+
+    result_current_grid = np.asarray(
+        res.get("field_current_grid", field_current_grid),
+        dtype=float,
+    )
+    result_pred_grid = np.asarray(
+        res.get("field_post_grid", field_current_grid),
+        dtype=float,
+    )
+    result_current_coords = np.asarray(
+        res.get("field_current_coords", current_coords),
+        dtype=float,
+    )
+    result_current_nodes = np.asarray(
+        res.get("field_current_temp_nodes", current_temp_nodes),
+        dtype=float,
+    )
+    result_pred_coords = np.asarray(
+        res.get("field_post_coords", result_current_coords),
+        dtype=float,
+    )
+    result_pred_nodes = np.asarray(
+        res.get("field_post_temp_nodes", result_current_nodes),
+        dtype=float,
+    )
+
+    # Use the same definitions for BEFORE and AFTER so the comparison is fair.
+    before_mean = float(np.nanmean(result_current_nodes))
+    after_mean = float(np.nanmean(result_pred_nodes))
+
+    before_p05 = float(np.nanpercentile(result_current_nodes, 5))
+    before_p95 = float(np.nanpercentile(result_current_nodes, 95))
+    after_p05 = float(np.nanpercentile(result_pred_nodes, 5))
+    after_p95 = float(np.nanpercentile(result_pred_nodes, 95))
+
+    before_spread = max(0.0, before_p95 - before_p05)
+    after_spread = max(0.0, after_p95 - after_p05)
+
+    # "목표 초과 영역" is easier to understand than HVAC-specific hotspot jargon.
+    # We count points more than 1°C above the target.
+    before_hot = float(np.mean(result_current_nodes > (target + 1.0)) * 100.0)
+    after_hot = float(np.mean(result_pred_nodes > (target + 1.0)) * 100.0)
+
+    mean_delta = after_mean - before_mean
+    spread_improve_pct = (
+        max(0.0, (before_spread - after_spread) / before_spread * 100.0)
+        if before_spread > 1e-8
+        else 0.0
+    )
+    hot_improve_pp = before_hot - after_hot
+
+    status = str(res.get("status", "INFEASIBLE"))
+    if status == "FEASIBLE":
+        status_text = "목표 온도 달성 가능"
+        status_color = "#74e0a8"
+        status_symbol = "✓"
+    elif status == "NEAR_FEASIBLE":
+        status_text = "목표 온도 근접 달성"
+        status_color = "#ffd36b"
+        status_symbol = "•"
+    else:
+        status_text = "목표 온도 달성 어려움"
+        status_color = "#ff7d8b"
+        status_symbol = "×"
+
+    # Comparison-screen-only styling.
+    st.markdown(
+        """
+        <style>
+        .compare-eyebrow {
+            font-size: 12px;
+            letter-spacing: 0.16em;
+            color: #62d6ff;
+            font-weight: 800;
+            margin: 2px 0 6px 0;
+        }
+        .compare-title {
+            font-size: 30px;
+            color: #f4fbff;
+            font-weight: 800;
+            margin: 0 0 16px 0;
+            letter-spacing: -0.02em;
+        }
+        .compare-hero {
+            border-radius: 22px;
+            padding: 20px 18px;
+            background: linear-gradient(145deg, rgba(8,43,72,.96), rgba(14,55,83,.92));
+            border: 1px solid rgba(118,203,244,.24);
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .compare-temp-row {
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:14px;
+            flex-wrap:wrap;
+        }
+        .compare-temp {
+            font-size: 36px;
+            font-weight: 800;
+            color:#ffffff;
+        }
+        .compare-arrow {
+            font-size: 28px;
+            color:#6bd8ff;
+            font-weight:800;
+        }
+        .compare-target {
+            margin-top:8px;
+            font-size:13px;
+            color:#a9d2e8;
+        }
+        .compare-status {
+            margin-top:10px;
+            font-size:15px;
+            font-weight:800;
+        }
+        .compare-card {
+            border-radius: 18px;
+            background: rgba(15,57,87,.72);
+            border: 1px solid rgba(116,191,230,.20);
+            padding: 15px 14px;
+            margin-bottom: 10px;
+        }
+        .compare-card-title {
+            font-size: 13px;
+            color:#b4d7e8;
+            font-weight:700;
+            margin-bottom:8px;
+        }
+        .compare-values {
+            display:grid;
+            grid-template-columns:1fr auto 1fr;
+            align-items:center;
+            gap:8px;
+        }
+        .compare-before, .compare-after {
+            font-size:20px;
+            font-weight:800;
+            color:#f7fbff;
+        }
+        .compare-after { text-align:right; }
+        .compare-mini-arrow {
+            color:#55d3ff;
+            font-size:18px;
+            font-weight:800;
+        }
+        .compare-change {
+            margin-top:7px;
+            font-size:11px;
+            color:#7fe0b2;
+            font-weight:700;
+        }
+        .compare-map-label {
+            font-size:12px;
+            color:#86aec4;
+            font-weight:700;
+            margin-top:6px;
+            margin-bottom:5px;
+        }
+        .compare-summary {
+            margin:16px 0 12px 0;
+            padding:17px 16px;
+            border-radius:20px;
+            background:rgba(66,188,147,.10);
+            border:1px solid rgba(114,224,168,.50);
+            color:#dffbf0;
+            line-height:1.65;
+            font-size:13px;
+        }
+        .compare-summary strong {
+            color:#78e0aa;
+            font-size:16px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="compare-eyebrow">BEFORE → AFTER</div>', unsafe_allow_html=True)
+    st.markdown('<div class="compare-title">AI 냉방 효과 분석</div>', unsafe_allow_html=True)
+
+    st.markdown(
+        f"""
+        <div class="compare-hero">
+            <div class="compare-temp-row">
+                <div class="compare-temp">{before_mean:.1f}°C</div>
+                <div class="compare-arrow">→</div>
+                <div class="compare-temp">{after_mean:.1f}°C</div>
+            </div>
+            <div class="compare-target">목표 온도 {target:.1f}°C</div>
+            <div class="compare-status" style="color:{status_color};">
+                {status_symbol} {status_text}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+        <div class="compare-card">
+            <div class="compare-card-title">평균 온도</div>
+            <div class="compare-values">
+                <div class="compare-before">{before_mean:.2f}°C</div>
+                <div class="compare-mini-arrow">→</div>
+                <div class="compare-after">{after_mean:.2f}°C</div>
+            </div>
+            <div class="compare-change">{abs(mean_delta):.2f}°C 변화</div>
+        </div>
+
+        <div class="compare-card">
+            <div class="compare-card-title">공간 온도 편차</div>
+            <div class="compare-values">
+                <div class="compare-before">{before_spread:.2f}°C</div>
+                <div class="compare-mini-arrow">→</div>
+                <div class="compare-after">{after_spread:.2f}°C</div>
+            </div>
+            <div class="compare-change">온도 불균형 {spread_improve_pct:.0f}% 개선</div>
+        </div>
+
+        <div class="compare-card">
+            <div class="compare-card-title">목표 초과 영역</div>
+            <div class="compare-values">
+                <div class="compare-before">{before_hot:.1f}%</div>
+                <div class="compare-mini-arrow">→</div>
+                <div class="compare-after">{after_hot:.1f}%</div>
+            </div>
+            <div class="compare-change">{max(0.0, hot_improve_pp):.1f}%p 감소</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="section-title" style="margin-top:18px;">공간 온도 변화</div>', unsafe_allow_html=True)
+
+    if "compare_field_mode" not in st.session_state:
+        st.session_state.compare_field_mode = "BEFORE"
+
+    if hasattr(st, "segmented_control"):
+        compare_field_mode = st.segmented_control(
+            "Before / After",
+            options=["BEFORE", "AFTER"],
+            selection_mode="single",
+            key="compare_field_mode",
+            label_visibility="collapsed",
+        ) or "BEFORE"
+    else:
+        compare_field_mode = st.radio(
+            "Before / After",
+            options=["BEFORE", "AFTER"],
+            horizontal=True,
+            key="compare_field_mode",
+            label_visibility="collapsed",
+        )
+
+    compare_view = field_view_selector("compare_map_view")
+
+    if compare_field_mode == "BEFORE":
+        st.markdown('<div class="compare-map-label">Current Field</div>', unsafe_allow_html=True)
+        if compare_view == "3D":
+            compare_fig = make_true_3d_field(
+                result_current_coords,
+                result_current_nodes,
+                height=430,
+            )
+        else:
+            compare_fig = make_2d_heatmap(result_current_grid, height=330)
+    else:
+        st.markdown('<div class="compare-map-label">Predicted Field</div>', unsafe_allow_html=True)
+        if compare_view == "3D":
+            compare_fig = make_true_3d_field(
+                result_pred_coords,
+                result_pred_nodes,
+                height=430,
+            )
+        else:
+            compare_fig = make_2d_heatmap(result_pred_grid, height=330)
+
+    st.plotly_chart(
+        compare_fig,
+        use_container_width=True,
+        config={"displayModeBar": False},
+        key=f"compare_plot_{compare_field_mode}_{compare_view}",
+    )
+
+    if status == "FEASIBLE":
+        conclusion = (
+            f"추천 제어안을 적용하면 목표 {target:.1f}°C에 도달하면서 "
+            f"공간 온도 불균형이 약 {spread_improve_pct:.0f}% 감소할 것으로 예측됩니다."
+        )
+    elif status == "NEAR_FEASIBLE":
+        conclusion = (
+            f"추천 제어안 적용 후 목표 온도에 근접하며, "
+            f"공간 온도 불균형은 약 {spread_improve_pct:.0f}% 개선될 것으로 예측됩니다."
+        )
+    else:
+        conclusion = (
+            f"현재 냉방 후보 범위만으로는 목표 {target:.1f}°C 달성이 어렵지만, "
+            f"공간 온도 분포 변화와 개선 가능성을 사전에 확인할 수 있습니다."
+        )
+
+    st.markdown(
+        f"""
+        <div class="compare-summary">
+            <strong>{status_symbol} AI 냉방 효과</strong><br>
+            {conclusion}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div style="
+            text-align:center;
+            color:#789eb4;
+            font-size:10px;
+            line-height:1.5;
+            margin:4px 8px 14px 8px;
+        ">
+            실제 에어컨에 명령을 전송한 결과가 아니라,
+            AI 추천 제어안을 적용했을 때의 공간 온도를 예측한 시뮬레이션입니다.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if st.button(
+        "새로운 최적화 실행",
+        type="secondary",
+        use_container_width=True,
+        key="btn_restart_from_compare",
+    ):
+        st.session_state.show_control_simulation = False
+        st.session_state.app_view = "HOME"
+        st.rerun()
+
+
+# ============================================================
+# 10. BOTTOM NAVIGATION BAR
 # ============================================================
 if st.session_state.app_view != "INTRO":
     st.markdown('<div class="bottom-nav"></div>', unsafe_allow_html=True)
@@ -3314,7 +3492,10 @@ if st.session_state.app_view != "INTRO":
             st.rerun()
 
     with b_col3:
-        btn_analysis_kind = "primary" if st.session_state.app_view == "RESULTS" else "secondary"
+        btn_analysis_kind = "primary" if st.session_state.app_view in ("RESULTS", "COMPARE") else "secondary"
         if st.button("Analysis", type=btn_analysis_kind, use_container_width=True, key="btn_nav_analysis"):
-            st.session_state.app_view = "RESULTS"
+            if st.session_state.has_run_optimization and st.session_state.show_control_simulation:
+                st.session_state.app_view = "COMPARE"
+            else:
+                st.session_state.app_view = "RESULTS"
             st.rerun()
