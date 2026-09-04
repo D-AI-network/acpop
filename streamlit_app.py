@@ -3568,79 +3568,34 @@ elif st.session_state.app_view == "RESULTS":
         _before_node_text = ", ".join(f"Node {n}" for n in _before_nodes)
         _after_node_text = ", ".join(f"Node {n}" for n in _after_nodes)
 
-        st.markdown(
-            f"""
-            <div style="
-                margin:10px 0 14px 0;
-                padding:14px 15px;
-                border-radius:18px;
-                background:rgba(7, 40, 67, 0.72);
-                border:1px solid rgba(121,195,232,0.22);
-            ">
-                <div style="
-                    color:#eaf8ff;
-                    font-family:'Outfit','Noto Sans KR',sans-serif;
-                    font-size:15px;
-                    font-weight:800;
-                    margin-bottom:9px;
-                ">Adaptive Sensor Plan</div>
-
-                <div style="
-                    display:flex;
-                    align-items:center;
-                    justify-content:space-between;
-                    gap:10px;
-                    margin-bottom:10px;
-                ">
-                    <div style="color:#9bcce5;font-size:11px;font-weight:700;">활성 센서 변화</div>
-                    <div style="
-                        color:#f5fbff;
-                        font-family:'JetBrains Mono',monospace;
-                        font-size:20px;
-                        font-weight:800;
-                        white-space:nowrap;
-                    ">{result_before_sensor_count} → {result_after_sensor_count}</div>
-                </div>
-
-                <div style="
-                    color:#6fdcff;
-                    font-size:11px;
-                    font-weight:750;
-                    margin-bottom:11px;
-                ">{_sensor_change_text} · 최종 권장 활성 센서 {result_after_sensor_count}개</div>
-
-                <div style="
-                    color:#9fc3d9;
-                    font-size:10px;
-                    font-weight:700;
-                    margin-bottom:3px;
-                ">Current sensor nodes ({result_before_sensor_count})</div>
-                <div style="
-                    color:#dff5ff;
-                    font-family:'JetBrains Mono',monospace;
-                    font-size:9px;
-                    line-height:1.55;
-                    word-break:break-word;
-                    margin-bottom:9px;
-                ">{_before_node_text}</div>
-
-                <div style="
-                    color:#9fc3d9;
-                    font-size:10px;
-                    font-weight:700;
-                    margin-bottom:3px;
-                ">Recommended sensor nodes ({result_after_sensor_count})</div>
-                <div style="
-                    color:#f5fbff;
-                    font-family:'JetBrains Mono',monospace;
-                    font-size:9px;
-                    line-height:1.55;
-                    word-break:break-word;
-                ">{_after_node_text}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        _adaptive_sensor_html = (
+            f'<div style="margin:10px 0 14px 0;padding:14px 15px;'
+            f'border-radius:18px;background:rgba(7,40,67,0.72);'
+            f'border:1px solid rgba(121,195,232,0.22);">'
+            f'<div style="color:#eaf8ff;font-family:Outfit,\'Noto Sans KR\',sans-serif;'
+            f'font-size:15px;font-weight:800;margin-bottom:9px;">Adaptive Sensor Plan</div>'
+            f'<div style="display:flex;align-items:center;justify-content:space-between;'
+            f'gap:10px;margin-bottom:10px;">'
+            f'<div style="color:#9bcce5;font-size:11px;font-weight:700;">활성 센서 변화</div>'
+            f'<div style="color:#f5fbff;font-family:\'JetBrains Mono\',monospace;'
+            f'font-size:20px;font-weight:800;white-space:nowrap;">'
+            f'{result_before_sensor_count} → {result_after_sensor_count}</div>'
+            f'</div>'
+            f'<div style="color:#6fdcff;font-size:11px;font-weight:750;margin-bottom:11px;">'
+            f'{_sensor_change_text} · 최종 권장 활성 센서 {result_after_sensor_count}개</div>'
+            f'<div style="color:#9fc3d9;font-size:10px;font-weight:700;margin-bottom:3px;">'
+            f'Current sensor nodes ({result_before_sensor_count})</div>'
+            f'<div style="color:#dff5ff;font-family:\'JetBrains Mono\',monospace;'
+            f'font-size:9px;line-height:1.55;word-break:break-word;margin-bottom:9px;">'
+            f'{_before_node_text}</div>'
+            f'<div style="color:#9fc3d9;font-size:10px;font-weight:700;margin-bottom:3px;">'
+            f'Recommended sensor nodes ({result_after_sensor_count})</div>'
+            f'<div style="color:#f5fbff;font-family:\'JetBrains Mono\',monospace;'
+            f'font-size:9px;line-height:1.55;word-break:break-word;">'
+            f'{_after_node_text}</div>'
+            f'</div>'
         )
+        st.markdown(_adaptive_sensor_html, unsafe_allow_html=True)
 
         airflow_color = "#69e6ff"
         active_dirs = max(int(left_on) + int(middle_on) + int(right_on), 1)
