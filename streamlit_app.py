@@ -1382,6 +1382,12 @@ ROA_NODES_META = {
 }
 ROA_NODE_IDS = list(ROA_NODES_META.keys())
 
+# Fallback only: the normal path below uses the learned sensor basis.
+# A nested 5 -> 10 -> 20 -> 30 hierarchy is derived from that basis so
+# sensor activation can change without changing any UI/CSS/layout.
+FALLBACK_SENSOR_META = {int(k): dict(v) for k, v in ROA_NODES_META.items()}
+ADAPTIVE_SENSOR_COUNTS = (5, 10, 20, 30)
+
 
 APP_ROOT = Path(__file__).resolve().parent
 
@@ -1593,6 +1599,117 @@ def load_reconstruction_basis():
         except Exception:
             pass
     return None
+
+
+def _adaptive_sensor_budget(reference_temp_c, target_temp_c, temp_nodes):
+    """
+    Select the active sensor budget from thermal error + spatial imbalance.
+
+    30 -> far from target / strongly non-uniform
+    20 -> moderately far / non-uniform
+    10 -> near target but still settling
+     5 -> close to target and spatially balanced
+    """
+    values = np.asarray(temp_nodes, dtype=float).reshape(-1)
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return 30
+
+    error_c = abs(float(reference_temp_c) - float(target_temp_c))
+    spread_c = float(np.nanpercentile(values, 95) - np.nanpercentile(values, 5))
+
+    if error_c >= 2.5 or spread_c >= 3.0:
+        return 30
+    if error_c >= 1.2 or spread_c >= 2.0:
+        return 20
+    if error_c >= 0.4 or spread_c >= 1.0:
+        return 10
+    return 5
+
+
+def _nested_sensor_indices_from_basis(assets, k, n_nodes, max_k=30):
+    """
+    Build one nested sensor hierarchy from sensor_reconstruction_basis.npz.
+
+    The validated selected_sensor_idx set is kept first (normally the 5-sensor
+    core from the sensor study). Additional sensors are appended from one
+    pivoted-QR ranking of the learned PCA basis. Therefore:
+        sensors(5) ⊂ sensors(10) ⊂ sensors(20) ⊂ sensors(30)
+    """
+    k = int(max(1, min(int(k), int(n_nodes))))
+    max_k = int(max(k, min(int(max_k), int(n_nodes))))
+
+    ordered = []
+
+    if assets is not None:
+        core = np.asarray(assets.get("selected_sensor_idx", []), dtype=np.int64).reshape(-1)
+        for nid in core.tolist():
+            nid = int(nid)
+            if 0 <= nid < int(n_nodes) and nid not in ordered:
+                ordered.append(nid)
+
+        basis = np.asarray(assets.get("temperature_basis", []), dtype=np.float32)
+        if basis.ndim == 2 and basis.shape[0] == int(n_nodes) and basis.shape[1] > 0:
+            try:
+                from scipy.linalg import qr
+                use_rank = min(max_k, basis.shape[1])
+                _q, _r, piv = qr(
+                    basis[:, :use_rank].T,
+                    pivoting=True,
+                    mode="economic",
+                )
+                for nid in np.asarray(piv, dtype=np.int64).tolist():
+                    nid = int(nid)
+                    if 0 <= nid < int(n_nodes) and nid not in ordered:
+                        ordered.append(nid)
+                    if len(ordered) >= max_k:
+                        break
+            except Exception:
+                pass
+
+    for nid in FALLBACK_SENSOR_META.keys():
+        nid = int(nid)
+        if 0 <= nid < int(n_nodes) and nid not in ordered:
+            ordered.append(nid)
+
+    if len(ordered) < k:
+        step = max(1, int(n_nodes) // max(k, 1))
+        for nid in range(0, int(n_nodes), step):
+            if nid not in ordered:
+                ordered.append(int(nid))
+            if len(ordered) >= k:
+                break
+
+    return np.asarray(ordered[:k], dtype=np.int64)
+
+
+def _adaptive_sensor_meta(coords, temp_nodes, reference_temp_c, target_temp_c, assets):
+    """Return active count and sensor metadata for the current field."""
+    coords = np.asarray(coords, dtype=float)
+    k = _adaptive_sensor_budget(
+        reference_temp_c=reference_temp_c,
+        target_temp_c=target_temp_c,
+        temp_nodes=temp_nodes,
+    )
+    idx = _nested_sensor_indices_from_basis(
+        assets=assets,
+        k=k,
+        n_nodes=len(coords),
+        max_k=max(ADAPTIVE_SENSOR_COUNTS),
+    )
+
+    meta = {}
+    for order, nid in enumerate(idx.tolist(), start=1):
+        nid = int(nid)
+        meta[nid] = {
+            "code": f"S{order}",
+            "name": f"Sensor {order}",
+            "x_plot": float(coords[nid, 0]),
+            "y_plot": float(coords[nid, 1]),
+            "z": float(coords[nid, 2]),
+            "zone": "Adaptive sensing",
+        }
+    return int(len(idx)), meta
 
 
 # Heavy/data assets are initialized only after the INTRO splash.
@@ -2286,9 +2403,18 @@ field_current_grid = _temperature_plane_grid(
 )
 
 # Sensor values come from the retrieved real CFD field by NODE ID.
+# Only the ACTIVE sensor set is changed; the existing UI is left untouched.
+active_sensor_count, active_sensor_meta = _adaptive_sensor_meta(
+    current_coords,
+    current_temp_nodes,
+    float(st.session_state.current_temp_query),
+    float(st.session_state.target_temp),
+    basis_assets,
+)
+
 sensor_plot_meta = {}
 sensor_readings = {}
-for nid, meta in ROA_NODES_META.items():
+for nid, meta in active_sensor_meta.items():
     m = dict(meta)
     if 0 <= int(nid) < len(current_coords):
         m["x_plot"] = float(current_coords[int(nid), 0])
@@ -2331,9 +2457,10 @@ def field_view_selector(key: str) -> str:
     )
 
 
-def make_2d_heatmap(grid_data, height=315):
+def make_2d_heatmap(grid_data, height=315, sensor_meta=None):
     """Classic top-down 2D temperature map used when the user selects 2D."""
     heatmap_data = np.asarray(grid_data, dtype=float)
+    plot_sensor_meta = sensor_plot_meta if sensor_meta is None else sensor_meta
 
     temp_scale = [
         [0.00, "#8ee7ff"],
@@ -2372,11 +2499,11 @@ def make_2d_heatmap(grid_data, height=315):
         )
     )
 
-    sx = [meta["x_plot"] for meta in sensor_plot_meta.values()]
-    sy = [meta["y_plot"] for meta in sensor_plot_meta.values()]
+    sx = [meta["x_plot"] for meta in plot_sensor_meta.values()]
+    sy = [meta["y_plot"] for meta in plot_sensor_meta.values()]
 
     sensor_hover = []
-    for nid, meta in sensor_plot_meta.items():
+    for nid, meta in plot_sensor_meta.items():
         ix = int(np.argmin(np.abs(grid_len_axis - float(meta["x_plot"]))))
         iy = int(np.argmin(np.abs(grid_wid_axis - float(meta["y_plot"]))))
         sampled = float(heatmap_data[iy, ix])
@@ -2595,7 +2722,7 @@ def make_mobile_heatmap(grid_data, height=340):
     return fig
 
 
-def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
+def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, sensor_meta=None):
     """
     Clean 3D room-style temperature map.
 
@@ -2605,6 +2732,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
     """
     coords_xyz = np.asarray(coords_xyz, dtype=float)
     temp_nodes = np.asarray(temp_nodes, dtype=float).reshape(-1)
+    plot_sensor_meta = sensor_plot_meta if sensor_meta is None else sensor_meta
 
     valid = (
         coords_xyz.ndim == 2
@@ -2726,7 +2854,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
     # Plotly Scatter3d cannot use arbitrary image markers, so the silhouette is
     # composed from a small white circular body plus a white upward tip.
     sensor_x, sensor_y, sensor_z, sensor_hover = [], [], [], []
-    for nid, meta in ROA_NODES_META.items():
+    for nid, meta in plot_sensor_meta.items():
         target = np.asarray(
             [float(meta["x_plot"]), float(meta["y_plot"]), float(meta["z"])],
             dtype=float,
@@ -2913,9 +3041,9 @@ if st.session_state.app_view == "HOME":
     with st.container(key="temperature_map_card"):
         home_field_view = field_view_selector("home_field_view")
         if home_field_view == "3D":
-            home_fig = make_true_3d_field(current_coords, current_temp_nodes, height=410)
+            home_fig = make_true_3d_field(current_coords, current_temp_nodes, height=410, sensor_meta=active_sensor_meta)
         else:
-            home_fig = make_2d_heatmap(field_current_grid, height=315)
+            home_fig = make_2d_heatmap(field_current_grid, height=315, sensor_meta=active_sensor_meta)
 
         st.plotly_chart(
             home_fig,
@@ -3673,6 +3801,22 @@ elif st.session_state.app_view == "COMPARE":
     before_mean = float(np.nanmean(result_current_nodes))
     after_mean = float(np.nanmean(result_pred_nodes))
 
+    # Adaptive sensor activation for the displayed BEFORE/AFTER thermal states.
+    before_sensor_count, before_sensor_meta = _adaptive_sensor_meta(
+        result_current_coords,
+        result_current_nodes,
+        before_mean,
+        float(st.session_state.target_temp),
+        basis_assets,
+    )
+    after_sensor_count, after_sensor_meta = _adaptive_sensor_meta(
+        result_pred_coords,
+        result_pred_nodes,
+        after_mean,
+        float(st.session_state.target_temp),
+        basis_assets,
+    )
+
     before_p05 = float(np.nanpercentile(result_current_nodes, 5))
     before_p95 = float(np.nanpercentile(result_current_nodes, 95))
     after_p05 = float(np.nanpercentile(result_pred_nodes, 5))
@@ -3909,9 +4053,10 @@ elif st.session_state.app_view == "COMPARE":
                 result_current_coords,
                 result_current_nodes,
                 height=430,
+                sensor_meta=before_sensor_meta,
             )
         else:
-            compare_fig = make_2d_heatmap(result_current_grid, height=330)
+            compare_fig = make_2d_heatmap(result_current_grid, height=330, sensor_meta=before_sensor_meta)
     else:
         st.markdown('<div class="compare-map-label">Predicted Field</div>', unsafe_allow_html=True)
         if compare_view == "3D":
@@ -3919,9 +4064,10 @@ elif st.session_state.app_view == "COMPARE":
                 result_pred_coords,
                 result_pred_nodes,
                 height=430,
+                sensor_meta=after_sensor_meta,
             )
         else:
-            compare_fig = make_2d_heatmap(result_pred_grid, height=330)
+            compare_fig = make_2d_heatmap(result_pred_grid, height=330, sensor_meta=after_sensor_meta)
 
     st.plotly_chart(
         compare_fig,
