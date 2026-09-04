@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v67
+# FACTOR_UI_BUILD = 2026-09-04-v68
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -3508,7 +3508,7 @@ elif st.session_state.app_view == "RESULTS":
         active_after = set(sensor_priority[:recommended_sensor_count])
 
         before_dots = "".join(
-            f'<circle cx="{x}" cy="{y}" r="2.9" fill="#70e8ff" '
+            f'<circle cx="{x}" cy="{y}" r="3.25" fill="#70e8ff" '
             f'stroke="#d8f8ff" stroke-width="0.55" '
             f'style="filter:drop-shadow(0 0 3px rgba(87,222,255,.82));"/>'
             for x, y in sensor_points
@@ -3516,12 +3516,12 @@ elif st.session_state.app_view == "RESULTS":
 
         after_dots = "".join(
             (
-                f'<circle cx="{x}" cy="{y}" r="3.0" fill="#70e8ff" '
+                f'<circle cx="{x}" cy="{y}" r="3.35" fill="#70e8ff" '
                 f'stroke="#e6fbff" stroke-width="0.65" '
                 f'style="filter:drop-shadow(0 0 3px rgba(87,222,255,.82));"/>'
                 if i in active_after
                 else
-                f'<circle cx="{x}" cy="{y}" r="2.65" fill="#415c72" '
+                f'<circle cx="{x}" cy="{y}" r="3.0" fill="#415c72" '
                 f'opacity="0.55" stroke="#688197" stroke-width="0.35"/>'
             )
             for i, (x, y) in enumerate(sensor_points)
@@ -3618,8 +3618,8 @@ elif st.session_state.app_view == "RESULTS":
           .asp-maps {{
             display:grid;
             grid-template-columns: 1fr 1fr;
-            gap:10px;
-            padding: 10px;
+            gap:14px;
+            padding: 12px;
             border-radius:16px;
             background: rgba(4,25,45,.58);
             border: 1px solid rgba(86,168,209,.18);
@@ -3631,76 +3631,21 @@ elif st.session_state.app_view == "RESULTS":
             gap:4px;
             padding: 0 3px 6px;
           }}
-          .asp-map-title b {{ font-size:11px; color:#eafaff; }}
+          .asp-map-title b {{ font-size:13px; color:#eafaff; }}
           .asp-map-title span {{
-            font-size:8.5px;
+            font-size:9.5px;
             color:#79bfdc;
             font-weight:700;
           }}
           .room {{
             width:100%;
-            height:126px;
+            height:172px;
             display:block;
             border-radius:11px;
             background:linear-gradient(145deg,#0a223a,#0c2c49);
             border:1px solid rgba(126,208,244,.15);
           }}
-          .asp-legend {{
-            display:flex;
-            justify-content:center;
-            gap:18px;
-            margin-top:9px;
-            font-size:8.5px;
-            font-weight:700;
-            color:#9fc5d7;
-          }}
-          .legend-dot {{
-            display:inline-block;
-            width:8px;
-            height:8px;
-            border-radius:50%;
-            margin-right:5px;
-            vertical-align:-1px;
-          }}
-          .active-dot {{
-            background:#70e8ff;
-            box-shadow:0 0 6px rgba(112,232,255,.60);
-          }}
-          .sleep-dot {{ background:#516b80; opacity:.7; }}
-          .asp-result {{
-            margin-top:12px;
-            display:grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap:7px;
-          }}
-          .asp-result-item {{
-            min-height:55px;
-            padding:8px 6px;
-            border-radius:12px;
-            text-align:center;
-            background:rgba(15,57,86,.54);
-            border:1px solid rgba(110,190,229,.15);
-          }}
-          .asp-result-item strong {{
-            display:block;
-            font-size:9px;
-            color:#dff6ff;
-            margin-bottom:3px;
-          }}
-          .asp-result-item span {{
-            display:block;
-            font-size:7.5px;
-            line-height:1.35;
-            color:#84b3c9;
-          }}
-          .asp-foot {{
-            margin-top:9px;
-            text-align:center;
-            font-size:7.5px;
-            line-height:1.4;
-            color:#688fa4;
-          }}
-        </style>
+</style>
 
         <div class="asp-shell">
           <div class="asp-head">
@@ -3759,27 +3704,10 @@ elif st.session_state.app_view == "RESULTS":
             </div>
           </div>
 
-          <div class="asp-legend">
-            <span><i class="legend-dot active-dot"></i>활성 센서</span>
-            <span><i class="legend-dot sleep-dot"></i>비활성 센서</span>
-          </div>
-            <div class="asp-result-item">
-              <strong>안정화 후 효율 운용</strong>
-              <span>중복 모니터링을 줄이고 핵심 센서 중심으로 운영</span>
-            </div>
-            <div class="asp-result-item">
-              <strong>변화 시 재활성화</strong>
-              <span>불균형이 다시 커지면 활성 센서 수를 확대</span>
-            </div>
-          </div>
-
-          <div class="asp-foot">
-            설치 센서를 제거하는 것이 아니라, 현재 모니터링에 사용하는 활성 센서 수를 조정하는 운영안입니다.
-          </div>
         </div>
         """
 
-        components.html(adaptive_sensor_html, height=395, scrolling=False)
+        components.html(adaptive_sensor_html, height=430, scrolling=False)
 
         st.markdown(
             """
