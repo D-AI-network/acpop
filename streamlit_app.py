@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v69
+# FACTOR_UI_BUILD = 2026-09-04-v70
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -529,26 +529,33 @@ div[data-testid="stPlotlyChart"] {
   font-size: 11px;
   line-height: 1.0;
   font-weight: 800;
-  color: rgba(129, 215, 255, 0.32);
+  color: #edf9ff;
+  opacity: 0.92;
   letter-spacing: 0.02em;
 }
 .air-ray {
   width: 36px;
   height: 34px;
   text-align: center;
-  color: rgba(129, 215, 255, 0.24);
+  color: #f4fbff;
+  opacity: 0.92;
   font-size: 31px;
   line-height: 32px;
   font-weight: 800;
   transition: .15s ease;
 }
 .air-dir.active .air-dir-tag {
-  color: #dff7ff;
+  color: #55d7ff;
+  opacity: 1;
+  text-shadow: 0 0 8px rgba(63, 199, 255, 0.30);
 }
 .air-dir.active .air-ray {
-  color: #73dcff;
-  text-shadow: 0 0 12px rgba(82, 209, 255, 0.38);
-  transform: translateY(-1px) scale(1.06);
+  color: #43c8ff;
+  opacity: 1;
+  text-shadow:
+    0 0 7px rgba(67, 200, 255, 0.75),
+    0 0 15px rgba(67, 200, 255, 0.42);
+  transform: translateY(-1px) scale(1.09);
 }
 
 /* Flow strength: five vertical bars */
@@ -2259,8 +2266,22 @@ if current_field is None:
     }
 
 current_coords = np.asarray(current_field["coords"], dtype=np.float32)
-current_temp_nodes = np.asarray(current_field["temp_c"], dtype=np.float32)
-avg_room_temp = float(current_field["mean_temp_c"])
+current_temp_nodes_raw = np.asarray(current_field["temp_c"], dtype=np.float32)
+
+# UI consistency:
+# the user's "현재 공간 평균 온도" is the baseline shown throughout the app.
+# Keep the retrieved CFD spatial shape, but shift the whole field by one
+# constant offset so its mean exactly matches the entered current temperature.
+# This DOES NOT change spatial temperature differences or the optimization model.
+requested_current_mean_c = float(st.session_state.current_temp_query)
+raw_current_mean_c = float(np.nanmean(current_temp_nodes_raw))
+current_mean_offset_c = requested_current_mean_c - raw_current_mean_c
+current_temp_nodes = np.asarray(
+    current_temp_nodes_raw + current_mean_offset_c,
+    dtype=np.float32,
+)
+
+avg_room_temp = float(np.nanmean(current_temp_nodes))
 current_field_source = str(current_field["source"])
 matched_dp_id = int(matched_scenario["dp_id"]) if matched_scenario is not None else 0
 matched_mean_temp_c = float(matched_scenario["mean_temp_c"]) if matched_scenario is not None else avg_room_temp
@@ -3284,10 +3305,18 @@ elif st.session_state.app_view == "HEAT_LOAD":
                     "retrieval_score": float(retrieval["retrieval_score"]),
                     "query_loads_W": {k: float(v) for k, v in query_loads.items()},
                     "matched_loads_W": {k: float(v) for k, v in loads.items()},
+                    # Comparison baseline aligned to the user's entered current mean.
+                    # Spatial gradients remain identical to the retrieved CFD case.
                     "field_current_grid": np.asarray(
                         _temperature_plane_grid(
                             matched_current["coords"],
-                            matched_current["temp_c"],
+                            (
+                                np.asarray(matched_current["temp_c"], dtype=np.float32)
+                                + (
+                                    float(st.session_state.current_temp_query)
+                                    - float(np.nanmean(np.asarray(matched_current["temp_c"], dtype=np.float32)))
+                                )
+                            ),
                             st.session_state.z_plane,
                             grid_len_axis,
                             grid_wid_axis,
@@ -3295,7 +3324,17 @@ elif st.session_state.app_view == "HEAT_LOAD":
                         dtype=np.float32,
                     ),
                     "field_current_coords": np.asarray(matched_current["coords"], dtype=np.float32),
-                    "field_current_temp_nodes": np.asarray(matched_current["temp_c"], dtype=np.float32),
+                    "field_current_temp_nodes": np.asarray(
+                        np.asarray(matched_current["temp_c"], dtype=np.float32)
+                        + (
+                            float(st.session_state.current_temp_query)
+                            - float(np.nanmean(np.asarray(matched_current["temp_c"], dtype=np.float32)))
+                        ),
+                        dtype=np.float32,
+                    ),
+                    "field_current_raw_mean_c": float(
+                        np.nanmean(np.asarray(matched_current["temp_c"], dtype=np.float32))
+                    ),
                 }
 
                 st.session_state.has_run_optimization = True
@@ -3787,8 +3826,14 @@ elif st.session_state.app_view == "COMPARE":
         dtype=float,
     )
 
-    # Use the same definitions for BEFORE and AFTER so the comparison is fair.
-    before_mean = float(np.nanmean(result_current_nodes))
+    # BEFORE is the current temperature entered on HOME.
+    # The displayed current field was shifted by a constant offset to match it.
+    before_mean = float(
+        res.get(
+            "current_temp_query_c",
+            st.session_state.get("current_temp_query", np.nanmean(result_current_nodes)),
+        )
+    )
     after_mean = float(np.nanmean(result_pred_nodes))
 
     before_p05 = float(np.nanpercentile(result_current_nodes, 5))
