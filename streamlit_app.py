@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v50
+# FACTOR_UI_BUILD = 2026-09-04-v51
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -1441,6 +1441,11 @@ if "cfd_retrieval_defaults_v1" not in st.session_state:
 
 if "has_run_optimization" not in st.session_state:
     st.session_state.has_run_optimization = False
+
+# RESULTS 화면에서 AI 추천 제어안을 "적용해 본 결과"를 보여줄지 여부.
+# 실제 BMS 전송이 아니라, 선택된 제어안을 PopField 예측 결과로 시뮬레이션합니다.
+if "show_control_simulation" not in st.session_state:
+    st.session_state.show_control_simulation = False
 
 if "optimized_results" not in st.session_state:
     st.session_state.optimized_results = {
@@ -2924,6 +2929,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
                 }
 
                 st.session_state.has_run_optimization = True
+                st.session_state.show_control_simulation = False
                 st.session_state.app_view = "RESULTS"
                 st.rerun()
 
@@ -2936,34 +2942,34 @@ elif st.session_state.app_view == "HEAT_LOAD":
 # ============================================================
 elif st.session_state.app_view == "RESULTS":
     if not st.session_state.has_run_optimization:
-        st.markdown('<div class="section-title">📊 분석 결과 (Analysis)</div>', unsafe_allow_html=True)
-        st.info("💡 아직 실행된 최적화 분석이 없습니다. 먼저 설정을 완료하고 AI 분석을 시작해 주세요.")
+        st.markdown('<div class="section-title">분석 결과</div>', unsafe_allow_html=True)
+        st.info("아직 실행된 최적화 분석이 없습니다. 먼저 냉방 조건을 설정하고 AI 최적화를 실행해 주세요.")
 
-        if st.button("🚀 AI 최적화 설정 시작하기", type="primary", use_container_width=True):
+        if st.button("AI 최적화 설정 시작하기", type="primary", use_container_width=True):
             st.session_state.app_view = "HOME"
             st.rerun()
 
-        if st.button("🏠 홈으로 이동", type="secondary", use_container_width=True):
+        if st.button("홈으로 이동", type="secondary", use_container_width=True):
             st.session_state.app_view = "HOME"
             st.rerun()
+
     else:
         st.markdown(
-            '<div class="section-title results-title-row"><span class="results-title-glyph">❄</span>AI 최적화 필드 예측</div>',
+            '<div class="section-title results-title-row"><span class="results-title-glyph">❄</span>AI 최적 냉방 결과</div>',
             unsafe_allow_html=True,
         )
 
         res = st.session_state.optimized_results
         target = st.session_state.target_temp
+
         result_current_grid = np.asarray(
             res.get("field_current_grid", field_current_grid),
             dtype=float,
         )
-
-        if "field_post_grid" in res:
-            # This is the actual PopField output for the selected HVAC action.
-            field_post_grid = np.asarray(res["field_post_grid"], dtype=float)
-        else:
-            field_post_grid = np.asarray(field_current_grid, dtype=float)
+        field_post_grid = np.asarray(
+            res.get("field_post_grid", field_current_grid),
+            dtype=float,
+        )
 
         result_current_coords = np.asarray(
             res.get("field_current_coords", current_coords),
@@ -2985,38 +2991,9 @@ elif st.session_state.app_view == "RESULTS":
         if "field_post_temp_nodes" not in res:
             st.warning("이전 결과가 남아 있어 3D 예측 필드를 새로 만들 수 없습니다. 냉방 최적화를 다시 실행해 주세요.")
 
-        if res["status"] == "FEASIBLE":
-            badge_bg, badge_border, badge_text, badge_desc = (
-                "rgba(118, 205, 170, 0.12)",
-                "#7ad9a6",
-                "✓ 목표 온도 달성 가능",
-                f"목표 {target:.1f}℃ 및 쾌적 지표를 만족하는 냉방 설정입니다.",
-            )
-        elif res["status"] == "NEAR_FEASIBLE":
-            badge_bg, badge_border, badge_text, badge_desc = (
-                "rgba(242, 193, 91, 0.14)",
-                "#e7b95d",
-                "• 목표 온도 근접 달성",
-                "대부분의 기준을 만족하지만 일부 공간에 경미한 편차가 있습니다.",
-            )
-        else:
-            badge_bg, badge_border, badge_text, badge_desc = (
-                "rgba(255, 120, 132, 0.14)",
-                "#ff7f8d",
-                "✕ 목표 온도 달성 어려움",
-                "현재 냉방 설정 후보만으로는 목표 온도를 만족하기 어렵습니다.",
-            )
-
-        st.markdown(
-            f"""
-        <div class="feasibility-box" style="background:{badge_bg}; border-color:{badge_border};">
-            <div class="feasibility-title" style="color:{badge_border};">{badge_text}</div>
-            <div class="feasibility-desc" style="color:#d8edf8;">{badge_desc}</div>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
+        # --------------------------------------------------------
+        # A. AI recommendation: this is available immediately
+        # --------------------------------------------------------
         vane_map = {
             "Left (L)": "좌측 (L)",
             "Middle (M)": "중앙 (M)",
@@ -3025,7 +3002,7 @@ elif st.session_state.app_view == "RESULTS":
             "M / R": "중앙 / 우측",
             "L / R": "좌측 / 우측",
         }
-        vane_display = vane_map.get(str(res['vane']), str(res['vane']))
+        vane_display = vane_map.get(str(res["vane"]), str(res["vane"]))
 
         st.markdown(
             f"""
@@ -3040,36 +3017,16 @@ elif st.session_state.app_view == "RESULTS":
             unsafe_allow_html=True,
         )
 
-
-        st.markdown('<div class="section-title">공간 온도 균형 지표</div>', unsafe_allow_html=True)
-        st.markdown(
-            f"""
-        <div class="metric-grid">
-            <div class="metric-cell">
-                <div class="lbl">예측 평균 온도</div><div class="metric-help">제어 후 공간 전체 평균</div>
-                <div class="val">{res['mean_temp']:.2f} °C</div>
-            </div>
-            <div class="metric-cell">
-                <div class="lbl">상위 5% 고온 기준</div><div class="metric-help">가장 뜨거운 영역의 기준 온도</div>
-                <div class="val">{res['p95_temp']:.2f} °C</div>
-            </div>
-        </div>
-        <div class="metric-grid">
-            <div class="metric-cell">
-                <div class="lbl">공간 온도 편차 (ΔT)</div><div class="metric-help">공간 내 온도 불균형 정도</div>
-                <div class="val">{res['zone_spread']:.2f} °C</div>
-            </div>
-            <div class="metric-cell">
-                <div class="lbl">과열 / 과냉 영역</div><div class="metric-help">모델 기준 고온·저온 영역 비율</div>
-                <div class="val">{res['hot_fraction']:.1f}% / {res['cold_fraction']:.1f}%</div>
-            </div>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
+        # --------------------------------------------------------
+        # B. BEFORE simulation: show only the current field
+        #    AFTER simulation: show Current + Predicted together
+        # --------------------------------------------------------
         with st.container(key="field_comparison_card"):
-            st.markdown('<div class="field-map-title current-title">Current Field</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="field-map-title current-title">Current Field</div>',
+                unsafe_allow_html=True,
+            )
+
             current_view = field_view_selector("result_current_view")
             if current_view == "3D":
                 current_fig = make_true_3d_field(
@@ -3086,30 +3043,156 @@ elif st.session_state.app_view == "RESULTS":
                 config={"displayModeBar": False},
             )
 
-            st.markdown('<div class="field-map-divider"></div>', unsafe_allow_html=True)
-
-            st.markdown('<div class="field-map-title current-title">Predicted Field</div>', unsafe_allow_html=True)
-            predicted_view = field_view_selector("result_predicted_view")
-            if predicted_view == "3D":
-                predicted_fig = make_true_3d_field(
-                    result_pred_coords,
-                    result_pred_nodes,
-                    height=420,
+            if st.session_state.show_control_simulation:
+                st.markdown(
+                    '<div class="field-map-divider"></div>',
+                    unsafe_allow_html=True,
                 )
-            else:
-                predicted_fig = make_2d_heatmap(field_post_grid, height=315)
+                st.markdown(
+                    '<div class="field-map-title current-title">Predicted Field</div>',
+                    unsafe_allow_html=True,
+                )
 
-            st.plotly_chart(
-                predicted_fig,
-                use_container_width=True,
-                config={"displayModeBar": False},
+                predicted_view = field_view_selector("result_predicted_view")
+                if predicted_view == "3D":
+                    predicted_fig = make_true_3d_field(
+                        result_pred_coords,
+                        result_pred_nodes,
+                        height=420,
+                    )
+                else:
+                    predicted_fig = make_2d_heatmap(field_post_grid, height=315)
+
+                st.plotly_chart(
+                    predicted_fig,
+                    use_container_width=True,
+                    config={"displayModeBar": False},
+                )
+
+        # --------------------------------------------------------
+        # C. Simulation action
+        # --------------------------------------------------------
+        if not st.session_state.show_control_simulation:
+            st.markdown(
+                """
+                <div style="
+                    text-align:center;
+                    color:#aee4ff;
+                    font-size:13px;
+                    line-height:1.55;
+                    margin:12px 6px 10px 6px;
+                ">
+                    AI가 추천한 냉방 설정을 적용했을 때의 공간 온도 변화를 미리 확인합니다.
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
-        st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
-        if st.button("제어 명령 에어컨 전송 (BMS)", type="primary", use_container_width=True):
-            st.success("Carrier BMS 게이트웨이로 최적 제어 파라미터를 전송했습니다!")
+            if st.button(
+                "AI 제어안 시뮬레이션",
+                type="primary",
+                use_container_width=True,
+                key="btn_control_simulation",
+            ):
+                st.session_state.show_control_simulation = True
+                st.rerun()
 
-        if st.button("새로운 최적화 실행", type="secondary", use_container_width=True):
+        # --------------------------------------------------------
+        # D. AFTER simulation: reveal feasibility + diagnostics
+        # --------------------------------------------------------
+        else:
+            if res["status"] == "FEASIBLE":
+                badge_bg, badge_border, badge_text, badge_desc = (
+                    "rgba(118, 205, 170, 0.12)",
+                    "#7ad9a6",
+                    "✓ 목표 온도 달성 가능",
+                    f"추천 제어안을 적용하면 목표 {target:.1f}℃ 및 쾌적 지표를 만족할 것으로 예측됩니다.",
+                )
+            elif res["status"] == "NEAR_FEASIBLE":
+                badge_bg, badge_border, badge_text, badge_desc = (
+                    "rgba(242, 193, 91, 0.14)",
+                    "#e7b95d",
+                    "• 목표 온도 근접 달성",
+                    "추천 제어안 적용 시 대부분의 기준을 만족하지만 일부 공간에 경미한 편차가 남을 것으로 예측됩니다.",
+                )
+            else:
+                badge_bg, badge_border, badge_text, badge_desc = (
+                    "rgba(255, 120, 132, 0.14)",
+                    "#ff7f8d",
+                    "✕ 목표 온도 달성 어려움",
+                    "현재 후보 범위에서는 목표 온도를 충분히 만족하기 어려울 것으로 예측됩니다.",
+                )
+
+            st.markdown(
+                f"""
+            <div class="feasibility-box" style="background:{badge_bg}; border-color:{badge_border};">
+                <div class="feasibility-title" style="color:{badge_border};">{badge_text}</div>
+                <div class="feasibility-desc" style="color:#d8edf8;">{badge_desc}</div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(
+                '<div class="section-title">시뮬레이션 결과</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"""
+            <div class="metric-grid">
+                <div class="metric-cell">
+                    <div class="lbl">예측 평균 온도</div>
+                    <div class="metric-help">제어안 적용 후 공간 전체 평균</div>
+                    <div class="val">{res['mean_temp']:.2f} °C</div>
+                </div>
+                <div class="metric-cell">
+                    <div class="lbl">상위 5% 고온 기준</div>
+                    <div class="metric-help">가장 뜨거운 영역의 기준 온도</div>
+                    <div class="val">{res['p95_temp']:.2f} °C</div>
+                </div>
+            </div>
+            <div class="metric-grid">
+                <div class="metric-cell">
+                    <div class="lbl">공간 온도 편차 (ΔT)</div>
+                    <div class="metric-help">공간 내 온도 불균형 정도</div>
+                    <div class="val">{res['zone_spread']:.2f} °C</div>
+                </div>
+                <div class="metric-cell">
+                    <div class="lbl">과열 / 과냉 영역</div>
+                    <div class="metric-help">예측된 고온·저온 영역 비율</div>
+                    <div class="val">{res['hot_fraction']:.1f}% / {res['cold_fraction']:.1f}%</div>
+                </div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(
+                """
+                <div style="
+                    text-align:center;
+                    color:#8fb5ca;
+                    font-size:11px;
+                    line-height:1.5;
+                    margin:6px 8px 14px 8px;
+                ">
+                    이 결과는 실제 에어컨에 명령을 전송한 것이 아니라,
+                    AI 추천 제어안을 적용했을 때의 공간 온도를 예측한 시뮬레이션입니다.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        # --------------------------------------------------------
+        # E. Restart
+        # --------------------------------------------------------
+        if st.button(
+            "새로운 최적화 실행",
+            type="secondary",
+            use_container_width=True,
+            key="btn_restart_optimization",
+        ):
+            st.session_state.show_control_simulation = False
             st.session_state.app_view = "HOME"
             st.rerun()
 
