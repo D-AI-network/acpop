@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v68
+# FACTOR_UI_BUILD = 2026-09-04-v69
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -3616,6 +3616,7 @@ elif st.session_state.app_view == "RESULTS":
             line-height:1.55;
           }}
           .asp-maps {{
+            margin-top: 12px;
             display:grid;
             grid-template-columns: 1fr 1fr;
             gap:14px;
@@ -3707,12 +3708,12 @@ elif st.session_state.app_view == "RESULTS":
         </div>
         """
 
-        components.html(adaptive_sensor_html, height=430, scrolling=False)
+        components.html(adaptive_sensor_html, height=402, scrolling=False)
 
         st.markdown(
             """
             <div style="
-                margin:18px 2px 12px 2px;
+                margin:6px 2px 12px 2px;
                 padding:15px 16px;
                 border-radius:18px;
                 background:rgba(7, 41, 70, 0.52);
