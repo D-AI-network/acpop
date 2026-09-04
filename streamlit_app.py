@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v65
+# FACTOR_UI_BUILD = 2026-09-04-v66
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -2331,7 +2331,97 @@ def field_view_selector(key: str) -> str:
     )
 
 
-def make_2d_heatmap(grid_data, height=315):
+
+def _select_adaptive_sensor_points(coords_xyz, temp_nodes, sensor_count):
+    """
+    Deterministically choose sensor-display positions across the 3D room.
+
+    - The original five ROA sensor positions are always retained first.
+    - Additional positions are added by farthest-point sampling so the room
+      remains spatially covered when 10/20/30 active sensing points are shown.
+    - This controls the UI/displayed active sensing plan only; it does not
+      retrain PopField or physically add/remove installed sensors.
+    """
+    coords_xyz = np.asarray(coords_xyz, dtype=float)
+    temp_nodes = np.asarray(temp_nodes, dtype=float).reshape(-1)
+    sensor_count = int(max(0, sensor_count))
+
+    valid = (
+        coords_xyz.ndim == 2
+        and coords_xyz.shape[1] >= 3
+        and len(coords_xyz) == len(temp_nodes)
+    )
+    if not valid or sensor_count <= 0:
+        return (
+            np.empty((0, 3), dtype=float),
+            np.empty((0,), dtype=float),
+            [],
+        )
+
+    finite = np.isfinite(coords_xyz[:, :3]).all(axis=1) & np.isfinite(temp_nodes)
+    coords = coords_xyz[finite, :3]
+    temps = temp_nodes[finite]
+    if len(coords) == 0:
+        return (
+            np.empty((0, 3), dtype=float),
+            np.empty((0,), dtype=float),
+            [],
+        )
+
+    sensor_count = min(sensor_count, len(coords))
+
+    # Normalize dimensions before distance calculations so Z does not get
+    # ignored just because X/Y have a larger numeric range.
+    mins = coords.min(axis=0)
+    spans = np.ptp(coords, axis=0)
+    spans = np.where(spans > 1e-9, spans, 1.0)
+    norm = (coords - mins) / spans
+
+    selected = []
+    selected_names = []
+
+    # Core 5 = original physical sensor locations used by the app.
+    for nid, meta in ROA_NODES_META.items():
+        target = np.asarray(
+            [float(meta["x_plot"]), float(meta["y_plot"]), float(meta["z"])],
+            dtype=float,
+        )
+        target_n = (target - mins) / spans
+        idx = int(np.argmin(np.sum((norm - target_n[None, :]) ** 2, axis=1)))
+        if idx not in selected:
+            selected.append(idx)
+            selected_names.append(str(meta.get("name", f"Sensor {len(selected)}")))
+        if len(selected) >= sensor_count:
+            break
+
+    # Add spatially spread points until the requested active count is reached.
+    while len(selected) < sensor_count:
+        if selected:
+            sel = norm[np.asarray(selected, dtype=int)]
+            d2 = np.sum(
+                (norm[:, None, :] - sel[None, :, :]) ** 2,
+                axis=2,
+            )
+            min_d2 = d2.min(axis=1)
+            min_d2[np.asarray(selected, dtype=int)] = -1.0
+            next_idx = int(np.argmax(min_d2))
+        else:
+            next_idx = int(len(coords) // 2)
+
+        if next_idx in selected:
+            break
+
+        selected.append(next_idx)
+        selected_names.append(f"Adaptive Sensor {len(selected)}")
+
+    selected = np.asarray(selected[:sensor_count], dtype=int)
+    selected_names = selected_names[:sensor_count]
+
+    return coords[selected], temps[selected], selected_names
+
+
+
+def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, coords_xyz=None, temp_nodes=None):
     """Classic top-down 2D temperature map used when the user selects 2D."""
     heatmap_data = np.asarray(grid_data, dtype=float)
 
@@ -2372,48 +2462,54 @@ def make_2d_heatmap(grid_data, height=315):
         )
     )
 
-    sx = [meta["x_plot"] for meta in sensor_plot_meta.values()]
-    sy = [meta["y_plot"] for meta in sensor_plot_meta.values()]
+    if show_sensors:
+        if coords_xyz is not None and temp_nodes is not None:
+            selected_xyz, selected_temp, selected_names = _select_adaptive_sensor_points(
+                coords_xyz,
+                temp_nodes,
+                sensor_count,
+            )
+            sx = selected_xyz[:, 0].tolist() if len(selected_xyz) else []
+            sy = selected_xyz[:, 1].tolist() if len(selected_xyz) else []
+            sensor_hover = [
+                (
+                    f"<b>{name}</b><br>"
+                    f"X={xyz[0]:.2f}m, Y={xyz[1]:.2f}m, Z={xyz[2]:.2f}m<br>"
+                    f"온도={temp:.2f}°C"
+                )
+                for xyz, temp, name in zip(selected_xyz, selected_temp, selected_names)
+            ]
+        else:
+            sx = [meta["x_plot"] for meta in sensor_plot_meta.values()]
+            sy = [meta["y_plot"] for meta in sensor_plot_meta.values()]
+            sensor_hover = []
+            for nid, meta in sensor_plot_meta.items():
+                ix = int(np.argmin(np.abs(grid_len_axis - float(meta["x_plot"]))))
+                iy = int(np.argmin(np.abs(grid_wid_axis - float(meta["y_plot"]))))
+                sampled = float(heatmap_data[iy, ix])
+                sensor_hover.append(
+                    f"<b>{meta['name']}</b><br>"
+                    f"X={meta['x_plot']:.2f}m, Y={meta['y_plot']:.2f}m<br>"
+                    f"온도={sampled:.2f}°C"
+                )
 
-    sensor_hover = []
-    for nid, meta in sensor_plot_meta.items():
-        ix = int(np.argmin(np.abs(grid_len_axis - float(meta["x_plot"]))))
-        iy = int(np.argmin(np.abs(grid_wid_axis - float(meta["y_plot"]))))
-        sampled = float(heatmap_data[iy, ix])
-        sensor_hover.append(
-            f"<b>{meta['name']}</b><br>"
-            f"X={meta['x_plot']:.2f}m, Y={meta['y_plot']:.2f}m<br>"
-            f"온도={sampled:.2f}°C"
-        )
+        n_sensor_vis = max(1, len(sx))
+        marker_size = 9 if n_sensor_vis <= 5 else 7 if n_sensor_vis <= 10 else 5 if n_sensor_vis <= 20 else 4
 
-    fig.add_trace(
-        go.Scatter(
-            x=sx,
-            y=sy,
-            mode="markers",
-            marker=dict(size=22, color="rgba(0,0,0,0)"),
-            hovertext=sensor_hover,
-            hoverinfo="text",
-            showlegend=False,
-        )
-    )
-
-    sensor_uri = f"data:image/svg+xml;base64,{WHITE_SENSOR_DROP_SVG_B64}"
-    for x_pos, y_pos in zip(sx, sy):
-        fig.add_layout_image(
-            dict(
-                source=sensor_uri,
-                x=x_pos,
-                y=y_pos,
-                xref="x",
-                yref="y",
-                sizex=0.28,
-                sizey=0.28,
-                xanchor="center",
-                yanchor="middle",
-                sizing="contain",
-                opacity=1.0,
-                layer="above",
+        fig.add_trace(
+            go.Scatter(
+                x=sx,
+                y=sy,
+                mode="markers",
+                marker=dict(
+                    size=marker_size,
+                    color="#ffffff",
+                    line=dict(color="#65ddff", width=1.1),
+                    opacity=0.98,
+                ),
+                hovertext=sensor_hover,
+                hoverinfo="text",
+                showlegend=False,
             )
         )
 
@@ -2440,7 +2536,7 @@ def make_2d_heatmap(grid_data, height=315):
     )
     return fig
 
-def make_mobile_heatmap(grid_data, height=340):
+def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5):
     """Interactive 3D spatial-temperature surface used by HOME and RESULTS."""
     surface_data = np.asarray(grid_data, dtype=float)
 
@@ -2486,69 +2582,38 @@ def make_mobile_heatmap(grid_data, height=340):
         )
     )
 
-    sx_plot = [meta["x_plot"] for meta in sensor_plot_meta.values()]
-    sy_plot = [meta["y_plot"] for meta in sensor_plot_meta.values()]
-    sz_plot = [sensor_readings.get(nid, np.nan) + 0.15 for nid in sensor_plot_meta.keys()]
-    hover_texts = [
-        (
-            f"<b>{meta['name']}</b><br>"
-            f"Zone: {meta['zone']}<br>"
-            f"Coords: (L={meta['x_plot']:.2f}, W={meta['y_plot']:.2f})m<br>"
-            f"Live: {sensor_readings.get(nid, 0.0):.2f}°C"
-        )
-        for nid, meta in sensor_plot_meta.items()
-    ]
+    if show_sensors:
+        sx_plot = [meta["x_plot"] for meta in sensor_plot_meta.values()]
+        sy_plot = [meta["y_plot"] for meta in sensor_plot_meta.values()]
+        sz_plot = [sensor_readings.get(nid, np.nan) + 0.15 for nid in sensor_plot_meta.keys()]
+        hover_texts = [
+            (
+                f"<b>{meta['name']}</b><br>"
+                f"Zone: {meta['zone']}<br>"
+                f"Coords: (L={meta['x_plot']:.2f}, W={meta['y_plot']:.2f})m<br>"
+                f"Live: {sensor_readings.get(nid, 0.0):.2f}°C"
+            )
+            for nid, meta in sensor_plot_meta.items()
+        ]
 
-    # Sensor glyph: red top bar + red circular body + white center.
-    # Plotly Scatter3d cannot use arbitrary PNG/SVG marker images, so this
-    # composite gives the same visual silhouette while preserving 3D rotation.
-    fig.add_trace(
-        go.Scatter3d(
-            x=sx_plot,
-            y=sy_plot,
-            z=[z + 0.30 for z in sz_plot],
-            mode="text",
-            text=["▬"] * len(sx_plot),
-            textfont=dict(size=16, color="#e74c3c"),
-            hoverinfo="skip",
-            showlegend=False,
+        fig.add_trace(
+            go.Scatter3d(
+                x=sx_plot,
+                y=sy_plot,
+                z=[z + 0.12 for z in sz_plot],
+                mode="markers",
+                marker=dict(
+                    size=5.5,
+                    color="#ffffff",
+                    line=dict(color="#65ddff", width=1.0),
+                    symbol="circle",
+                    opacity=1.0,
+                ),
+                hovertext=hover_texts,
+                hoverinfo="text",
+                showlegend=False,
+            )
         )
-    )
-    fig.add_trace(
-        go.Scatter3d(
-            x=sx_plot,
-            y=sy_plot,
-            z=[z + 0.12 for z in sz_plot],
-            mode="markers",
-            marker=dict(
-                size=8,
-                color="#e74c3c",
-                line=dict(color="#ffb8b2", width=1.1),
-                symbol="circle",
-                opacity=1.0,
-            ),
-            hovertext=hover_texts,
-            hoverinfo="text",
-            showlegend=False,
-        )
-    )
-    fig.add_trace(
-        go.Scatter3d(
-            x=sx_plot,
-            y=sy_plot,
-            z=[z + 0.12 for z in sz_plot],
-            mode="markers",
-            marker=dict(
-                size=2.4,
-                color="#ffffff",
-                line=dict(width=0),
-                symbol="circle",
-                opacity=1.0,
-            ),
-            hoverinfo="skip",
-            showlegend=False,
-        )
-    )
 
     fig.update_layout(
         title=dict(text="", font=dict(size=1)),
@@ -2595,7 +2660,7 @@ def make_mobile_heatmap(grid_data, height=340):
     return fig
 
 
-def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
+def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show_sensors=True, sensor_count=5):
     """
     Clean 3D room-style temperature map.
 
@@ -2612,14 +2677,14 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
         and len(coords_xyz) == len(temp_nodes)
     )
     if not valid:
-        return make_mobile_heatmap(field_current_grid, height=height)
+        return make_mobile_heatmap(field_current_grid, height=height, show_sensors=show_sensors, sensor_count=sensor_count)
 
     finite = np.isfinite(coords_xyz[:, :3]).all(axis=1) & np.isfinite(temp_nodes)
     coords = coords_xyz[finite, :3]
     temps = temp_nodes[finite]
 
     if len(coords) == 0:
-        return make_mobile_heatmap(field_current_grid, height=height)
+        return make_mobile_heatmap(field_current_grid, height=height, show_sensors=show_sensors, sensor_count=sensor_count)
 
     xmin, ymin, zmin = np.min(coords, axis=0)
     xmax, ymax, zmax = np.max(coords, axis=0)
@@ -2722,64 +2787,50 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
             )
         )
 
-    # Sensor positions: all-white inverted water-drop style.
-    # Plotly Scatter3d cannot use arbitrary image markers, so the silhouette is
-    # composed from a small white circular body plus a white upward tip.
-    sensor_x, sensor_y, sensor_z, sensor_hover = [], [], [], []
-    for nid, meta in ROA_NODES_META.items():
-        target = np.asarray(
-            [float(meta["x_plot"]), float(meta["y_plot"]), float(meta["z"])],
-            dtype=float,
-        )
-        dist = np.sum((coords - target[None, :]) ** 2, axis=1)
-        idx = int(np.argmin(dist))
-        sx, sy, sz = coords[idx]
-        sensor_x.append(float(sx))
-        sensor_y.append(float(sy))
-        sensor_z.append(float(sz))
-        sensor_hover.append(
-            f"<b>{meta['name']}</b><br>"
-            f"X={sx:.2f}m, Y={sy:.2f}m, Z={sz:.2f}m<br>"
-            f"온도={temps[idx]:.2f}°C"
+    # Adaptive sensor overlay.
+    # HOME can hide it entirely; comparison screens can show 30 -> 20 -> 10 -> 5.
+    if show_sensors:
+        selected_xyz, selected_temp, selected_names = _select_adaptive_sensor_points(
+            coords,
+            temps,
+            sensor_count,
         )
 
-    # Rounded lower body.
-    fig.add_trace(
-        go.Scatter3d(
-            x=sensor_x,
-            y=sensor_y,
-            z=[z + 0.045 for z in sensor_z],
-            mode="markers",
-            marker=dict(
-                size=5.5,
-                color="#ffffff",
-                line=dict(color="#ffffff", width=0.5),
-                symbol="circle",
-                opacity=1.0,
-            ),
-            hovertext=sensor_hover,
-            hoverinfo="text",
-            showlegend=False,
-        )
-    )
+        if len(selected_xyz):
+            n_sensor_vis = len(selected_xyz)
+            marker_size = (
+                6.2 if n_sensor_vis <= 5
+                else 5.0 if n_sensor_vis <= 10
+                else 3.8 if n_sensor_vis <= 20
+                else 3.1
+            )
+            hover_texts = [
+                (
+                    f"<b>{name}</b><br>"
+                    f"X={xyz[0]:.2f}m, Y={xyz[1]:.2f}m, Z={xyz[2]:.2f}m<br>"
+                    f"온도={temp:.2f}°C"
+                )
+                for xyz, temp, name in zip(selected_xyz, selected_temp, selected_names)
+            ]
 
-    # Pointed upper tip: together with the circle it reads as an upside-down drop.
-    fig.add_trace(
-        go.Scatter3d(
-            x=sensor_x,
-            y=sensor_y,
-            z=[z + 0.135 for z in sensor_z],
-            mode="text",
-            text=["▲"] * len(sensor_x),
-            textfont=dict(
-                size=10,
-                color="#ffffff",
-                family="Arial Black",
-            ),
-            hoverinfo="skip",
-            showlegend=False,
-        )
-    )
+            fig.add_trace(
+                go.Scatter3d(
+                    x=selected_xyz[:, 0],
+                    y=selected_xyz[:, 1],
+                    z=selected_xyz[:, 2] + 0.055,
+                    mode="markers",
+                    marker=dict(
+                        size=marker_size,
+                        color="#ffffff",
+                        line=dict(color="#65ddff", width=1.0),
+                        symbol="circle",
+                        opacity=0.98,
+                    ),
+                    hovertext=hover_texts,
+                    hoverinfo="text",
+                    showlegend=False,
+                )
+            )
 
     # Perspective and proportions tuned to the reference mockup.
     fig.update_layout(
@@ -2913,9 +2964,9 @@ if st.session_state.app_view == "HOME":
     with st.container(key="temperature_map_card"):
         home_field_view = field_view_selector("home_field_view")
         if home_field_view == "3D":
-            home_fig = make_true_3d_field(current_coords, current_temp_nodes, height=410)
+            home_fig = make_true_3d_field(current_coords, current_temp_nodes, height=410, show_sensors=False)
         else:
-            home_fig = make_2d_heatmap(field_current_grid, height=315)
+            home_fig = make_2d_heatmap(field_current_grid, height=315, show_sensors=False)
 
         st.plotly_chart(
             home_fig,
@@ -3406,30 +3457,38 @@ elif st.session_state.app_view == "RESULTS":
             and zone_spread_now <= 1.20
             and max(hot_now, cold_now) <= 2.0
         ):
-            recommended_sensor_count = 14
+            recommended_sensor_count = 5
             sensor_stage = "안정 운전"
-            sensor_reason = "공간 온도장이 충분히 안정되어 핵심 센서만 유지합니다."
+            sensor_reason = "공간 온도장이 충분히 안정되어 기존 핵심 센서 5개만 유지합니다."
         elif (
             status_now == "FEASIBLE"
             and zone_spread_now <= 1.90
             and max(hot_now, cold_now) <= 5.0
         ):
-            recommended_sensor_count = 20
+            recommended_sensor_count = 10
             sensor_stage = "안정화 단계"
-            sensor_reason = "온도 편차가 감소해 중복 모니터링 센서를 일부 비활성화합니다."
+            sensor_reason = "온도 편차가 감소해 핵심 영역 중심으로 활성 센서를 10개까지 줄입니다."
         elif (
             status_now in ("FEASIBLE", "NEAR_FEASIBLE")
             and zone_spread_now <= 2.60
         ):
-            recommended_sensor_count = 24
+            recommended_sensor_count = 20
             sensor_stage = "안정화 진행"
-            sensor_reason = "아직 일부 공간 변동이 남아 있어 센서를 비교적 많이 유지합니다."
+            sensor_reason = "일부 공간 변동이 남아 있어 20개 센서로 넓게 모니터링합니다."
         else:
             recommended_sensor_count = 30
             sensor_stage = "정밀 모니터링"
-            sensor_reason = "온도 불균형 또는 목표 미달 가능성이 있어 전체 센서를 유지합니다."
+            sensor_reason = "온도 불균형 또는 목표 미달 가능성이 있어 30개 센서를 유지합니다."
 
         deactivated_sensor_count = current_sensor_count - recommended_sensor_count
+
+        # Persist the adaptive sensing decision so the Before/After Field
+        # visualization can reflect the same active-sensor count.
+        res["initial_sensor_count"] = int(current_sensor_count)
+        res["recommended_sensor_count"] = int(recommended_sensor_count)
+        res["adaptive_sensor_stage"] = str(sensor_stage)
+        st.session_state.recommended_sensor_count = int(recommended_sensor_count)
+        st.session_state.optimized_results = res
 
         # 30 schematic positions for UI visualization only.
         sensor_points = [
@@ -4042,26 +4101,58 @@ elif st.session_state.app_view == "COMPARE":
 
     compare_view = field_view_selector("compare_map_view")
 
+    before_active_sensor_count = int(res.get("initial_sensor_count", 30))
+    after_active_sensor_count = int(
+        res.get(
+            "recommended_sensor_count",
+            st.session_state.get("recommended_sensor_count", 5),
+        )
+    )
+
     if compare_field_mode == "BEFORE":
-        st.markdown('<div class="compare-map-label">Current Field</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="compare-map-label">Current Field · 활성 센서 {before_active_sensor_count}개</div>',
+            unsafe_allow_html=True,
+        )
         if compare_view == "3D":
             compare_fig = make_true_3d_field(
                 result_current_coords,
                 result_current_nodes,
                 height=430,
+                show_sensors=True,
+                sensor_count=before_active_sensor_count,
             )
         else:
-            compare_fig = make_2d_heatmap(result_current_grid, height=330)
+            compare_fig = make_2d_heatmap(
+                result_current_grid,
+                height=330,
+                show_sensors=True,
+                sensor_count=before_active_sensor_count,
+                coords_xyz=result_current_coords,
+                temp_nodes=result_current_nodes,
+            )
     else:
-        st.markdown('<div class="compare-map-label">Predicted Field</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="compare-map-label">Predicted Field · 활성 센서 {after_active_sensor_count}개</div>',
+            unsafe_allow_html=True,
+        )
         if compare_view == "3D":
             compare_fig = make_true_3d_field(
                 result_pred_coords,
                 result_pred_nodes,
                 height=430,
+                show_sensors=True,
+                sensor_count=after_active_sensor_count,
             )
         else:
-            compare_fig = make_2d_heatmap(result_pred_grid, height=330)
+            compare_fig = make_2d_heatmap(
+                result_pred_grid,
+                height=330,
+                show_sensors=True,
+                sensor_count=after_active_sensor_count,
+                coords_xyz=result_pred_coords,
+                temp_nodes=result_pred_nodes,
+            )
 
     st.plotly_chart(
         compare_fig,
