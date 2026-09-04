@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v54
+# FACTOR_UI_BUILD = 2026-09-04-v55
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -1391,6 +1391,11 @@ def load_popfield_backend():
             "coords_norm_t": coords_norm_t,
             "device": device,
             "checkpoint_path": str(CHECKPOINT_PATH),
+
+            # Keep the actual callables with the cached backend.
+            # This avoids NoneType-callable errors after Streamlit reruns.
+            "optimize_hvac_fn": popfield_optimize_hvac,
+            "predict_conditions_fn": popfield_predict_conditions,
         }
     except Exception as exc:
         return {
@@ -1724,7 +1729,17 @@ def _predict_case_field_with_popfield(selected_dp_id: int):
 
     try:
         cond = np.asarray([[float(row[c]) for c in COND_COLS]], dtype=np.float32)
-        pred_field, pred_ra = popfield_predict_conditions(
+        predict_fn = backend.get("predict_conditions_fn")
+        if not callable(predict_fn):
+            # Defensive recovery for an old/stale cached backend.
+            if not _lazy_import_popfield_modules():
+                return None
+            predict_fn = popfield_predict_conditions
+
+        if not callable(predict_fn):
+            return None
+
+        pred_field, pred_ra = predict_fn(
             backend["model"],
             cond,
             backend["scalers"]["cond"],
@@ -2919,7 +2934,25 @@ elif st.session_state.app_view == "HEAT_LOAD":
                 runtime_dir.mkdir(parents=True, exist_ok=True)
 
                 with st.spinner("AI 예측 중..."):
-                    opt_df = popfield_optimize_hvac(
+                    optimize_fn = backend.get("optimize_hvac_fn")
+                    predict_fn = backend.get("predict_conditions_fn")
+
+                    # Defensive recovery in case Streamlit is holding an old
+                    # cached backend object from the previous build.
+                    if not callable(optimize_fn) or not callable(predict_fn):
+                        if not _lazy_import_popfield_modules():
+                            raise RuntimeError(
+                                f"PopField 모듈을 불러오지 못했습니다: {POPFIELD_BACKEND_IMPORT_ERROR}"
+                            )
+                        optimize_fn = popfield_optimize_hvac
+                        predict_fn = popfield_predict_conditions
+
+                    if not callable(optimize_fn):
+                        raise RuntimeError("PopField optimize_hvac 함수를 불러오지 못했습니다.")
+                    if not callable(predict_fn):
+                        raise RuntimeError("PopField predict_conditions 함수를 불러오지 못했습니다.")
+
+                    opt_df = optimize_fn(
                         model=backend["model"],
                         case_df=case_info_df,
                         loads=loads,
@@ -2964,7 +2997,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
                         float(rec["AirTemp_C"]),
                     ]], dtype=np.float32)
 
-                    pred_field, pred_ra = popfield_predict_conditions(
+                    pred_field, pred_ra = predict_fn(
                         backend["model"],
                         cond,
                         backend["scalers"]["cond"],
