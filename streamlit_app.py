@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v60
+# FACTOR_UI_BUILD = 2026-09-04-v62
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -3401,7 +3401,7 @@ elif st.session_state.app_view == "RESULTS":
         airflow_preview_html = f'''
         <div style="
             margin:12px 2px 8px 2px;
-            padding:18px 18px 10px 18px;
+            padding:14px 14px 8px 14px;
             border-radius:24px;
             background:linear-gradient(180deg, rgba(7,39,68,0.98), rgba(9,46,77,0.98));
             border:1px solid rgba(99, 206, 255, 0.35);
@@ -3409,14 +3409,14 @@ elif st.session_state.app_view == "RESULTS":
         ">
             <div style="
                 text-align:center;
-                font-size:34px;
-                line-height:1.18;
-                font-weight:900;
-                letter-spacing:-0.03em;
+                font-size:28px;
+                line-height:1.15;
+                font-weight:850;
+                letter-spacing:-0.025em;
                 color:#f5fbff;
-                margin:2px 0 14px 0;
+                margin:0 0 4px 0;
             ">냉방 흐름 미리보기</div>
-            <svg viewBox="0 0 560 305" width="100%" height="350" style="display:block; border-radius:18px;">
+            <svg viewBox="0 22 560 250" width="100%" height="340" preserveAspectRatio="xMidYMid meet" style="display:block; border-radius:18px;">
                 <defs>
                     <linearGradient id="floorHeat" x1="0%" y1="100%" x2="100%" y2="0%">
                         <stop offset="0%" stop-color="#0f5dd8"/>
@@ -3451,35 +3451,35 @@ elif st.session_state.app_view == "RESULTS":
 
                 <rect x="10" y="10" width="540" height="278" rx="22" fill="#0a2746" opacity="0.12"/>
 
-                <!-- room shell -->
-                <polygon points="95,74 465,74 530,130 280,170 30,130" fill="url(#wallGlow)" opacity="0.70"/>
-                <polygon points="30,130 280,170 280,254 30,210" fill="#0a2f55" opacity="0.82"/>
-                <polygon points="530,130 280,170 280,254 530,210" fill="#103962" opacity="0.82"/>
-                <polygon points="30,210 280,254 530,210 280,170" fill="url(#floorHeat)" opacity="0.90"/>
+                <!-- room shell : rectangular box -->
+                <rect x="95" y="74" width="370" height="80" fill="url(#wallGlow)" opacity="0.72"/>
+                <polygon points="30,130 95,74 95,154 30,210" fill="#0a2f55" opacity="0.82"/>
+                <polygon points="465,74 530,130 530,210 465,154" fill="#103962" opacity="0.82"/>
+                <polygon points="95,154 465,154 530,210 30,210" fill="url(#floorHeat)" opacity="0.90"/>
 
                 <!-- room wireframe -->
-                <polyline points="95,74 465,74 530,130 280,170 30,130 95,74" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="1.3"/>
-                <line x1="30" y1="130" x2="30" y2="210" stroke="rgba(255,255,255,0.65)" stroke-width="1.3"/>
-                <line x1="530" y1="130" x2="530" y2="210" stroke="rgba(255,255,255,0.65)" stroke-width="1.3"/>
-                <line x1="280" y1="170" x2="280" y2="254" stroke="rgba(255,255,255,0.55)" stroke-width="1.1"/>
-                <line x1="95" y1="74" x2="95" y2="154" stroke="rgba(255,255,255,0.55)" stroke-width="1.1"/>
-                <line x1="465" y1="74" x2="465" y2="154" stroke="rgba(255,255,255,0.55)" stroke-width="1.1"/>
+                <rect x="95" y="74" width="370" height="80" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="1.3"/>
+                <polygon points="30,130 95,74 95,154 30,210" fill="none" stroke="rgba(255,255,255,0.62)" stroke-width="1.25"/>
+                <polygon points="465,74 530,130 530,210 465,154" fill="none" stroke="rgba(255,255,255,0.62)" stroke-width="1.25"/>
+                <polygon points="95,154 465,154 530,210 30,210" fill="none" stroke="rgba(255,255,255,0.62)" stroke-width="1.25"/>
+                <line x1="95" y1="74" x2="30" y2="130" stroke="rgba(255,255,255,0.62)" stroke-width="1.25"/>
+                <line x1="465" y1="74" x2="530" y2="130" stroke="rgba(255,255,255,0.62)" stroke-width="1.25"/>
+                <line x1="95" y1="154" x2="30" y2="210" stroke="rgba(255,255,255,0.52)" stroke-width="1.05"/>
+                <line x1="465" y1="154" x2="530" y2="210" stroke="rgba(255,255,255,0.52)" stroke-width="1.05"/>
 
                 <!-- subtle floor grid -->
                 <g opacity="0.18" stroke="#a7d9ff" stroke-width="0.8">
-                    <line x1="72" y1="203" x2="320" y2="246"/>
-                    <line x1="116" y1="196" x2="364" y2="239"/>
-                    <line x1="160" y1="188" x2="408" y2="231"/>
-                    <line x1="204" y1="181" x2="452" y2="224"/>
-                    <line x1="248" y1="174" x2="496" y2="217"/>
-                    <line x1="75" y1="146" x2="75" y2="218"/>
-                    <line x1="132" y1="156" x2="132" y2="227"/>
-                    <line x1="189" y1="166" x2="189" y2="236"/>
-                    <line x1="246" y1="176" x2="246" y2="245"/>
-                    <line x1="303" y1="166" x2="303" y2="249"/>
-                    <line x1="360" y1="156" x2="360" y2="236"/>
-                    <line x1="417" y1="146" x2="417" y2="227"/>
-                    <line x1="474" y1="136" x2="474" y2="216"/>
+                    <line x1="151" y1="160" x2="83" y2="210"/>
+                    <line x1="207" y1="160" x2="153" y2="210"/>
+                    <line x1="263" y1="160" x2="223" y2="210"/>
+                    <line x1="319" y1="160" x2="293" y2="210"/>
+                    <line x1="375" y1="160" x2="363" y2="210"/>
+                    <line x1="431" y1="160" x2="433" y2="210"/>
+                    <line x1="487" y1="160" x2="503" y2="210"/>
+
+                    <line x1="95" y1="165" x2="465" y2="165"/>
+                    <line x1="78" y1="179" x2="481" y2="179"/>
+                    <line x1="62" y1="193" x2="497" y2="193"/>
                 </g>
 
                 <!-- furniture -->
@@ -3536,7 +3536,7 @@ elif st.session_state.app_view == "RESULTS":
             </svg>
         </div>
         '''
-        components.html(airflow_preview_html, height=455, scrolling=False)
+        components.html(airflow_preview_html, height=395, scrolling=False)
 
         st.markdown(
             """
