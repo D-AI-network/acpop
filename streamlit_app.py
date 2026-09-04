@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v62
+# FACTOR_UI_BUILD = 2026-09-04-v63
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -3416,7 +3416,7 @@ elif st.session_state.app_view == "RESULTS":
                 color:#f5fbff;
                 margin:0 0 4px 0;
             ">냉방 흐름 미리보기</div>
-            <svg viewBox="0 22 560 250" width="100%" height="340" preserveAspectRatio="xMidYMid meet" style="display:block; border-radius:18px;">
+            <svg viewBox="0 10 560 292" width="100%" height="360" preserveAspectRatio="xMidYMid meet" style="display:block; border-radius:18px;">
                 <defs>
                     <linearGradient id="floorHeat" x1="0%" y1="100%" x2="100%" y2="0%">
                         <stop offset="0%" stop-color="#0f5dd8"/>
@@ -3451,92 +3451,141 @@ elif st.session_state.app_view == "RESULTS":
 
                 <rect x="10" y="10" width="540" height="278" rx="22" fill="#0a2746" opacity="0.12"/>
 
-                <!-- room shell : rectangular box -->
-                <rect x="95" y="74" width="370" height="80" fill="url(#wallGlow)" opacity="0.72"/>
-                <polygon points="30,130 95,74 95,154 30,210" fill="#0a2f55" opacity="0.82"/>
-                <polygon points="465,74 530,130 530,210 465,154" fill="#103962" opacity="0.82"/>
-                <polygon points="95,154 465,154 530,210 30,210" fill="url(#floorHeat)" opacity="0.90"/>
+                <!-- room shell : slightly top-down rectangular perspective -->
+                <polygon points="105,72 455,72 455,114 105,114"
+                         fill="url(#wallGlow)" opacity="0.78"/>
+                <polygon points="105,114 455,114 520,266 40,266"
+                         fill="url(#floorHeat)" opacity="0.94"/>
+                <polygon points="40,132 105,72 105,114 40,266"
+                         fill="#0a2f55" opacity="0.78"/>
+                <polygon points="455,72 520,132 520,266 455,114"
+                         fill="#103962" opacity="0.78"/>
 
                 <!-- room wireframe -->
-                <rect x="95" y="74" width="370" height="80" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="1.3"/>
-                <polygon points="30,130 95,74 95,154 30,210" fill="none" stroke="rgba(255,255,255,0.62)" stroke-width="1.25"/>
-                <polygon points="465,74 530,130 530,210 465,154" fill="none" stroke="rgba(255,255,255,0.62)" stroke-width="1.25"/>
-                <polygon points="95,154 465,154 530,210 30,210" fill="none" stroke="rgba(255,255,255,0.62)" stroke-width="1.25"/>
-                <line x1="95" y1="74" x2="30" y2="130" stroke="rgba(255,255,255,0.62)" stroke-width="1.25"/>
-                <line x1="465" y1="74" x2="530" y2="130" stroke="rgba(255,255,255,0.62)" stroke-width="1.25"/>
-                <line x1="95" y1="154" x2="30" y2="210" stroke="rgba(255,255,255,0.52)" stroke-width="1.05"/>
-                <line x1="465" y1="154" x2="530" y2="210" stroke="rgba(255,255,255,0.52)" stroke-width="1.05"/>
+                <polygon points="105,72 455,72 520,132 520,266 40,266 40,132"
+                         fill="none" stroke="rgba(255,255,255,0.68)" stroke-width="1.35"/>
+                <line x1="105" y1="72" x2="105" y2="114"
+                      stroke="rgba(255,255,255,0.62)" stroke-width="1.15"/>
+                <line x1="455" y1="72" x2="455" y2="114"
+                      stroke="rgba(255,255,255,0.62)" stroke-width="1.15"/>
+                <line x1="105" y1="114" x2="40" y2="266"
+                      stroke="rgba(255,255,255,0.58)" stroke-width="1.1"/>
+                <line x1="455" y1="114" x2="520" y2="266"
+                      stroke="rgba(255,255,255,0.58)" stroke-width="1.1"/>
+                <line x1="105" y1="114" x2="455" y2="114"
+                      stroke="rgba(255,255,255,0.55)" stroke-width="1.0"/>
 
-                <!-- subtle floor grid -->
-                <g opacity="0.18" stroke="#a7d9ff" stroke-width="0.8">
-                    <line x1="151" y1="160" x2="83" y2="210"/>
-                    <line x1="207" y1="160" x2="153" y2="210"/>
-                    <line x1="263" y1="160" x2="223" y2="210"/>
-                    <line x1="319" y1="160" x2="293" y2="210"/>
-                    <line x1="375" y1="160" x2="363" y2="210"/>
-                    <line x1="431" y1="160" x2="433" y2="210"/>
-                    <line x1="487" y1="160" x2="503" y2="210"/>
+                <!-- floor grid for a clearer bird's-eye room view -->
+                <g opacity="0.20" stroke="#b8e7ff" stroke-width="0.8">
+                    <line x1="155" y1="114" x2="120" y2="266"/>
+                    <line x1="205" y1="114" x2="200" y2="266"/>
+                    <line x1="255" y1="114" x2="280" y2="266"/>
+                    <line x1="305" y1="114" x2="360" y2="266"/>
+                    <line x1="355" y1="114" x2="440" y2="266"/>
+                    <line x1="405" y1="114" x2="500" y2="266"/>
 
-                    <line x1="95" y1="165" x2="465" y2="165"/>
-                    <line x1="78" y1="179" x2="481" y2="179"/>
-                    <line x1="62" y1="193" x2="497" y2="193"/>
+                    <line x1="91" y1="146" x2="469" y2="146"/>
+                    <line x1="77" y1="178" x2="483" y2="178"/>
+                    <line x1="64" y1="210" x2="496" y2="210"/>
+                    <line x1="52" y1="238" x2="508" y2="238"/>
                 </g>
 
-                <!-- furniture -->
-                <rect x="220" y="172" width="58" height="26" rx="6" fill="#164775" opacity="0.88"/>
-                <rect x="214" y="165" width="70" height="12" rx="4" fill="#20588d" opacity="0.88"/>
-                <rect x="210" y="175" width="8" height="28" rx="2" fill="#1d4d7b" opacity="0.88"/>
-                <rect x="280" y="175" width="8" height="28" rx="2" fill="#1d4d7b" opacity="0.88"/>
-                <rect x="348" y="160" width="62" height="12" rx="3" fill="#19446f" opacity="0.84"/>
-                <line x1="352" y1="171" x2="348" y2="201" stroke="#1b4c7a" stroke-width="3"/>
-                <line x1="406" y1="171" x2="410" y2="197" stroke="#1b4c7a" stroke-width="3"/>
-                <line x1="365" y1="170" x2="365" y2="199" stroke="#1b4c7a" stroke-width="2"/>
+                <!-- furniture : simplified top-down silhouettes -->
+                <g opacity="0.90">
+                    <!-- sofa -->
+                    <rect x="205" y="168" width="92" height="34" rx="8"
+                          fill="#164775"/>
+                    <rect x="213" y="160" width="76" height="12" rx="5"
+                          fill="#245e92"/>
+                    <rect x="198" y="172" width="10" height="28" rx="3"
+                          fill="#1d4d7b"/>
+                    <rect x="294" y="172" width="10" height="28" rx="3"
+                          fill="#1d4d7b"/>
+
+                    <!-- desk -->
+                    <polygon points="350,157 423,157 435,179 360,179"
+                             fill="#1b4a73"/>
+                    <line x1="360" y1="179" x2="354" y2="207"
+                          stroke="#1b4c7a" stroke-width="3"/>
+                    <line x1="426" y1="179" x2="432" y2="207"
+                          stroke="#1b4c7a" stroke-width="3"/>
+                </g>
 
                 <!-- AC unit -->
                 <g filter="url(#softGlow)">
-                    <rect x="214" y="86" width="132" height="28" rx="8" fill="url(#acGrad)" stroke="#d9ecff" stroke-width="1.2"/>
-                    <rect x="222" y="106" width="116" height="4" rx="2" fill="#0f2645"/>
-                    <line x1="238" y1="98" x2="252" y2="98" stroke="#91a9bf" stroke-width="2"/>
-                    <line x1="308" y1="98" x2="322" y2="98" stroke="#91a9bf" stroke-width="2"/>
+                    <rect x="206" y="82" width="148" height="31" rx="8"
+                          fill="url(#acGrad)" stroke="#d9ecff" stroke-width="1.2"/>
+                    <rect x="216" y="104" width="128" height="4" rx="2"
+                          fill="#0f2645"/>
+                    <line x1="232" y1="95" x2="248" y2="95"
+                          stroke="#91a9bf" stroke-width="2"/>
+                    <line x1="312" y1="95" x2="328" y2="95"
+                          stroke="#91a9bf" stroke-width="2"/>
                 </g>
 
                 <!-- airflow beams -->
                 <g fill="none" stroke-linecap="round" filter="url(#glow)">
-                    <path d="M255 110 C225 130, 190 156, 145 216" stroke="{airflow_color}" stroke-width="{left_width * boost:.2f}" opacity="{left_opacity}"/>
-                    <path d="M268 110 C235 132, 210 157, 178 204" stroke="{airflow_color}" stroke-width="{max(2.5, left_width-0.4) * boost:.2f}" opacity="{max(0.15, left_opacity-0.18)}"/>
-                    <path d="M280 110 C280 132, 280 154, 280 218" stroke="{airflow_color}" stroke-width="{mid_width * boost:.2f}" opacity="{mid_opacity}"/>
-                    <path d="M292 110 C292 133, 302 158, 312 214" stroke="{airflow_color}" stroke-width="{max(2.7, mid_width-0.8) * boost:.2f}" opacity="{max(0.15, mid_opacity-0.18)}"/>
-                    <path d="M305 110 C340 130, 376 156, 422 214" stroke="{airflow_color}" stroke-width="{right_width * boost:.2f}" opacity="{right_opacity}"/>
-                    <path d="M317 110 C345 128, 366 148, 392 196" stroke="{airflow_color}" stroke-width="{max(2.5, right_width-0.4) * boost:.2f}" opacity="{max(0.15, right_opacity-0.18)}"/>
+                    <path d="M246 109 C214 136, 176 179, 118 246"
+                          stroke="{airflow_color}"
+                          stroke-width="{left_width * boost:.2f}"
+                          opacity="{left_opacity}"/>
+                    <path d="M260 109 C230 140, 205 177, 167 229"
+                          stroke="{airflow_color}"
+                          stroke-width="{max(2.5, left_width-0.4) * boost:.2f}"
+                          opacity="{max(0.15, left_opacity-0.18)}"/>
+
+                    <path d="M279 109 C278 144, 280 185, 282 248"
+                          stroke="{airflow_color}"
+                          stroke-width="{mid_width * boost:.2f}"
+                          opacity="{mid_opacity}"/>
+                    <path d="M292 109 C294 146, 301 184, 315 232"
+                          stroke="{airflow_color}"
+                          stroke-width="{max(2.7, mid_width-0.8) * boost:.2f}"
+                          opacity="{max(0.15, mid_opacity-0.18)}"/>
+
+                    <path d="M309 109 C341 136, 382 179, 444 246"
+                          stroke="{airflow_color}"
+                          stroke-width="{right_width * boost:.2f}"
+                          opacity="{right_opacity}"/>
+                    <path d="M323 109 C353 135, 382 169, 410 220"
+                          stroke="{airflow_color}"
+                          stroke-width="{max(2.5, right_width-0.4) * boost:.2f}"
+                          opacity="{max(0.15, right_opacity-0.18)}"/>
                 </g>
 
                 <!-- arrow heads -->
-                <g fill="{airflow_color}" opacity="0.95">
-                    {"<polygon points='145,216 137,210 141,221'/>" if left_on else ""}
-                    {"<polygon points='178,204 171,199 174,208'/>" if left_on else ""}
-                    {"<polygon points='280,218 273,210 287,210'/>" if middle_on else ""}
-                    {"<polygon points='312,214 306,206 319,208'/>" if middle_on else ""}
-                    {"<polygon points='422,214 427,206 434,217'/>" if right_on else ""}
-                    {"<polygon points='392,196 397,189 405,201'/>" if right_on else ""}
+                <g fill="{airflow_color}" opacity="0.98">
+                    {"<polygon points='118,246 108,239 112,252'/>" if left_on else ""}
+                    {"<polygon points='167,229 158,223 162,235'/>" if left_on else ""}
+                    {"<polygon points='282,248 274,238 290,238'/>" if middle_on else ""}
+                    {"<polygon points='315,232 308,223 321,226'/>" if middle_on else ""}
+                    {"<polygon points='444,246 450,237 458,250'/>" if right_on else ""}
+                    {"<polygon points='410,220 416,212 424,224'/>" if right_on else ""}
                 </g>
 
                 <!-- impact/cooling zones -->
-                <ellipse cx="160" cy="210" rx="{26 + flow_level*2}" ry="{13 + flow_level}" fill="#52d5ff" opacity="{0.16 + flow_level*0.03}"/>
-                <ellipse cx="280" cy="220" rx="{22 + flow_level*2}" ry="{12 + flow_level}" fill="#52d5ff" opacity="{0.13 + flow_level*0.028}"/>
-                <ellipse cx="410" cy="210" rx="{26 + flow_level*2}" ry="{13 + flow_level}" fill="#52d5ff" opacity="{0.16 + flow_level*0.03}"/>
+                <ellipse cx="132" cy="244"
+                         rx="{32 + flow_level*2}" ry="{14 + flow_level}"
+                         fill="#52d5ff" opacity="{0.16 + flow_level*0.03}"/>
+                <ellipse cx="282" cy="248"
+                         rx="{29 + flow_level*2}" ry="{13 + flow_level}"
+                         fill="#52d5ff" opacity="{0.14 + flow_level*0.028}"/>
+                <ellipse cx="432" cy="244"
+                         rx="{32 + flow_level*2}" ry="{14 + flow_level}"
+                         fill="#52d5ff" opacity="{0.16 + flow_level*0.03}"/>
 
                 <!-- legend chips -->
                 <g>
-                    <rect x="26" y="30" width="106" height="24" rx="12" fill="rgba(11,44,75,0.88)" stroke="rgba(99,216,255,0.28)"/>
-                    <circle cx="41" cy="42" r="5" fill="{airflow_color}"/>
-                    <text x="54" y="46" font-size="12" fill="#eaf8ff" font-weight="700">공기 흐름 방향</text>
-                    <rect x="394" y="30" width="140" height="24" rx="12" fill="rgba(11,44,75,0.88)" stroke="rgba(99,216,255,0.28)"/>
-                    <text x="407" y="46" font-size="12" fill="#a7d7ef">적용 방향: {vane_display}</text>
+                    <rect x="24" y="28" width="112" height="24" rx="12" fill="rgba(11,44,75,0.88)" stroke="rgba(99,216,255,0.28)"/>
+                    <circle cx="40" cy="40" r="5" fill="{airflow_color}"/>
+                    <text x="53" y="44" font-size="12" fill="#eaf8ff" font-weight="700">공기 흐름 방향</text>
+                    <rect x="382" y="28" width="154" height="24" rx="12" fill="rgba(11,44,75,0.88)" stroke="rgba(99,216,255,0.28)"/>
+                    <text x="395" y="44" font-size="12" fill="#a7d7ef">적용 방향: {vane_display}</text>
                 </g>
             </svg>
         </div>
         '''
-        components.html(airflow_preview_html, height=395, scrolling=False)
+        components.html(airflow_preview_html, height=420, scrolling=False)
 
         st.markdown(
             """
