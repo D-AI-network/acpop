@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v70
+# FACTOR_UI_BUILD = 2026-09-04-v67
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -529,33 +529,26 @@ div[data-testid="stPlotlyChart"] {
   font-size: 11px;
   line-height: 1.0;
   font-weight: 800;
-  color: #edf9ff;
-  opacity: 0.92;
+  color: rgba(129, 215, 255, 0.32);
   letter-spacing: 0.02em;
 }
 .air-ray {
   width: 36px;
   height: 34px;
   text-align: center;
-  color: #f4fbff;
-  opacity: 0.92;
+  color: rgba(129, 215, 255, 0.24);
   font-size: 31px;
   line-height: 32px;
   font-weight: 800;
   transition: .15s ease;
 }
 .air-dir.active .air-dir-tag {
-  color: #55d7ff;
-  opacity: 1;
-  text-shadow: 0 0 8px rgba(63, 199, 255, 0.30);
+  color: #dff7ff;
 }
 .air-dir.active .air-ray {
-  color: #43c8ff;
-  opacity: 1;
-  text-shadow:
-    0 0 7px rgba(67, 200, 255, 0.75),
-    0 0 15px rgba(67, 200, 255, 0.42);
-  transform: translateY(-1px) scale(1.09);
+  color: #73dcff;
+  text-shadow: 0 0 12px rgba(82, 209, 255, 0.38);
+  transform: translateY(-1px) scale(1.06);
 }
 
 /* Flow strength: five vertical bars */
@@ -1381,13 +1374,19 @@ div[class*="st-key-result_predicted_view"] [data-testid="stRadio"] {
 # Canonical positions strictly aligned with the room heatmap:
 # Horizontal (x_plot, Length): 0 to 9.0 m | Vertical (y_plot, Width): 0 to 4.0 m
 ROA_NODES_META = {
-    887:  {"code": "S1", "name": "Sensor 1", "x_plot": 6.75, "y_plot": 2.75, "z": 1.50, "zone": "Office North"},
-    672:  {"code": "S2", "name": "Sensor 2", "x_plot": 2.75, "y_plot": 2.75, "z": 1.50, "zone": "Office South"},
-    63:   {"code": "S3", "name": "Sensor 3", "x_plot": 4.25, "y_plot": 1.75, "z": 2.50, "zone": "Ceiling Center"},
-    1036: {"code": "S4", "name": "Sensor 4", "x_plot": 1.25, "y_plot": 1.25, "z": 2.00, "zone": "Server Pod"},
-    1129: {"code": "S5", "name": "Sensor 5", "x_plot": 5.50, "y_plot": 1.75, "z": 2.00, "zone": "Meeting Room"},
+    653:  {"code": "S1", "name": "Sensor 1 · Node 653",  "x_plot": 6.75, "y_plot": 2.75, "z": 1.50, "zone": "Core Sensor"},
+    887:  {"code": "S2", "name": "Sensor 2 · Node 887",  "x_plot": 2.75, "y_plot": 2.75, "z": 1.50, "zone": "Core Sensor"},
+    1036: {"code": "S3", "name": "Sensor 3 · Node 1036", "x_plot": 4.25, "y_plot": 1.75, "z": 2.50, "zone": "Core Sensor"},
+    639:  {"code": "S4", "name": "Sensor 4 · Node 639",  "x_plot": 1.25, "y_plot": 1.25, "z": 2.00, "zone": "Core Sensor"},
+    1229: {"code": "S5", "name": "Sensor 5 · Node 1229", "x_plot": 5.50, "y_plot": 1.75, "z": 2.00, "zone": "Core Sensor"},
 }
 ROA_NODE_IDS = list(ROA_NODES_META.keys())
+
+# Validation-selected nested sensor hierarchy:
+# 5 ⊂ 6 ⊂ 7 ⊂ 8 ⊂ 9 ⊂ 10
+FINAL_NESTED_SENSOR_ORDER = (653, 887, 1036, 639, 1229, 670, 323, 859, 1050, 551)
+MIN_ACTIVE_SENSORS = 5
+MAX_ACTIVE_SENSORS = 10
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -1600,6 +1599,47 @@ def load_reconstruction_basis():
         except Exception:
             pass
     return None
+
+
+def _nested_sensor_order(n_nodes: int):
+    """Read the validated 5→10 nested order from the NPZ; use the validated fallback if needed."""
+    order = None
+    if basis_assets is not None:
+        try:
+            raw = np.asarray(basis_assets.get("nested_sensor_order", []), dtype=np.int64).reshape(-1)
+            if len(raw) >= MAX_ACTIVE_SENSORS:
+                order = [int(x) for x in raw.tolist()]
+        except Exception:
+            order = None
+
+    if order is None:
+        order = list(FINAL_NESTED_SENSOR_ORDER)
+
+    cleaned = []
+    for nid in order:
+        nid = int(nid)
+        if 0 <= nid < int(n_nodes) and nid not in cleaned:
+            cleaned.append(nid)
+        if len(cleaned) >= MAX_ACTIVE_SENSORS:
+            break
+
+    return cleaned
+
+
+def _active_sensor_count_from_temperature(reference_temp_c: float, target_temp_c: float) -> int:
+    """
+    Transparent 5–10 activation policy.
+
+    The validated sensor locations are data-driven. The activation count is an
+    operational policy: approximately one additional active sensor per 1°C of
+    target deviation, rounded to the nearest degree and clipped to [5, 10].
+
+    For target 24°C:
+      24.0→5, 25.0→6, 26.0→7, 27.0→8, 28.0→9, 29°C+→10.
+    """
+    error_c = abs(float(reference_temp_c) - float(target_temp_c))
+    extra = int(np.floor(error_c + 0.5))
+    return int(np.clip(MIN_ACTIVE_SENSORS + extra, MIN_ACTIVE_SENSORS, MAX_ACTIVE_SENSORS))
 
 
 # Heavy/data assets are initialized only after the INTRO splash.
@@ -2266,22 +2306,8 @@ if current_field is None:
     }
 
 current_coords = np.asarray(current_field["coords"], dtype=np.float32)
-current_temp_nodes_raw = np.asarray(current_field["temp_c"], dtype=np.float32)
-
-# UI consistency:
-# the user's "현재 공간 평균 온도" is the baseline shown throughout the app.
-# Keep the retrieved CFD spatial shape, but shift the whole field by one
-# constant offset so its mean exactly matches the entered current temperature.
-# This DOES NOT change spatial temperature differences or the optimization model.
-requested_current_mean_c = float(st.session_state.current_temp_query)
-raw_current_mean_c = float(np.nanmean(current_temp_nodes_raw))
-current_mean_offset_c = requested_current_mean_c - raw_current_mean_c
-current_temp_nodes = np.asarray(
-    current_temp_nodes_raw + current_mean_offset_c,
-    dtype=np.float32,
-)
-
-avg_room_temp = float(np.nanmean(current_temp_nodes))
+current_temp_nodes = np.asarray(current_field["temp_c"], dtype=np.float32)
+avg_room_temp = float(current_field["mean_temp_c"])
 current_field_source = str(current_field["source"])
 matched_dp_id = int(matched_scenario["dp_id"]) if matched_scenario is not None else 0
 matched_mean_temp_c = float(matched_scenario["mean_temp_c"]) if matched_scenario is not None else avg_room_temp
@@ -2355,90 +2381,56 @@ def field_view_selector(key: str) -> str:
 
 def _select_adaptive_sensor_points(coords_xyz, temp_nodes, sensor_count):
     """
-    Deterministically choose sensor-display positions across the 3D room.
+    Return the validated nested active sensor set for display.
 
-    - The original five ROA sensor positions are always retained first.
-    - Additional positions are added by farthest-point sampling so the room
-      remains spatially covered when 10/20/30 active sensing points are shown.
-    - This controls the UI/displayed active sensing plan only; it does not
-      retrain PopField or physically add/remove installed sensors.
+    Sensor order is loaded from sensor_reconstruction_basis.npz:
+    653, 887, 1036, 639, 1229, 670, 323, 859, 1050, 551.
+    The first K nodes are active, preserving the strict nested hierarchy.
     """
     coords_xyz = np.asarray(coords_xyz, dtype=float)
     temp_nodes = np.asarray(temp_nodes, dtype=float).reshape(-1)
-    sensor_count = int(max(0, sensor_count))
 
     valid = (
         coords_xyz.ndim == 2
         and coords_xyz.shape[1] >= 3
         and len(coords_xyz) == len(temp_nodes)
     )
-    if not valid or sensor_count <= 0:
+    if not valid:
         return (
             np.empty((0, 3), dtype=float),
             np.empty((0,), dtype=float),
             [],
         )
+
+    sensor_count = int(np.clip(
+        int(sensor_count),
+        MIN_ACTIVE_SENSORS,
+        MAX_ACTIVE_SENSORS,
+    ))
 
     finite = np.isfinite(coords_xyz[:, :3]).all(axis=1) & np.isfinite(temp_nodes)
-    coords = coords_xyz[finite, :3]
-    temps = temp_nodes[finite]
-    if len(coords) == 0:
+    order = _nested_sensor_order(len(coords_xyz))
+    selected_nodes = [
+        int(nid) for nid in order
+        if 0 <= int(nid) < len(coords_xyz) and bool(finite[int(nid)])
+    ][:sensor_count]
+
+    if not selected_nodes:
         return (
             np.empty((0, 3), dtype=float),
             np.empty((0,), dtype=float),
             [],
         )
 
-    sensor_count = min(sensor_count, len(coords))
+    idx = np.asarray(selected_nodes, dtype=np.int64)
+    selected_xyz = coords_xyz[idx, :3]
+    selected_temp = temp_nodes[idx]
+    selected_names = [
+        f"S{i + 1} · Node {int(nid)}"
+        for i, nid in enumerate(selected_nodes)
+    ]
 
-    # Normalize dimensions before distance calculations so Z does not get
-    # ignored just because X/Y have a larger numeric range.
-    mins = coords.min(axis=0)
-    spans = np.ptp(coords, axis=0)
-    spans = np.where(spans > 1e-9, spans, 1.0)
-    norm = (coords - mins) / spans
-
-    selected = []
-    selected_names = []
-
-    # Core 5 = original physical sensor locations used by the app.
-    for nid, meta in ROA_NODES_META.items():
-        target = np.asarray(
-            [float(meta["x_plot"]), float(meta["y_plot"]), float(meta["z"])],
-            dtype=float,
-        )
-        target_n = (target - mins) / spans
-        idx = int(np.argmin(np.sum((norm - target_n[None, :]) ** 2, axis=1)))
-        if idx not in selected:
-            selected.append(idx)
-            selected_names.append(str(meta.get("name", f"Sensor {len(selected)}")))
-        if len(selected) >= sensor_count:
-            break
-
-    # Add spatially spread points until the requested active count is reached.
-    while len(selected) < sensor_count:
-        if selected:
-            sel = norm[np.asarray(selected, dtype=int)]
-            d2 = np.sum(
-                (norm[:, None, :] - sel[None, :, :]) ** 2,
-                axis=2,
-            )
-            min_d2 = d2.min(axis=1)
-            min_d2[np.asarray(selected, dtype=int)] = -1.0
-            next_idx = int(np.argmax(min_d2))
-        else:
-            next_idx = int(len(coords) // 2)
-
-        if next_idx in selected:
-            break
-
-        selected.append(next_idx)
-        selected_names.append(f"Adaptive Sensor {len(selected)}")
-
-    selected = np.asarray(selected[:sensor_count], dtype=int)
-    selected_names = selected_names[:sensor_count]
-
-    return coords[selected], temps[selected], selected_names
+    return selected_xyz, selected_temp, selected_names
 
 
 
@@ -2809,11 +2801,11 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
         )
 
     # Adaptive sensor overlay.
-    # HOME can hide it entirely; comparison screens can show 30 -> 20 -> 10 -> 5.
+    # HOME can hide it entirely; comparison screens use the validated nested 10 -> 5 hierarchy.
     if show_sensors:
         selected_xyz, selected_temp, selected_names = _select_adaptive_sensor_points(
-            coords,
-            temps,
+            coords_xyz,
+            temp_nodes,
             sensor_count,
         )
 
@@ -3305,18 +3297,10 @@ elif st.session_state.app_view == "HEAT_LOAD":
                     "retrieval_score": float(retrieval["retrieval_score"]),
                     "query_loads_W": {k: float(v) for k, v in query_loads.items()},
                     "matched_loads_W": {k: float(v) for k, v in loads.items()},
-                    # Comparison baseline aligned to the user's entered current mean.
-                    # Spatial gradients remain identical to the retrieved CFD case.
                     "field_current_grid": np.asarray(
                         _temperature_plane_grid(
                             matched_current["coords"],
-                            (
-                                np.asarray(matched_current["temp_c"], dtype=np.float32)
-                                + (
-                                    float(st.session_state.current_temp_query)
-                                    - float(np.nanmean(np.asarray(matched_current["temp_c"], dtype=np.float32)))
-                                )
-                            ),
+                            matched_current["temp_c"],
                             st.session_state.z_plane,
                             grid_len_axis,
                             grid_wid_axis,
@@ -3324,17 +3308,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
                         dtype=np.float32,
                     ),
                     "field_current_coords": np.asarray(matched_current["coords"], dtype=np.float32),
-                    "field_current_temp_nodes": np.asarray(
-                        np.asarray(matched_current["temp_c"], dtype=np.float32)
-                        + (
-                            float(st.session_state.current_temp_query)
-                            - float(np.nanmean(np.asarray(matched_current["temp_c"], dtype=np.float32)))
-                        ),
-                        dtype=np.float32,
-                    ),
-                    "field_current_raw_mean_c": float(
-                        np.nanmean(np.asarray(matched_current["temp_c"], dtype=np.float32))
-                    ),
+                    "field_current_temp_nodes": np.asarray(matched_current["temp_c"], dtype=np.float32),
                 }
 
                 st.session_state.has_run_optimization = True
@@ -3480,97 +3454,127 @@ elif st.session_state.app_view == "RESULTS":
 
         # --------------------------------------------------------
         # Adaptive Sensor Plan
-        # Dense sensing first -> reduce active monitoring sensors
-        # only after the predicted spatial field becomes stable.
+        # Validated nested sensor hierarchy: 5 -> 6 -> 7 -> 8 -> 9 -> 10.
+        # Only ACTIVE monitoring count changes; installed pool stays at 10.
         # --------------------------------------------------------
-        current_sensor_count = 30
-        zone_spread_now = float(res.get("zone_spread", 99.0))
-        hot_now = float(res.get("hot_fraction", 100.0))
-        cold_now = float(res.get("cold_fraction", 100.0))
-        status_now = str(res.get("status", "INFEASIBLE"))
+        current_reference_temp = float(
+            res.get("current_temp_query_c", st.session_state.current_temp_query)
+        )
+        predicted_reference_temp = float(
+            res.get("mean_temp", st.session_state.target_temp)
+        )
+        target_sensor_temp = float(st.session_state.target_temp)
 
-        # Transparent demo policy for the hackathon UI.
-        # This adjusts ACTIVE MONITORING sensors, not physically installed sensors.
-        if (
-            status_now == "FEASIBLE"
-            and zone_spread_now <= 1.20
-            and max(hot_now, cold_now) <= 2.0
-        ):
-            recommended_sensor_count = 5
+        current_sensor_count = _active_sensor_count_from_temperature(
+            current_reference_temp,
+            target_sensor_temp,
+        )
+        recommended_sensor_count = _active_sensor_count_from_temperature(
+            predicted_reference_temp,
+            target_sensor_temp,
+        )
+
+        current_error_c = abs(current_reference_temp - target_sensor_temp)
+        predicted_error_c = abs(predicted_reference_temp - target_sensor_temp)
+
+        if recommended_sensor_count <= 5:
             sensor_stage = "안정 운전"
-            sensor_reason = "공간 온도장이 충분히 안정되어 기존 핵심 센서 5개만 유지합니다."
-        elif (
-            status_now == "FEASIBLE"
-            and zone_spread_now <= 1.90
-            and max(hot_now, cold_now) <= 5.0
-        ):
-            recommended_sensor_count = 10
+            sensor_reason = "목표 온도에 가까워져 검증된 핵심 센서 5개만 활성화합니다."
+        elif recommended_sensor_count <= 7:
             sensor_stage = "안정화 단계"
-            sensor_reason = "온도 편차가 감소해 핵심 영역 중심으로 활성 센서를 10개까지 줄입니다."
-        elif (
-            status_now in ("FEASIBLE", "NEAR_FEASIBLE")
-            and zone_spread_now <= 2.60
-        ):
-            recommended_sensor_count = 20
-            sensor_stage = "안정화 진행"
-            sensor_reason = "일부 공간 변동이 남아 있어 20개 센서로 넓게 모니터링합니다."
-        else:
-            recommended_sensor_count = 30
+            sensor_reason = f"목표 편차 {predicted_error_c:.1f}°C에 맞춰 {recommended_sensor_count}개 센서를 활성화합니다."
+        elif recommended_sensor_count <= 9:
             sensor_stage = "정밀 모니터링"
-            sensor_reason = "온도 불균형 또는 목표 미달 가능성이 있어 30개 센서를 유지합니다."
+            sensor_reason = f"목표 편차 {predicted_error_c:.1f}°C가 남아 {recommended_sensor_count}개 센서를 활성화합니다."
+        else:
+            sensor_stage = "최대 모니터링"
+            sensor_reason = "목표 온도와의 차이가 커 최대 10개 센서를 활성화합니다."
 
         deactivated_sensor_count = current_sensor_count - recommended_sensor_count
 
+        # Exact validated nested node order from the NPZ (fallback is identical).
+        _sensor_order = _nested_sensor_order(len(res.get("field_current_temp_nodes", current_temp_nodes)))
+        current_sensor_nodes = _sensor_order[:current_sensor_count]
+        recommended_sensor_nodes = _sensor_order[:recommended_sensor_count]
+
+        current_node_text = ", ".join(f"{n}" for n in current_sensor_nodes)
+        recommended_node_text = ", ".join(f"{n}" for n in recommended_sensor_nodes)
+
         # Persist the adaptive sensing decision so the Before/After Field
-        # visualization can reflect the same active-sensor count.
+        # visualization uses the same active-sensor count.
         res["initial_sensor_count"] = int(current_sensor_count)
         res["recommended_sensor_count"] = int(recommended_sensor_count)
+        res["initial_sensor_nodes"] = [int(x) for x in current_sensor_nodes]
+        res["recommended_sensor_nodes"] = [int(x) for x in recommended_sensor_nodes]
         res["adaptive_sensor_stage"] = str(sensor_stage)
         st.session_state.recommended_sensor_count = int(recommended_sensor_count)
         st.session_state.optimized_results = res
 
-        # 30 schematic positions for UI visualization only.
-        sensor_points = [
-            (15, 18), (29, 18), (43, 18), (57, 18), (71, 18), (85, 18),
-            (15, 34), (29, 34), (43, 34), (57, 34), (71, 34), (85, 34),
-            (15, 50), (29, 50), (43, 50), (57, 50), (71, 50), (85, 50),
-            (15, 66), (29, 66), (43, 66), (57, 66), (71, 66), (85, 66),
-            (15, 82), (29, 82), (43, 82), (57, 82), (71, 82), (85, 82),
-        ]
+        # The small room schematic keeps the SAME visual design, but now represents
+        # the actual 10-sensor installed pool and its active nested prefix.
+        _schematic_coords = np.asarray(
+            res.get("field_current_coords", current_coords),
+            dtype=float,
+        )
+        _pool_nodes = _sensor_order[:MAX_ACTIVE_SENSORS]
+        if (
+            _schematic_coords.ndim == 2
+            and _schematic_coords.shape[1] >= 2
+            and len(_pool_nodes) >= 1
+        ):
+            _xy = _schematic_coords[np.asarray(_pool_nodes, dtype=int), :2]
+            _xmin, _ymin = np.nanmin(_xy, axis=0)
+            _xmax, _ymax = np.nanmax(_xy, axis=0)
+            _xspan = max(float(_xmax - _xmin), 1e-9)
+            _yspan = max(float(_ymax - _ymin), 1e-9)
+            sensor_points = [
+                (
+                    12.0 + 76.0 * (float(x) - float(_xmin)) / _xspan,
+                    12.0 + 76.0 * (float(y) - float(_ymin)) / _yspan,
+                )
+                for x, y in _xy
+            ]
+        else:
+            sensor_points = [
+                (14, 28), (32, 20), (50, 28), (68, 20), (86, 28),
+                (14, 72), (32, 80), (50, 72), (68, 80), (86, 72),
+            ]
 
-        # Coverage-first retention order for the visual mock.
-        sensor_priority = [
-            0, 5, 24, 29, 14, 15, 8, 9, 20, 21,
-            2, 3, 26, 27, 12, 17, 6, 11, 18, 23,
-            7, 10, 19, 22, 1, 4, 25, 28, 13, 16,
-        ]
-        active_after = set(sensor_priority[:recommended_sensor_count])
+        active_before = set(range(min(current_sensor_count, len(sensor_points))))
+        active_after = set(range(min(recommended_sensor_count, len(sensor_points))))
 
         before_dots = "".join(
-            f'<circle cx="{x}" cy="{y}" r="3.25" fill="#70e8ff" '
-            f'stroke="#d8f8ff" stroke-width="0.55" '
-            f'style="filter:drop-shadow(0 0 3px rgba(87,222,255,.82));"/>'
-            for x, y in sensor_points
-        )
-
-        after_dots = "".join(
             (
-                f'<circle cx="{x}" cy="{y}" r="3.35" fill="#70e8ff" '
+                f'<circle cx="{x:.2f}" cy="{y:.2f}" r="3.0" fill="#70e8ff" '
                 f'stroke="#e6fbff" stroke-width="0.65" '
                 f'style="filter:drop-shadow(0 0 3px rgba(87,222,255,.82));"/>'
-                if i in active_after
+                if i in active_before
                 else
-                f'<circle cx="{x}" cy="{y}" r="3.0" fill="#415c72" '
+                f'<circle cx="{x:.2f}" cy="{y:.2f}" r="2.65" fill="#415c72" '
                 f'opacity="0.55" stroke="#688197" stroke-width="0.35"/>'
             )
             for i, (x, y) in enumerate(sensor_points)
         )
 
-        reduction_text = (
-            f"{deactivated_sensor_count}개 비활성화"
-            if deactivated_sensor_count > 0
-            else "전체 센서 유지"
+        after_dots = "".join(
+            (
+                f'<circle cx="{x:.2f}" cy="{y:.2f}" r="3.0" fill="#70e8ff" '
+                f'stroke="#e6fbff" stroke-width="0.65" '
+                f'style="filter:drop-shadow(0 0 3px rgba(87,222,255,.82));"/>'
+                if i in active_after
+                else
+                f'<circle cx="{x:.2f}" cy="{y:.2f}" r="2.65" fill="#415c72" '
+                f'opacity="0.55" stroke="#688197" stroke-width="0.35"/>'
+            )
+            for i, (x, y) in enumerate(sensor_points)
         )
+
+        if deactivated_sensor_count > 0:
+            reduction_text = f"{deactivated_sensor_count}개 비활성화"
+        elif deactivated_sensor_count < 0:
+            reduction_text = f"{abs(deactivated_sensor_count)}개 추가 활성화"
+        else:
+            reduction_text = "활성 센서 수 유지"
 
         adaptive_sensor_html = f"""
         <style>
@@ -3655,11 +3659,10 @@ elif st.session_state.app_view == "RESULTS":
             line-height:1.55;
           }}
           .asp-maps {{
-            margin-top: 12px;
             display:grid;
             grid-template-columns: 1fr 1fr;
-            gap:14px;
-            padding: 12px;
+            gap:10px;
+            padding: 10px;
             border-radius:16px;
             background: rgba(4,25,45,.58);
             border: 1px solid rgba(86,168,209,.18);
@@ -3671,21 +3674,76 @@ elif st.session_state.app_view == "RESULTS":
             gap:4px;
             padding: 0 3px 6px;
           }}
-          .asp-map-title b {{ font-size:13px; color:#eafaff; }}
+          .asp-map-title b {{ font-size:11px; color:#eafaff; }}
           .asp-map-title span {{
-            font-size:9.5px;
+            font-size:8.5px;
             color:#79bfdc;
             font-weight:700;
           }}
           .room {{
             width:100%;
-            height:172px;
+            height:126px;
             display:block;
             border-radius:11px;
             background:linear-gradient(145deg,#0a223a,#0c2c49);
             border:1px solid rgba(126,208,244,.15);
           }}
-</style>
+          .asp-legend {{
+            display:flex;
+            justify-content:center;
+            gap:18px;
+            margin-top:9px;
+            font-size:8.5px;
+            font-weight:700;
+            color:#9fc5d7;
+          }}
+          .legend-dot {{
+            display:inline-block;
+            width:8px;
+            height:8px;
+            border-radius:50%;
+            margin-right:5px;
+            vertical-align:-1px;
+          }}
+          .active-dot {{
+            background:#70e8ff;
+            box-shadow:0 0 6px rgba(112,232,255,.60);
+          }}
+          .sleep-dot {{ background:#516b80; opacity:.7; }}
+          .asp-result {{
+            margin-top:12px;
+            display:grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap:7px;
+          }}
+          .asp-result-item {{
+            min-height:55px;
+            padding:8px 6px;
+            border-radius:12px;
+            text-align:center;
+            background:rgba(15,57,86,.54);
+            border:1px solid rgba(110,190,229,.15);
+          }}
+          .asp-result-item strong {{
+            display:block;
+            font-size:9px;
+            color:#dff6ff;
+            margin-bottom:3px;
+          }}
+          .asp-result-item span {{
+            display:block;
+            font-size:7.5px;
+            line-height:1.35;
+            color:#84b3c9;
+          }}
+          .asp-foot {{
+            margin-top:9px;
+            text-align:center;
+            font-size:7.5px;
+            line-height:1.4;
+            color:#688fa4;
+          }}
+        </style>
 
         <div class="asp-shell">
           <div class="asp-head">
@@ -3711,7 +3769,7 @@ elif st.session_state.app_view == "RESULTS":
           <div class="asp-maps">
             <div>
               <div class="asp-map-title">
-                <b>Before</b><span>활성 센서 30개</span>
+                <b>Before</b><span>활성 센서 {current_sensor_count}개</span>
               </div>
               <svg class="room" viewBox="0 0 100 100">
                 <rect x="5" y="5" width="90" height="90" rx="5"
@@ -3744,15 +3802,36 @@ elif st.session_state.app_view == "RESULTS":
             </div>
           </div>
 
+          <div class="asp-legend">
+            <span><i class="legend-dot active-dot"></i>활성 센서</span>
+            <span><i class="legend-dot sleep-dot"></i>비활성 센서</span>
+          </div>
+          <div style="margin-top:9px;text-align:center;font-size:7.5px;line-height:1.55;color:#8db9ce;">
+            <div><b style="color:#ccefff;">Before Nodes</b> · {current_node_text}</div>
+            <div><b style="color:#ccefff;">After Nodes</b> · {recommended_node_text}</div>
+          </div>
+            <div class="asp-result-item">
+              <strong>안정화 후 효율 운용</strong>
+              <span>중복 모니터링을 줄이고 핵심 센서 중심으로 운영</span>
+            </div>
+            <div class="asp-result-item">
+              <strong>변화 시 재활성화</strong>
+              <span>불균형이 다시 커지면 활성 센서 수를 확대</span>
+            </div>
+          </div>
+
+          <div class="asp-foot">
+            설치 센서를 제거하는 것이 아니라, 현재 모니터링에 사용하는 활성 센서 수를 조정하는 운영안입니다.
+          </div>
         </div>
         """
 
-        components.html(adaptive_sensor_html, height=402, scrolling=False)
+        components.html(adaptive_sensor_html, height=395, scrolling=False)
 
         st.markdown(
             """
             <div style="
-                margin:6px 2px 12px 2px;
+                margin:18px 2px 12px 2px;
                 padding:15px 16px;
                 border-radius:18px;
                 background:rgba(7, 41, 70, 0.52);
@@ -3826,14 +3905,8 @@ elif st.session_state.app_view == "COMPARE":
         dtype=float,
     )
 
-    # BEFORE is the current temperature entered on HOME.
-    # The displayed current field was shifted by a constant offset to match it.
-    before_mean = float(
-        res.get(
-            "current_temp_query_c",
-            st.session_state.get("current_temp_query", np.nanmean(result_current_nodes)),
-        )
-    )
+    # Use the same definitions for BEFORE and AFTER so the comparison is fair.
+    before_mean = float(np.nanmean(result_current_nodes))
     after_mean = float(np.nanmean(result_pred_nodes))
 
     before_p05 = float(np.nanpercentile(result_current_nodes, 5))
@@ -4065,7 +4138,7 @@ elif st.session_state.app_view == "COMPARE":
 
     compare_view = field_view_selector("compare_map_view")
 
-    before_active_sensor_count = int(res.get("initial_sensor_count", 30))
+    before_active_sensor_count = int(res.get("initial_sensor_count", MAX_ACTIVE_SENSORS))
     after_active_sensor_count = int(
         res.get(
             "recommended_sensor_count",
