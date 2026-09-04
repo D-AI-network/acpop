@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v44
+# FACTOR_UI_BUILD = 2026-09-03-v45
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -61,6 +61,7 @@ except Exception as exc:
 
 SENSOR_ICON_SVG_B64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgdmlld0JveD0iMCAwIDcyIDcyIj4KICA8cmVjdCB4PSIxOCIgeT0iOCIgd2lkdGg9IjM2IiBoZWlnaHQ9IjE0IiByeD0iNyIgZmlsbD0iIzEyM2I1ZCIvPgogIDxjaXJjbGUgY3g9IjM2IiBjeT0iMTUiIHI9IjIuNiIgZmlsbD0iIzlmZTRmZiIvPgogIDxwYXRoIGQ9Ik0yOSAzMCBRMzYgMjQgNDMgMzAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0yNCAzOCBRMzYgMjkgNDggMzgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0xOSA0NyBRMzYgMzQgNTMgNDciIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4="
 RESULT_TITLE_SNOWFLAKE_B64 = "iVBORw0KGgoAAAANSUhEUgAAADQAAAArCAYAAAA3+KulAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAFiUAABYlAUlSJPAAAAWzSURBVGhD7ZdbbBRVHIe/M2d2ptttaUvLLW0plypIIVQJmqgx8Rb1RU0MCYk34osPvImG+IBREw2EYDTGB4MaERN88JIYiRo0KkGxolZrQZFSoKWFtRfsdWd25pzjwwCF3Vppd4vV9HubmZxz5juX3/xHhGFo+B9hZd74rzMtNNWZFprqTAtNdS6bUGO35vmmgL4w80l+mTShU/2GZz5Pc6BTA7C3U9HQZfh9IPqOv3BMsalVZbTKnUkTSgXw1THFU3sDdrcqDFAgBalQ89jBgE+TIR3D+S9SRL5Kn1QA7zUG3FVnU54QAHx+VLH524BEsUU8boi5Es/R9GGYYcPWOpcF8aj9rk5NhxY8XhW1nSh5W6FPD4W8vj/k44Mjh+TWxZKN18cY9DXdnsES0BdoSmKwbblzXgbg66TgJ8/QkpoiQlfNkwAcaIvOzDluWyh58roYANrATEewbVmM+QUjL96agjIh6e8PqY3ntmFyFtqyJ80nhxRLZgtK44KmDo2XkWS3zpfcXiVJa8P6Wofq+MXDfpxU9GvFPBs6fVjf5LM5Y2IulZyEBn346ohiy54063b6FDrR/aaO7JdxJQwrTWyUEX/6U3NaKbrShmeaNV7a5te+iSXgKN1fOkUuvPlgAXcuk5zo1QyHNgA/tGW/TI9nSCnD6eHsZwNpcBDU23FOhQE1xYYdK6JtOl5yTrkDbZrvTyh2N4cMpcGxLeaUutTNTfPA6hgHuzU7WkISxRLHgWFjcBx4ojZG84Bi18mQBZZLt1K0hyGuBStLLG6vsLipPDqX4yEnofu2e/Re8C1ZVC6or5bsO6ro9SCRkCRmG+IJi3muprLEonFIE3ckbSkFRlBoCWIxg8GQ9AyLHIcKKTmaTmPbijevdi8a85/ISWjD+z6ziwWraySrqi1K4lFy+SG8tj9g93FFTU2M9XUWy8tHUm1LS0DnsEWrp1g7T3J/9chK7OvRfNaj+W1As7TY4ukro218qeQkNBY/tGu2/hiytELw9A0Xn4chBY/9ouhOa967dmJn5e/IKRTGIhUYpIRSN/tDmZCgjUGZ/M9lTkJftyqSZ4vNTCqKLFLDhsN92RHecEZTKAX2GKN/cEqzr2f0vscipy1380spbCmoKpXUV8E11Rb1lZI9h0PeaAgYFrCszqFMaB5cZlOVEOzv1bzTqQg1SG2RQvHIApsSG/Z0aZr6NVJbFAkLFYftdWNYj0JOQjsaQr47HnLodNRFcdwm5StCbSiKw7rrY3zZoQmKJEZCgCbhWgwYTV2poMsztA3CFY5Lj1KEGNqDAGMMpY7F2kqbe+deRqFz/P6HYcP7HoN+dH3lbMHme1zKCgW+gg9bQnZ3aHwb5syAu6skt1REyfZFj2JrS8hMy6bKtjmufV5e4TDrbNUxXsanPwqv7A14dNeIDMAdV9mUFUZh4EpYs8Rm1SwLYQRrq+3zMgA3l0sqHEGXUjT6HoESbPg54I2T2RXFpZCT0KAP7zaGVJYKNt3lUDMz6m7V/OxuBeBYApEdetSe/X+qKYCahCGpFJ8k/wWhIhd2PlTA2w8XsLLS4kSvpjwhzoudYyiApm6FLQTfjJJcN860qHddkml4oc5h+8o4L6+Y2J7LSQigqiya3R/bo3jOXJ2hAB7/0ufYgEEZaO6FF1sv/r+4pULSGqTxNPwZwvy4Yc7EfHIXOsesIkFJgeDuC6rkVAAbP/M5ciZalUAb2v2Qzj6bbUeDC1rD4mKQo2zH8ZKXlBsNL4QNH3n8NgCrayxmzRB802tYU2vxbpemApvFJZonasdXq/0TeVuhTA4nNb92GernWjx7g4MjBSmlWVgkeW5JjNM6oOFMdhWRK5O2QgDNSc3yOdGc7Twc8tbxkFdvdFmUEJxMGQY1LD2bcPliUoUuxFNwYsiwZEZ+BTK5bEKXi0k7Q/8W00JTnWmhqc600FTnL6xOZyI/rRPuAAAAAElFTkSuQmCC"
+WHITE_SENSOR_DROP_SVG_B64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0Ij4KPHBhdGggZD0iTTMyIDUgQzMyIDUgMTQgMjIgMTQgMzggQzE0IDUwIDIyIDU5IDMyIDU5IEM0MiA1OSA1MCA1MCA1MCAzOCBDNTAgMjIgMzIgNSAzMiA1IFoiIGZpbGw9IiNmZmZmZmYiLz4KPC9zdmc+"
 
 # MERGED_HOME_BUILD = 2026-09-03-v8_HOME_CONTROL_COMBINED
 
@@ -1137,6 +1138,31 @@ div[data-testid="stSpinner"] p {
   letter-spacing: -0.2px !important;
 }
 
+
+/* Field view selector: compact 3D / 2D toggle inside each Field section */
+[data-testid="stSegmentedControl"] {
+  width: fit-content !important;
+  margin: 0 0 8px auto !important;
+}
+[data-testid="stSegmentedControl"] button {
+  min-height: 30px !important;
+  padding: 4px 13px !important;
+  font-family: 'Outfit', 'Inter', sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+.st-key-home_field_view [data-testid="stRadio"],
+.st-key-result_current_view [data-testid="stRadio"],
+.st-key-result_predicted_view [data-testid="stRadio"],
+div[class*="st-key-home_field_view"] [data-testid="stRadio"],
+div[class*="st-key-result_current_view"] [data-testid="stRadio"],
+div[class*="st-key-result_predicted_view"] [data-testid="stRadio"] {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 0 7px 0 !important;
+}
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -1952,6 +1978,140 @@ for nid, meta in ROA_NODES_META.items():
     sensor_plot_meta[nid] = m
 
 
+
+def field_view_selector(key: str) -> str:
+    """Small 3D / 2D selector. Uses segmented control when available."""
+    if key not in st.session_state:
+        st.session_state[key] = "3D"
+
+    if hasattr(st, "segmented_control"):
+        selected = st.segmented_control(
+            "Field view",
+            options=["3D", "2D"],
+            selection_mode="single",
+            key=key,
+            label_visibility="collapsed",
+        )
+        return selected or "3D"
+
+    return st.radio(
+        "Field view",
+        options=["3D", "2D"],
+        horizontal=True,
+        key=key,
+        label_visibility="collapsed",
+    )
+
+
+def make_2d_heatmap(grid_data, height=315):
+    """Classic top-down 2D temperature map used when the user selects 2D."""
+    heatmap_data = np.asarray(grid_data, dtype=float)
+
+    temp_scale = [
+        [0.00, "#8ee7ff"],
+        [0.18, "#50c9ff"],
+        [0.36, "#17bed0"],
+        [0.54, "#4edb78"],
+        [0.70, "#b9e63d"],
+        [0.84, "#ffa13a"],
+        [1.00, "#e63a32"],
+    ]
+
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=heatmap_data,
+            x=grid_len_axis,
+            y=grid_wid_axis,
+            colorscale=temp_scale,
+            hoverongaps=False,
+            zmin=18.0,
+            zmax=28.0,
+            colorbar=dict(
+                title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
+                thickness=5,
+                len=0.68,
+                x=0.99,
+                tickvals=[18, 20, 22, 24, 26, 28],
+                tickfont=dict(size=8, color="#d9f3ff"),
+                outlinecolor="rgba(174,228,255,0.18)",
+            ),
+            hovertemplate=(
+                "X: %{x:.2f} m<br>"
+                "Y: %{y:.2f} m<br>"
+                "온도: %{z:.2f} °C"
+                "<extra></extra>"
+            ),
+        )
+    )
+
+    sx = [meta["x_plot"] for meta in sensor_plot_meta.values()]
+    sy = [meta["y_plot"] for meta in sensor_plot_meta.values()]
+
+    sensor_hover = []
+    for nid, meta in sensor_plot_meta.items():
+        ix = int(np.argmin(np.abs(grid_len_axis - float(meta["x_plot"]))))
+        iy = int(np.argmin(np.abs(grid_wid_axis - float(meta["y_plot"]))))
+        sampled = float(heatmap_data[iy, ix])
+        sensor_hover.append(
+            f"<b>{meta['name']}</b><br>"
+            f"X={meta['x_plot']:.2f}m, Y={meta['y_plot']:.2f}m<br>"
+            f"온도={sampled:.2f}°C"
+        )
+
+    fig.add_trace(
+        go.Scatter(
+            x=sx,
+            y=sy,
+            mode="markers",
+            marker=dict(size=22, color="rgba(0,0,0,0)"),
+            hovertext=sensor_hover,
+            hoverinfo="text",
+            showlegend=False,
+        )
+    )
+
+    sensor_uri = f"data:image/svg+xml;base64,{WHITE_SENSOR_DROP_SVG_B64}"
+    for x_pos, y_pos in zip(sx, sy):
+        fig.add_layout_image(
+            dict(
+                source=sensor_uri,
+                x=x_pos,
+                y=y_pos,
+                xref="x",
+                yref="y",
+                sizex=0.34,
+                sizey=0.34,
+                xanchor="center",
+                yanchor="middle",
+                sizing="contain",
+                opacity=1.0,
+                layer="above",
+            )
+        )
+
+    fig.update_layout(
+        height=height,
+        margin=dict(l=0, r=4, t=0, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        showlegend=False,
+        xaxis=dict(
+            range=[float(grid_len_axis.min()), float(grid_len_axis.max())],
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+        ),
+        yaxis=dict(
+            range=[float(grid_wid_axis.min()), float(grid_wid_axis.max())],
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            scaleanchor="x",
+            scaleratio=1,
+        ),
+    )
+    return fig
+
 def make_mobile_heatmap(grid_data, height=340):
     """Interactive 3D spatial-temperature surface used by HOME and RESULTS."""
     surface_data = np.asarray(grid_data, dtype=float)
@@ -2234,9 +2394,9 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
             )
         )
 
-    # Sensor positions: OPTION 3 — pin(marker)-style.
-    # A white circular head + a small downward tip + navy center.
-    # This reads as a location pin and is visually distinct from the round CFD nodes.
+    # Sensor positions: all-white inverted water-drop style.
+    # Plotly Scatter3d cannot use arbitrary image markers, so the silhouette is
+    # composed from a small white circular body plus a white upward tip.
     sensor_x, sensor_y, sensor_z, sensor_hover = [], [], [], []
     for nid, meta in ROA_NODES_META.items():
         target = np.asarray(
@@ -2255,17 +2415,17 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
             f"온도={temps[idx]:.2f}°C"
         )
 
-    # White pin head
+    # Rounded lower body.
     fig.add_trace(
         go.Scatter3d(
             x=sensor_x,
             y=sensor_y,
-            z=[z + 0.075 for z in sensor_z],
+            z=[z + 0.045 for z in sensor_z],
             mode="markers",
             marker=dict(
-                size=7.0,
+                size=5.5,
                 color="#ffffff",
-                line=dict(color="#dff7ff", width=0.9),
+                line=dict(color="#ffffff", width=0.5),
                 symbol="circle",
                 opacity=1.0,
             ),
@@ -2275,38 +2435,18 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
         )
     )
 
-    # White downward tip — use a text glyph because Scatter3d supports only
-    # a limited marker-symbol set (triangle-down is not supported).
+    # Pointed upper tip: together with the circle it reads as an upside-down drop.
     fig.add_trace(
         go.Scatter3d(
             x=sensor_x,
             y=sensor_y,
-            z=[z - 0.010 for z in sensor_z],
+            z=[z + 0.135 for z in sensor_z],
             mode="text",
-            text=["▼"] * len(sensor_x),
+            text=["▲"] * len(sensor_x),
             textfont=dict(
-                size=13,
+                size=10,
                 color="#ffffff",
                 family="Arial Black",
-            ),
-            hoverinfo="skip",
-            showlegend=False,
-        )
-    )
-
-    # Navy center dot
-    fig.add_trace(
-        go.Scatter3d(
-            x=sensor_x,
-            y=sensor_y,
-            z=[z + 0.082 for z in sensor_z],
-            mode="markers",
-            marker=dict(
-                size=2.4,
-                color="#123b5d",
-                line=dict(width=0),
-                symbol="circle",
-                opacity=1.0,
             ),
             hoverinfo="skip",
             showlegend=False,
@@ -2463,8 +2603,14 @@ elif st.session_state.app_view == "HOME":
     )
 
     with st.container(key="temperature_map_card"):
+        home_field_view = field_view_selector("home_field_view")
+        if home_field_view == "3D":
+            home_fig = make_true_3d_field(current_coords, current_temp_nodes, height=410)
+        else:
+            home_fig = make_2d_heatmap(field_current_grid, height=315)
+
         st.plotly_chart(
-            make_true_3d_field(current_coords, current_temp_nodes, height=410),
+            home_fig,
             use_container_width=True,
             config={"displayModeBar": False},
         )
@@ -2911,8 +3057,18 @@ elif st.session_state.app_view == "RESULTS":
 
         with st.container(key="field_comparison_card"):
             st.markdown('<div class="field-map-title current-title">Current Field</div>', unsafe_allow_html=True)
+            current_view = field_view_selector("result_current_view")
+            if current_view == "3D":
+                current_fig = make_true_3d_field(
+                    result_current_coords,
+                    result_current_nodes,
+                    height=420,
+                )
+            else:
+                current_fig = make_2d_heatmap(result_current_grid, height=315)
+
             st.plotly_chart(
-                make_true_3d_field(result_current_coords, result_current_nodes, height=420),
+                current_fig,
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
@@ -2920,8 +3076,18 @@ elif st.session_state.app_view == "RESULTS":
             st.markdown('<div class="field-map-divider"></div>', unsafe_allow_html=True)
 
             st.markdown('<div class="field-map-title current-title">Predicted Field</div>', unsafe_allow_html=True)
+            predicted_view = field_view_selector("result_predicted_view")
+            if predicted_view == "3D":
+                predicted_fig = make_true_3d_field(
+                    result_pred_coords,
+                    result_pred_nodes,
+                    height=420,
+                )
+            else:
+                predicted_fig = make_2d_heatmap(field_post_grid, height=315)
+
             st.plotly_chart(
-                make_true_3d_field(result_pred_coords, result_pred_nodes, height=420),
+                predicted_fig,
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
