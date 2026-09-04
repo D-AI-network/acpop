@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v47
+# FACTOR_UI_BUILD = 2026-09-04-v48
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -1466,34 +1466,49 @@ if st.session_state.app_view == "INTRO":
     st.markdown(
         """
         <style>
-        /* INTRO: make the target artwork fill the phone canvas exactly. */
+        /* INTRO: restore a darker navy page and add a mobile-app shell. */
         .stApp {
-            background: #020816 !important;
+            background: linear-gradient(180deg, #061427 0%, #071a2f 100%) !important;
         }
 
         .block-container {
-            max-width: 440px !important;
-            padding: 0 !important;
-            margin: 0.45rem auto 0 auto !important;
+            max-width: 472px !important;
+            padding: 0.85rem 0.85rem 1.3rem 0.85rem !important;
+            margin: 0.7rem auto 1.0rem auto !important;
             background: transparent !important;
             border: none !important;
             border-radius: 0 !important;
             box-shadow: none !important;
         }
 
-        /* Remove Streamlit's vertical spacing around the image HTML. */
         [data-testid="stVerticalBlock"] {
             gap: 0 !important;
+        }
+
+        .coollins-intro-shell {
+            width: 100%;
+            max-width: 440px;
+            margin: 0 auto;
+            padding: 1.0rem 0.95rem 1.15rem 0.95rem;
+            background: linear-gradient(180deg, #173a59 0%, #102c47 100%);
+            border: 1.2px solid rgba(133, 202, 245, 0.22);
+            border-radius: 36px;
+            box-shadow: 0 24px 56px -20px rgba(0, 8, 20, 0.55);
+            overflow: hidden;
+        }
+
+        .coollins-intro-shell .phone-notch {
+            margin: 0 auto 14px auto;
         }
 
         .coollins-intro-target {
             position: relative;
             width: 100%;
-            max-width: 440px;
             margin: 0 auto;
             line-height: 0;
             overflow: hidden;
             background: #020816;
+            border-radius: 28px;
         }
 
         .coollins-intro-target img {
@@ -1504,6 +1519,7 @@ if st.session_state.app_view == "INTRO":
             padding: 0;
             user-select: none;
             -webkit-user-drag: none;
+            border-radius: 28px;
         }
 
         /* Transparent real click target placed exactly over the button in the artwork. */
@@ -1514,7 +1530,7 @@ if st.session_state.app_view == "INTRO":
             width: 85.6%;
             height: 9.35%;
             display: block;
-            border-radius: 18px;
+            border-radius: 22px;
             cursor: pointer;
             text-decoration: none !important;
             background: rgba(0,0,0,0.001);
@@ -2529,18 +2545,25 @@ if st.session_state.app_view != "INTRO":
 if st.session_state.app_view == "INTRO":
     st.markdown(
         f"""
-        <div class="coollins-intro-target">
-            <img
-                src="data:image/webp;base64,{INTRO_IMAGE_WEBP_B64}"
-                alt="COOLLINS AI Smart Cooling Optimizer 소개 화면"
-            />
-            <a
-                class="coollins-intro-enter"
-                href="?enter=1"
-                target="_self"
-                aria-label="냉방 상태 확인하기"
-                title="냉방 상태 확인하기"
-            ></a>
+        <div class="coollins-intro-shell">
+            <div class="phone-notch">
+                <div class="notch-cam"></div>
+                <div class="notch-speaker"></div>
+            </div>
+
+            <div class="coollins-intro-target">
+                <img
+                    src="data:image/webp;base64,{INTRO_IMAGE_WEBP_B64}"
+                    alt="COOLLINS AI Smart Cooling Optimizer 소개 화면"
+                />
+                <a
+                    class="coollins-intro-enter"
+                    href="?enter=1"
+                    target="_self"
+                    aria-label="냉방 상태 확인하기"
+                    title="냉방 상태 확인하기"
+                ></a>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
