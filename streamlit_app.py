@@ -1384,9 +1384,9 @@ ROA_NODE_IDS = list(ROA_NODES_META.keys())
 
 # Validation-selected nested sensor hierarchy:
 # 5 ⊂ 6 ⊂ 7 ⊂ 8 ⊂ 9 ⊂ 10
-FINAL_NESTED_SENSOR_ORDER = (653, 887, 1036, 639, 1229, 670, 323, 859, 1050, 551)
+FINAL_NESTED_SENSOR_ORDER = (653, 887, 1036, 639, 1229, 670, 323, 859, 1050, 551, 739, 750, 4, 1255, 721)
 MIN_ACTIVE_SENSORS = 5
-MAX_ACTIVE_SENSORS = 10
+MAX_ACTIVE_SENSORS = 15
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -1602,7 +1602,7 @@ def load_reconstruction_basis():
 
 
 def _nested_sensor_order(n_nodes: int):
-    """Read the validated 5→10 nested order from the NPZ; use the validated fallback if needed."""
+    """Read the validated 5→15 nested order from the NPZ; use the validated fallback if needed."""
     order = None
     if basis_assets is not None:
         try:
@@ -1628,17 +1628,18 @@ def _nested_sensor_order(n_nodes: int):
 
 def _active_sensor_count_from_temperature(reference_temp_c: float, target_temp_c: float) -> int:
     """
-    Transparent 5–10 activation policy.
+    Transparent 5–15 activation policy.
 
     The validated sensor locations are data-driven. The activation count is an
-    operational policy: approximately one additional active sensor per 1°C of
-    target deviation, rounded to the nearest degree and clipped to [5, 10].
+    operational policy: one additional active sensor per 0.5°C of target
+    deviation, clipped to [5, 15].
 
-    For target 24°C:
-      24.0→5, 25.0→6, 26.0→7, 27.0→8, 28.0→9, 29°C+→10.
+    Example for target 24°C:
+      <24.5→5, 24.5→6, 25.0→7, 25.5→8, 26.0→9,
+      26.5→10, 27.0→11, 27.5→12, 28.0→13, 28.5→14, 29.0°C+→15.
     """
     error_c = abs(float(reference_temp_c) - float(target_temp_c))
-    extra = int(np.floor(error_c + 0.5))
+    extra = int(np.floor((error_c + 1e-9) / 0.5))
     return int(np.clip(MIN_ACTIVE_SENSORS + extra, MIN_ACTIVE_SENSORS, MAX_ACTIVE_SENSORS))
 
 
@@ -2384,7 +2385,8 @@ def _select_adaptive_sensor_points(coords_xyz, temp_nodes, sensor_count):
     Return the validated nested active sensor set for display.
 
     Sensor order is loaded from sensor_reconstruction_basis.npz:
-    653, 887, 1036, 639, 1229, 670, 323, 859, 1050, 551.
+    653, 887, 1036, 639, 1229, 670, 323, 859, 1050, 551,
+    739, 750, 4, 1255, 721.
     The first K nodes are active, preserving the strict nested hierarchy.
     """
     coords_xyz = np.asarray(coords_xyz, dtype=float)
@@ -2801,7 +2803,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
         )
 
     # Adaptive sensor overlay.
-    # HOME can hide it entirely; comparison screens use the validated nested 10 -> 5 hierarchy.
+    # HOME can hide it entirely; comparison screens use the validated nested 15 -> 5 hierarchy.
     if show_sensors:
         selected_xyz, selected_temp, selected_names = _select_adaptive_sensor_points(
             coords_xyz,
@@ -3454,8 +3456,8 @@ elif st.session_state.app_view == "RESULTS":
 
         # --------------------------------------------------------
         # Adaptive Sensor Plan
-        # Validated nested sensor hierarchy: 5 -> 6 -> 7 -> 8 -> 9 -> 10.
-        # Only ACTIVE monitoring count changes; installed pool stays at 10.
+        # Validated nested sensor hierarchy: 5 -> 6 -> ... -> 14 -> 15.
+        # Only ACTIVE monitoring count changes; installed pool stays at 15.
         # --------------------------------------------------------
         current_reference_temp = float(
             res.get("current_temp_query_c", st.session_state.current_temp_query)
@@ -3480,15 +3482,18 @@ elif st.session_state.app_view == "RESULTS":
         if recommended_sensor_count <= 5:
             sensor_stage = "안정 운전"
             sensor_reason = "목표 온도에 가까워져 검증된 핵심 센서 5개만 활성화합니다."
-        elif recommended_sensor_count <= 7:
+        elif recommended_sensor_count <= 8:
             sensor_stage = "안정화 단계"
             sensor_reason = f"목표 편차 {predicted_error_c:.1f}°C에 맞춰 {recommended_sensor_count}개 센서를 활성화합니다."
-        elif recommended_sensor_count <= 9:
+        elif recommended_sensor_count <= 12:
             sensor_stage = "정밀 모니터링"
             sensor_reason = f"목표 편차 {predicted_error_c:.1f}°C가 남아 {recommended_sensor_count}개 센서를 활성화합니다."
+        elif recommended_sensor_count < 15:
+            sensor_stage = "고밀도 모니터링"
+            sensor_reason = f"목표 편차가 커 {recommended_sensor_count}개 센서를 활성화합니다."
         else:
             sensor_stage = "최대 모니터링"
-            sensor_reason = "목표 온도와의 차이가 커 최대 10개 센서를 활성화합니다."
+            sensor_reason = "목표 온도와의 차이가 커 최대 15개 센서를 활성화합니다."
 
         deactivated_sensor_count = current_sensor_count - recommended_sensor_count
 
