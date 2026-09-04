@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v51
+# FACTOR_UI_BUILD = 2026-09-04-v52
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -1416,9 +1416,18 @@ if "target_temp" not in st.session_state:
     st.session_state.target_temp = 24.0
 
 # User-described CURRENT room temperature used to retrieve the closest real CFD case.
+# Start the demo at 28.0 °C. The user can still edit it afterwards.
 # This is deliberately separate from the HOME widget key so it survives navigation.
 if "current_temp_query" not in st.session_state:
-    st.session_state.current_temp_query = None
+    st.session_state.current_temp_query = 28.0
+
+# One-time v52 migration: when this new build is first loaded in an already-open
+# Streamlit session, reset the HOME current-temperature field to the intended
+# demo starting value. It will NOT reset again on ordinary reruns/navigation.
+if "default_current_temp_v52_initialized" not in st.session_state:
+    st.session_state.current_temp_query = 28.0
+    st.session_state.home_current_temp_widget = 28.0
+    st.session_state.default_current_temp_v52_initialized = True
 
 # Optimization policy is intentionally fixed in the simplified UI.
 st.session_state.policy = "Balanced (균형)"
@@ -1908,16 +1917,9 @@ if FIELD_ZIP_PATH is None and FIELD_ZIP_ERROR:
         f"({FIELD_ZIP_ERROR})"
     )
 
-# Initialize the current-temperature input from DP 0 (Current) once, if possible.
+# Safety fallback only. Normal demo startup is fixed at 28.0 °C above.
 if st.session_state.current_temp_query is None:
-    default_current_temp = 24.0
-    if scenario_table is not None and len(scenario_table):
-        dp0 = scenario_table[pd.to_numeric(scenario_table["dp_id"], errors="coerce") == 0]
-        if len(dp0):
-            default_current_temp = float(dp0.iloc[0]["mean_temp_c"])
-        else:
-            default_current_temp = float(scenario_table.iloc[0]["mean_temp_c"])
-    st.session_state.current_temp_query = float(default_current_temp)
+    st.session_state.current_temp_query = 28.0
 
 matched_scenario = _find_nearest_cfd_scenario(
     float(st.session_state.current_temp_query),
