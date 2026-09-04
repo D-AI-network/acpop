@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v58
+# FACTOR_UI_BUILD = 2026-09-04-v59
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -21,6 +21,7 @@ import zipfile
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -509,28 +510,46 @@ div[data-testid="stPlotlyChart"] {
   opacity: 0.75;
 }
 .air-rays {
-  width: 78px;
+  width: 126px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-top: 3px;
+  gap: 8px;
+  margin-top: 6px;
+}
+.air-dir {
+  width: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1px;
+}
+.air-dir-tag {
+  font-size: 11px;
+  line-height: 1.0;
+  font-weight: 800;
+  color: rgba(129, 215, 255, 0.32);
+  letter-spacing: 0.02em;
 }
 .air-ray {
-  width: 23px;
-  height: 28px;
+  width: 36px;
+  height: 34px;
   text-align: center;
-  color: rgba(129, 215, 255, 0.20);
-  font-size: 24px;
-  line-height: 25px;
-  font-weight: 400;
+  color: rgba(129, 215, 255, 0.24);
+  font-size: 31px;
+  line-height: 32px;
+  font-weight: 800;
   transition: .15s ease;
 }
-.air-ray.active {
-  color: #73dcff;
-  text-shadow: 0 0 8px rgba(82, 209, 255, 0.30);
+.air-dir.active .air-dir-tag {
+  color: #dff7ff;
 }
-.air-ray.left { transform: rotate(18deg); }
-.air-ray.right { transform: rotate(-18deg); }
+.air-dir.active .air-ray {
+  color: #73dcff;
+  text-shadow: 0 0 12px rgba(82, 209, 255, 0.38);
+  transform: translateY(-1px) scale(1.06);
+}
 
 /* Flow strength: five vertical bars */
 .flow-bars {
@@ -3310,9 +3329,9 @@ elif st.session_state.app_view == "RESULTS":
             f'<div class="air-direction-wrap">'
             f'<div class="ac-mini"></div>'
             f'<div class="air-rays">'
-            f'<span class="air-ray left {"active" if left_on else ""}">⌄</span>'
-            f'<span class="air-ray {"active" if middle_on else ""}">↓</span>'
-            f'<span class="air-ray right {"active" if right_on else ""}">⌄</span>'
+            f'<div class="air-dir {"active" if left_on else ""}"><span class="air-ray">↙</span><span class="air-dir-tag">좌</span></div>'
+            f'<div class="air-dir {"active" if middle_on else ""}"><span class="air-ray">↓</span><span class="air-dir-tag">중</span></div>'
+            f'<div class="air-dir {"active" if right_on else ""}"><span class="air-ray">↘</span><span class="air-dir-tag">우</span></div>'
             f'</div>'
             f'</div>'
         )
@@ -3512,7 +3531,7 @@ elif st.session_state.app_view == "RESULTS":
             </svg>
         </div>
         '''
-        st.markdown(airflow_preview_html, unsafe_allow_html=True)
+        components.html(airflow_preview_html, height=470, scrolling=False)
 
         st.markdown(
             """
