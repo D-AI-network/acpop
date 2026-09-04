@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v66
+# FACTOR_UI_BUILD = 2026-09-04-v67
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -3723,10 +3723,6 @@ elif st.session_state.app_view == "RESULTS":
             </div>
           </div>
 
-          <div class="asp-reason">
-            <b style="color:#6de1ff;">{reduction_text}</b> · {sensor_reason}
-          </div>
-
           <div class="asp-maps">
             <div>
               <div class="asp-map-title">
@@ -3767,12 +3763,6 @@ elif st.session_state.app_view == "RESULTS":
             <span><i class="legend-dot active-dot"></i>활성 센서</span>
             <span><i class="legend-dot sleep-dot"></i>비활성 센서</span>
           </div>
-
-          <div class="asp-result">
-            <div class="asp-result-item">
-              <strong>빠른 초기 균형화</strong>
-              <span>초기에는 많은 센서로 공간 상태를 세밀하게 파악</span>
-            </div>
             <div class="asp-result-item">
               <strong>안정화 후 효율 운용</strong>
               <span>중복 모니터링을 줄이고 핵심 센서 중심으로 운영</span>
@@ -3789,7 +3779,7 @@ elif st.session_state.app_view == "RESULTS":
         </div>
         """
 
-        components.html(adaptive_sensor_html, height=505, scrolling=False)
+        components.html(adaptive_sensor_html, height=395, scrolling=False)
 
         st.markdown(
             """
@@ -3980,14 +3970,14 @@ elif st.session_state.app_view == "COMPARE":
             gap:8px;
         }
         .compare-before, .compare-after {
-            font-size:20px;
+            font-size:24px;
             font-weight:800;
             color:#f7fbff;
         }
         .compare-after { text-align:right; }
         .compare-mini-arrow {
             color:#55d3ff;
-            font-size:18px;
+            font-size:26px;
             font-weight:800;
         }
         .compare-change {
