@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v52
+# FACTOR_UI_BUILD = 2026-09-04-v53
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -25,39 +25,59 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from scipy.interpolate import griddata
-import torch
 
 # ------------------------------------------------------------------
 # Real PopField inference backend.
-# The Streamlit UI imports the exact training/deployment architecture
-# and inference utilities instead of treating best_deploy.pt as a raw dict.
+# IMPORTANT FOR FAST START:
+# Do NOT import PyTorch / the PopField model module during the splash screen.
+# They are imported lazily only when inference/optimization is actually needed.
 # ------------------------------------------------------------------
-try:
-    from demo_v3_hackathon_enhanced import (
-        COND_COLS,
-        load_case_info as popfield_load_case_info,
-        load_checkpoint as popfield_load_checkpoint,
-        optimize_hvac as popfield_optimize_hvac,
-        predict_conditions as popfield_predict_conditions,
-    )
-    POPFIELD_BACKEND_IMPORT_ERROR = None
-except Exception as exc:
-    COND_COLS = [
-        "P80 - Inlet L",
-        "P81 - Inlet M",
-        "P82 - Inlet R",
-        "P83 - external",
-        "P84 - meeting",
-        "P85 - server",
-        "P86 - working",
-        "P87 - CMM",
-        "P88 - AirTemp",
-    ]
-    popfield_load_case_info = None
-    popfield_load_checkpoint = None
-    popfield_optimize_hvac = None
-    popfield_predict_conditions = None
-    POPFIELD_BACKEND_IMPORT_ERROR = repr(exc)
+COND_COLS = [
+    "P80 - Inlet L",
+    "P81 - Inlet M",
+    "P82 - Inlet R",
+    "P83 - external",
+    "P84 - meeting",
+    "P85 - server",
+    "P86 - working",
+    "P87 - CMM",
+    "P88 - AirTemp",
+]
+popfield_load_case_info = None
+popfield_load_checkpoint = None
+popfield_optimize_hvac = None
+popfield_predict_conditions = None
+POPFIELD_BACKEND_IMPORT_ERROR = None
+
+
+def _lazy_import_popfield_modules():
+    """Import heavy PopField/PyTorch dependencies only when AI inference is requested."""
+    global COND_COLS
+    global popfield_load_case_info, popfield_load_checkpoint
+    global popfield_optimize_hvac, popfield_predict_conditions
+    global POPFIELD_BACKEND_IMPORT_ERROR
+
+    if popfield_load_checkpoint is not None and popfield_optimize_hvac is not None:
+        return True
+
+    try:
+        from demo_v3_hackathon_enhanced import (
+            COND_COLS as _COND_COLS,
+            load_case_info as _load_case_info,
+            load_checkpoint as _load_checkpoint,
+            optimize_hvac as _optimize_hvac,
+            predict_conditions as _predict_conditions,
+        )
+        COND_COLS = _COND_COLS
+        popfield_load_case_info = _load_case_info
+        popfield_load_checkpoint = _load_checkpoint
+        popfield_optimize_hvac = _optimize_hvac
+        popfield_predict_conditions = _predict_conditions
+        POPFIELD_BACKEND_IMPORT_ERROR = None
+        return True
+    except Exception as exc:
+        POPFIELD_BACKEND_IMPORT_ERROR = repr(exc)
+        return False
 
 SENSOR_ICON_SVG_B64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgdmlld0JveD0iMCAwIDcyIDcyIj4KICA8cmVjdCB4PSIxOCIgeT0iOCIgd2lkdGg9IjM2IiBoZWlnaHQ9IjE0IiByeD0iNyIgZmlsbD0iIzEyM2I1ZCIvPgogIDxjaXJjbGUgY3g9IjM2IiBjeT0iMTUiIHI9IjIuNiIgZmlsbD0iIzlmZTRmZiIvPgogIDxwYXRoIGQ9Ik0yOSAzMCBRMzYgMjQgNDMgMzAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0yNCAzOCBRMzYgMjkgNDggMzgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0xOSA0NyBRMzYgMzQgNTMgNDciIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzEyM2I1ZCIgc3Ryb2tlLXdpZHRoPSIzLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4="
 RESULT_TITLE_SNOWFLAKE_B64 = "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"
@@ -1299,7 +1319,8 @@ def _discover_cfd_zip():
     return None, "; ".join(diagnostics) if diagnostics else "no CFD dpN.csv archive found", 0
 
 
-FIELD_ZIP_PATH, FIELD_ZIP_ERROR, FIELD_ZIP_DP_COUNT = _discover_cfd_zip()
+# Deferred until after the INTRO splash for faster cold start.
+FIELD_ZIP_PATH, FIELD_ZIP_ERROR, FIELD_ZIP_DP_COUNT = None, None, 0
 
 
 @st.cache_data(show_spinner=False)
@@ -1339,11 +1360,15 @@ def load_case_info():
 
 @st.cache_resource(show_spinner=False)
 def load_popfield_backend():
-    if POPFIELD_BACKEND_IMPORT_ERROR is not None:
+    # PyTorch + PopField architecture are imported only here, when needed.
+    if not _lazy_import_popfield_modules():
         return {
             "ok": False,
             "error": f"demo_v3_hackathon_enhanced.py import failed: {POPFIELD_BACKEND_IMPORT_ERROR}",
         }
+
+    import torch
+
     if CHECKPOINT_PATH is None:
         return {
             "ok": False,
@@ -1386,8 +1411,9 @@ def load_reconstruction_basis():
     return None
 
 
-case_info_df = load_case_info()
-basis_assets = load_reconstruction_basis()
+# Heavy/data assets are initialized only after the INTRO splash.
+case_info_df = None
+basis_assets = None
 
 
 # ============================================================
@@ -1562,6 +1588,32 @@ if st.session_state.app_view == "INTRO":
         unsafe_allow_html=True,
     )
 
+# ============================================================
+# FAST INTRO GATE
+# ============================================================
+# Render the splash immediately and stop execution here.
+# This prevents CFD ZIP scanning, 200-case indexing, Plotly field construction,
+# and PopField/PyTorch loading before the user presses the intro button.
+if st.session_state.app_view == "INTRO":
+    intro_html = (
+        f'<div class="coollins-intro-shell">'
+        f'<div class="phone-notch"><div class="notch-cam"></div><div class="notch-speaker"></div></div>'
+        f'<div class="coollins-intro-target">'
+        f'<img src="data:image/webp;base64,{INTRO_IMAGE_WEBP_B64}" '
+        f'alt="COOLLINS AI Smart Cooling Optimizer 소개 화면" />'
+        f'<a class="coollins-intro-enter" href="?enter=1" target="_self" '
+        f'aria-label="냉방 상태 확인하기" title="냉방 상태 확인하기"></a>'
+        f'</div></div>'
+    )
+    st.markdown(intro_html, unsafe_allow_html=True)
+    st.stop()
+
+
+# From HOME onward, initialize data assets.
+FIELD_ZIP_PATH, FIELD_ZIP_ERROR, FIELD_ZIP_DP_COUNT = _discover_cfd_zip()
+case_info_df = load_case_info()
+basis_assets = load_reconstruction_basis()
+
 dp_options = (
     case_info_df["Name"].dropna().tolist()
     if (case_info_df is not None and "Name" in case_info_df.columns)
@@ -1726,17 +1778,51 @@ def _requested_heat_loads_from_ui():
 
 @st.cache_data(show_spinner=False)
 def load_cfd_temperature_index(zip_path_str: str, file_mtime_ns: int, file_size: int):
-    """Read all 200 CFD CSVs once and cache per-case spatial temperature statistics."""
-    del file_mtime_ns, file_size  # included only to invalidate Streamlit cache when file changes
+    """
+    Load per-DP temperature statistics.
+
+    FAST PATH:
+      1) cfd_temperature_index.csv next to streamlit_app.py
+      2) cfd_index.csv next to streamlit_app.py
+      3) a runtime /tmp sidecar generated by a previous session
+
+    FALLBACK:
+      Scan the CFD ZIP once, then write the small sidecar index so later sessions
+      in the same deployment/container do not need to parse all ~200 CSVs again.
+    """
+    del file_mtime_ns, file_size  # only used to invalidate Streamlit cache
+
+    required_cols = ["dp_id", "mean_temp_c", "p95_temp_c", "min_temp_c", "max_temp_c"]
+    runtime_index = Path(tempfile.gettempdir()) / "coollins_cfd_temperature_index.csv"
+    sidecar_candidates = [
+        APP_ROOT / "cfd_temperature_index.csv",
+        APP_ROOT / "cfd_index.csv",
+        runtime_index,
+    ]
+
+    for idx_path in sidecar_candidates:
+        if not idx_path.exists():
+            continue
+        try:
+            cached = pd.read_csv(idx_path)
+            if all(c in cached.columns for c in required_cols) and len(cached):
+                cached = cached[required_cols].copy()
+                cached["dp_id"] = pd.to_numeric(cached["dp_id"], errors="coerce")
+                cached = cached.dropna(subset=["dp_id"])
+                cached["dp_id"] = cached["dp_id"].astype(int)
+                return cached.sort_values("dp_id").reset_index(drop=True)
+        except Exception:
+            pass
+
     zip_path = Path(zip_path_str)
     rows = []
     if not zip_path.exists():
-        return pd.DataFrame(columns=["dp_id", "mean_temp_c", "p95_temp_c", "min_temp_c", "max_temp_c"])
+        return pd.DataFrame(columns=required_cols)
 
     try:
         zf_ctx = zipfile.ZipFile(zip_path, "r")
     except (zipfile.BadZipFile, OSError):
-        return pd.DataFrame(columns=["dp_id", "mean_temp_c", "p95_temp_c", "min_temp_c", "max_temp_c"])
+        return pd.DataFrame(columns=required_cols)
 
     with zf_ctx as zf:
         for name in zf.namelist():
@@ -1751,7 +1837,10 @@ def load_cfd_temperature_index(zip_path_str: str, file_mtime_ns: int, file_size:
                     i for i, line in enumerate(raw_lines)
                     if line.strip().lower().startswith("node number")
                 )
-                df = pd.read_csv(io.StringIO("\n".join(raw_lines[header_idx:])), skipinitialspace=True)
+                df = pd.read_csv(
+                    io.StringIO("\n".join(raw_lines[header_idx:])),
+                    skipinitialspace=True,
+                )
                 df.columns = [str(c).strip() for c in df.columns]
                 tcol = _resolve_field_column(df.columns, "Temperature")
                 temp_c = pd.to_numeric(df[tcol], errors="coerce").to_numpy(np.float64) - 273.15
@@ -1767,7 +1856,26 @@ def load_cfd_temperature_index(zip_path_str: str, file_mtime_ns: int, file_size:
                 })
             except Exception:
                 continue
-    return pd.DataFrame(rows).sort_values("dp_id").reset_index(drop=True)
+
+    result = pd.DataFrame(rows, columns=required_cols).sort_values("dp_id").reset_index(drop=True)
+
+    # Runtime sidecar: helps every later rerun/session in the same container.
+    if len(result):
+        try:
+            result.to_csv(runtime_index, index=False)
+        except Exception:
+            pass
+
+        # If the deployment filesystem is writable, also create a repo-side sidecar.
+        # Committing this CSV to GitHub gives the fastest possible cold HOME startup.
+        try:
+            repo_index = APP_ROOT / "cfd_temperature_index.csv"
+            if not repo_index.exists():
+                result.to_csv(repo_index, index=False)
+        except Exception:
+            pass
+
+    return result
 
 
 def _build_cfd_scenario_table():
@@ -2549,21 +2657,7 @@ if st.session_state.app_view != "INTRO":
 # ============================================================
 # 6. SCREEN 0: INTRO + SCREEN 1: HOME / COOLING SETUP
 # ============================================================
-if st.session_state.app_view == "INTRO":
-    intro_html = (
-        f'<div class="coollins-intro-shell">'
-        f'<div class="phone-notch"><div class="notch-cam"></div><div class="notch-speaker"></div></div>'
-        f'<div class="coollins-intro-target">'
-        f'<img src="data:image/webp;base64,{INTRO_IMAGE_WEBP_B64}" '
-        f'alt="COOLLINS AI Smart Cooling Optimizer 소개 화면" />'
-        f'<a class="coollins-intro-enter" href="?enter=1" target="_self" '
-        f'aria-label="냉방 상태 확인하기" title="냉방 상태 확인하기"></a>'
-        f'</div>'
-        f'</div>'
-    )
-    st.markdown(intro_html, unsafe_allow_html=True)
-
-elif st.session_state.app_view == "HOME":
+if st.session_state.app_view == "HOME":
     # Editable CURRENT temperature is a retrieval query, not a synthetic temperature shift.
     if "home_current_temp_widget" not in st.session_state:
         st.session_state.home_current_temp_widget = float(st.session_state.current_temp_query)
