@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v41
+# FACTOR_UI_BUILD = 2026-09-03-v42
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -2070,7 +2070,7 @@ def make_mobile_heatmap(grid_data, height=340):
         margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         scene=dict(
-            domain=dict(x=[0.00, 0.91], y=[0.00, 1.00]),
+            domain=dict(x=[0.00, 0.955], y=[0.00, 1.00]),
             bgcolor="rgba(0,0,0,0)",
             xaxis=dict(
                 title="",
@@ -2189,11 +2189,12 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
                 opacity=0.82,
                 colorbar=dict(
                     title=dict(text="°C", font=dict(size=11, color="#eefaff")),
-                    thickness=8,
-                    len=0.70,
-                    x=0.965,
+                    thickness=5,
+                    len=0.56,
+                    x=0.992,
+                    xpad=2,
                     tickvals=[18, 20, 22, 24, 26, 28],
-                    tickfont=dict(size=9, color="#dff4ff"),
+                    tickfont=dict(size=8, color="#dff4ff"),
                     outlinecolor="rgba(174,228,255,0.20)",
                 ),
             ),
@@ -2233,7 +2234,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
             )
         )
 
-    # Sensor positions: small white circles only.
+    # Sensor positions: compact white pin-style markers.
     sensor_x, sensor_y, sensor_z, sensor_hover = [], [], [], []
     for nid, meta in ROA_NODES_META.items():
         target = np.asarray(
@@ -2252,21 +2253,55 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
             f"온도={temps[idx]:.2f}°C"
         )
 
+    # Short stem under the pin head.
+    for sx, sy, sz in zip(sensor_x, sensor_y, sensor_z):
+        fig.add_trace(
+            go.Scatter3d(
+                x=[sx, sx],
+                y=[sy, sy],
+                z=[sz - 0.10, sz + 0.015],
+                mode="lines",
+                line=dict(color="#ffffff", width=3),
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+
+    # White pin head.
     fig.add_trace(
         go.Scatter3d(
             x=sensor_x,
             y=sensor_y,
-            z=[z + 0.035 for z in sensor_z],
+            z=[z + 0.055 for z in sensor_z],
             mode="markers",
             marker=dict(
-                size=4.2,
+                size=6.0,
                 color="#ffffff",
-                line=dict(color="#dff7ff", width=0.7),
+                line=dict(color="#dff7ff", width=0.8),
                 symbol="circle",
                 opacity=1.0,
             ),
             hovertext=sensor_hover,
             hoverinfo="text",
+            showlegend=False,
+        )
+    )
+
+    # Navy center makes the marker read as a device/pin rather than another temperature node.
+    fig.add_trace(
+        go.Scatter3d(
+            x=sensor_x,
+            y=sensor_y,
+            z=[z + 0.060 for z in sensor_z],
+            mode="markers",
+            marker=dict(
+                size=2.2,
+                color="#123b5d",
+                line=dict(width=0),
+                symbol="circle",
+                opacity=1.0,
+            ),
+            hoverinfo="skip",
             showlegend=False,
         )
     )
@@ -2308,9 +2343,9 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
                 linecolor="#7fdcff",
             ),
             aspectmode="manual",
-            aspectratio=dict(x=1.75, y=1.00, z=0.68),
+            aspectratio=dict(x=1.92, y=1.08, z=0.72),
             camera=dict(
-                eye=dict(x=1.42, y=-1.62, z=1.10),
+                eye=dict(x=1.30, y=-1.48, z=1.00),
                 center=dict(x=0.0, y=0.0, z=-0.02),
             ),
         ),
@@ -2422,7 +2457,7 @@ elif st.session_state.app_view == "HOME":
 
     with st.container(key="temperature_map_card"):
         st.plotly_chart(
-            make_true_3d_field(current_coords, current_temp_nodes, height=390),
+            make_true_3d_field(current_coords, current_temp_nodes, height=410),
             use_container_width=True,
             config={"displayModeBar": False},
         )
@@ -2870,7 +2905,7 @@ elif st.session_state.app_view == "RESULTS":
         with st.container(key="field_comparison_card"):
             st.markdown('<div class="field-map-title current-title">Current Field</div>', unsafe_allow_html=True)
             st.plotly_chart(
-                make_true_3d_field(result_current_coords, result_current_nodes, height=385),
+                make_true_3d_field(result_current_coords, result_current_nodes, height=420),
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
@@ -2879,7 +2914,7 @@ elif st.session_state.app_view == "RESULTS":
 
             st.markdown('<div class="field-map-title current-title">Predicted Field</div>', unsafe_allow_html=True)
             st.plotly_chart(
-                make_true_3d_field(result_pred_coords, result_pred_nodes, height=385),
+                make_true_3d_field(result_pred_coords, result_pred_nodes, height=420),
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
