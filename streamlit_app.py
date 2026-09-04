@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v42
+# FACTOR_UI_BUILD = 2026-09-03-v43
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -2234,7 +2234,9 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
             )
         )
 
-    # Sensor positions: compact white pin-style markers.
+    # Sensor positions: OPTION 3 — pin(marker)-style.
+    # A white circular head + a small downward tip + navy center.
+    # This reads as a location pin and is visually distinct from the round CFD nodes.
     sensor_x, sensor_y, sensor_z, sensor_hover = [], [], [], []
     for nid, meta in ROA_NODES_META.items():
         target = np.asarray(
@@ -2253,31 +2255,17 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
             f"온도={temps[idx]:.2f}°C"
         )
 
-    # Short stem under the pin head.
-    for sx, sy, sz in zip(sensor_x, sensor_y, sensor_z):
-        fig.add_trace(
-            go.Scatter3d(
-                x=[sx, sx],
-                y=[sy, sy],
-                z=[sz - 0.10, sz + 0.015],
-                mode="lines",
-                line=dict(color="#ffffff", width=3),
-                hoverinfo="skip",
-                showlegend=False,
-            )
-        )
-
-    # White pin head.
+    # White pin head
     fig.add_trace(
         go.Scatter3d(
             x=sensor_x,
             y=sensor_y,
-            z=[z + 0.055 for z in sensor_z],
+            z=[z + 0.075 for z in sensor_z],
             mode="markers",
             marker=dict(
-                size=6.0,
+                size=7.0,
                 color="#ffffff",
-                line=dict(color="#dff7ff", width=0.8),
+                line=dict(color="#dff7ff", width=0.9),
                 symbol="circle",
                 opacity=1.0,
             ),
@@ -2287,15 +2275,34 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
         )
     )
 
-    # Navy center makes the marker read as a device/pin rather than another temperature node.
+    # White downward tip — overlaps the circular head to form a map-pin silhouette.
     fig.add_trace(
         go.Scatter3d(
             x=sensor_x,
             y=sensor_y,
-            z=[z + 0.060 for z in sensor_z],
+            z=[z - 0.005 for z in sensor_z],
             mode="markers",
             marker=dict(
-                size=2.2,
+                size=5.2,
+                color="#ffffff",
+                line=dict(color="#dff7ff", width=0.7),
+                symbol="triangle-down",
+                opacity=1.0,
+            ),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
+
+    # Navy center dot
+    fig.add_trace(
+        go.Scatter3d(
+            x=sensor_x,
+            y=sensor_y,
+            z=[z + 0.082 for z in sensor_z],
+            mode="markers",
+            marker=dict(
+                size=2.4,
                 color="#123b5d",
                 line=dict(width=0),
                 symbol="circle",
