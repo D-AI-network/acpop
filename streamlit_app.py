@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-03-v43
+# FACTOR_UI_BUILD = 2026-09-03-v44
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -2275,19 +2275,19 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800):
         )
     )
 
-    # White downward tip — overlaps the circular head to form a map-pin silhouette.
+    # White downward tip — use a text glyph because Scatter3d supports only
+    # a limited marker-symbol set (triangle-down is not supported).
     fig.add_trace(
         go.Scatter3d(
             x=sensor_x,
             y=sensor_y,
-            z=[z - 0.005 for z in sensor_z],
-            mode="markers",
-            marker=dict(
-                size=5.2,
+            z=[z - 0.010 for z in sensor_z],
+            mode="text",
+            text=["▼"] * len(sensor_x),
+            textfont=dict(
+                size=13,
                 color="#ffffff",
-                line=dict(color="#dff7ff", width=0.7),
-                symbol="triangle-down",
-                opacity=1.0,
+                family="Arial Black",
             ),
             hoverinfo="skip",
             showlegend=False,
