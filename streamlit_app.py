@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v55
+# FACTOR_UI_BUILD = 2026-09-04-v56
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -425,37 +425,197 @@ div[data-testid="stPlotlyChart"] {
   padding: 0 4px;
 }
 
-/* Optimal HVAC Dispatch Card */
+/* AI recommended HVAC setting — compact visual 2x2 panel */
 .optimal-dispatch-box {
-  background: #173b59;
-  border: 1.5px solid rgba(56, 189, 248, 0.44);
-  border-radius: 16px;
-  padding: 18px 20px;
+  background: linear-gradient(155deg, rgba(18, 59, 89, 0.96), rgba(12, 45, 72, 0.96));
+  border: 1.5px solid rgba(74, 196, 244, 0.48);
+  border-radius: 20px;
+  padding: 16px;
   margin-top: 14px;
   margin-bottom: 14px;
-  box-shadow: 0 7px 20px rgba(2, 20, 38, 0.22);
+  box-shadow: 0 9px 24px rgba(2, 20, 38, 0.22);
 }
+
 .optimal-dispatch-box h4 {
-  color: #7ed7ff !important;
+  color: #eaf8ff !important;
   font-family: 'Outfit', 'Inter', sans-serif;
   font-size: 17px;
+  font-weight: 750;
+  margin: 0 0 13px 2px;
+}
+
+.hvac-visual-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hvac-mini-card {
+  min-height: 132px;
+  padding: 12px 11px 10px 11px;
+  border-radius: 16px;
+  background: rgba(7, 40, 67, 0.72);
+  border: 1px solid rgba(121, 195, 232, 0.20);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.hvac-mini-label {
+  color: #9bcce5;
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  margin-bottom: 3px;
+}
+
+.hvac-mini-value {
+  color: #f5fbff;
+  font-size: 16px;
+  line-height: 1.15;
   font-weight: 800;
-  margin: 0 0 12px 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
 }
-.optimal-dispatch-box .dispatch-row {
+
+/* Direction diagram */
+.air-direction-wrap {
+  height: 58px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #d9efff;
-  margin: 8px 0;
+  justify-content: flex-end;
+  margin-top: 4px;
 }
-.optimal-dispatch-box .dispatch-row b {
-  color: #f2fbff;
-  font-weight: 700;
+.ac-mini {
+  width: 54px;
+  height: 12px;
+  border: 1.5px solid #91ddff;
+  border-radius: 4px 4px 6px 6px;
+  position: relative;
+  background: rgba(112, 211, 255, 0.06);
+  box-shadow: 0 0 10px rgba(64, 196, 255, 0.09);
+}
+.ac-mini::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: #8bdcff;
+  opacity: 0.75;
+}
+.air-rays {
+  width: 78px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-top: 3px;
+}
+.air-ray {
+  width: 23px;
+  height: 28px;
+  text-align: center;
+  color: rgba(129, 215, 255, 0.20);
+  font-size: 24px;
+  line-height: 25px;
+  font-weight: 400;
+  transition: .15s ease;
+}
+.air-ray.active {
+  color: #73dcff;
+  text-shadow: 0 0 8px rgba(82, 209, 255, 0.30);
+}
+.air-ray.left { transform: rotate(18deg); }
+.air-ray.right { transform: rotate(-18deg); }
+
+/* Flow strength: five vertical bars */
+.flow-bars {
+  height: 53px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 5px;
+  padding-top: 7px;
+}
+.flow-bar {
+  width: 10px;
+  border-radius: 5px 5px 2px 2px;
+  background: rgba(118, 206, 244, 0.14);
+  border: 1px solid rgba(118, 206, 244, 0.12);
+}
+.flow-bar:nth-child(1){height:16px;}
+.flow-bar:nth-child(2){height:23px;}
+.flow-bar:nth-child(3){height:30px;}
+.flow-bar:nth-child(4){height:37px;}
+.flow-bar:nth-child(5){height:44px;}
+.flow-bar.active {
+  background: linear-gradient(180deg, #92e9ff 0%, #36c6f4 100%);
+  border-color: rgba(164, 237, 255, 0.76);
+  box-shadow: 0 0 8px rgba(69, 204, 246, 0.18);
+}
+
+/* Temperature / power track */
+.hvac-track-wrap {
+  margin-top: 15px;
+}
+.hvac-track {
+  height: 8px;
+  border-radius: 99px;
+  position: relative;
+  overflow: visible;
+}
+.temp-track {
+  background: linear-gradient(90deg, #79ddff 0%, #45caf3 38%, #b8ecf7 72%, #ffd2a1 100%);
+}
+.power-track {
+  background: rgba(83, 130, 158, 0.28);
+}
+.power-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5ad7ff 0%, #7ee5e2 56%, #d9f5ff 100%);
+}
+.hvac-marker {
+  position: absolute;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  margin-left: -6.5px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid #1b6c97;
+  box-shadow: 0 0 0 2px rgba(106, 218, 255, 0.16), 0 0 9px rgba(255,255,255,.25);
+}
+.hvac-range {
+  display: flex;
+  justify-content: space-between;
+  color: #6f9bb4;
+  font-size: 8.5px;
+  font-weight: 650;
+  margin-top: 5px;
+}
+
+.hvac-card-note {
+  color: #77a9c2;
+  font-size: 8.5px;
+  line-height: 1.25;
+  margin-top: 5px;
+}
+
+/* Preserve 2 columns on phone width, but tighten typography further. */
+@media (max-width: 420px) {
+  .hvac-visual-grid { gap: 8px; }
+  .hvac-mini-card { min-height: 124px; padding: 10px; }
+  .hvac-mini-value { font-size: 14px; }
+  .hvac-mini-label { font-size: 9.5px; }
 }
 
 /* Feasibility / target-achievement card */
@@ -3028,6 +3188,17 @@ elif st.session_state.app_view == "HEAT_LOAD":
                     "hot_fraction": float(rec["hot_fraction"]) * 100.0,
                     "cold_fraction": float(rec["cold_fraction"]) * 100.0,
                     "q_proxy": float(rec["estimated_sensible_cooling_kw"]),
+
+                    # Candidate ranges used only for recommendation-card visualization.
+                    # This makes bar positions relative to the ACTUAL candidate set,
+                    # rather than using arbitrary hard-coded min/max values.
+                    "flow_min": float(pd.to_numeric(opt_df["CMM"], errors="coerce").min()),
+                    "flow_max": float(pd.to_numeric(opt_df["CMM"], errors="coerce").max()),
+                    "supply_temp_min": float(pd.to_numeric(opt_df["AirTemp_C"], errors="coerce").min()),
+                    "supply_temp_max": float(pd.to_numeric(opt_df["AirTemp_C"], errors="coerce").max()),
+                    "q_min": float(pd.to_numeric(opt_df["estimated_sensible_cooling_kw"], errors="coerce").min()),
+                    "q_max": float(pd.to_numeric(opt_df["estimated_sensible_cooling_kw"], errors="coerce").max()),
+
                     "policy_used": policy,
                     "field_post_grid": np.asarray(field_post_grid, dtype=np.float32),
                     "field_post_coords": np.asarray(backend["coords"], dtype=np.float32),
@@ -3100,14 +3271,110 @@ elif st.session_state.app_view == "RESULTS":
         }
         vane_display = vane_map.get(str(res["vane"]), str(res["vane"]))
 
+        # --------------------------------------------------------
+        # Visual recommendation cards
+        # --------------------------------------------------------
+        flow_cmm = float(str(res["flow"]).replace("CMM", "").strip())
+        supply_temp_c = float(str(res["temp"]).replace("°C", "").replace("° C", "").strip())
+        q_kw = float(res["q_proxy"])
+
+        flow_min = float(res.get("flow_min", flow_cmm))
+        flow_max = float(res.get("flow_max", flow_cmm))
+        supply_min = float(res.get("supply_temp_min", supply_temp_c))
+        supply_max = float(res.get("supply_temp_max", supply_temp_c))
+        q_min = float(res.get("q_min", q_kw))
+        q_max = float(res.get("q_max", q_kw))
+
+        def _pct(value, lo, hi):
+            if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
+                return 50.0
+            return float(np.clip((value - lo) / (hi - lo) * 100.0, 0.0, 100.0))
+
+        flow_pct = _pct(flow_cmm, flow_min, flow_max)
+        temp_pct = _pct(supply_temp_c, supply_min, supply_max)
+        q_pct = _pct(q_kw, q_min, q_max)
+
+        # Convert the relative flow position into 1–5 visual bars.
+        flow_level = int(np.clip(np.ceil(max(flow_pct, 1.0) / 20.0), 1, 5))
+        flow_bars_html = "".join(
+            f'<span class="flow-bar {"active" if i <= flow_level else ""}"></span>'
+            for i in range(1, 6)
+        )
+
+        vane_raw = str(res.get("vane", ""))
+        left_on = ("Left" in vane_raw) or ("L" in vane_raw.split(" / ")) or ("좌측" in vane_display)
+        middle_on = ("Middle" in vane_raw) or ("M" in vane_raw.split(" / ")) or ("중앙" in vane_display)
+        right_on = ("Right" in vane_raw) or ("R" in vane_raw.split(" / ")) or ("우측" in vane_display)
+
+        direction_html = f"""
+            <div class="air-direction-wrap">
+                <div class="ac-mini"></div>
+                <div class="air-rays">
+                    <span class="air-ray left {'active' if left_on else ''}">⌄</span>
+                    <span class="air-ray {'active' if middle_on else ''}">↓</span>
+                    <span class="air-ray right {'active' if right_on else ''}">⌄</span>
+                </div>
+            </div>
+        """
+
         st.markdown(
             f"""
         <div class="optimal-dispatch-box">
             <h4>AI 추천 냉방 설정</h4>
-            <div class="dispatch-row">💨 <b>바람 방향:</b> {vane_display}</div>
-            <div class="dispatch-row">🌀 <b>풍량:</b> {res['flow']}</div>
-            <div class="dispatch-row">❄️ <b>공급 공기 온도:</b> {res['temp']}</div>
-            <div class="dispatch-row">⚡ <b>냉방 출력 추정치:</b> {float(res['q_proxy']):.2f} kW</div>
+
+            <div class="hvac-visual-grid">
+                <div class="hvac-mini-card">
+                    <div>
+                        <div class="hvac-mini-label">바람 방향</div>
+                        <div class="hvac-mini-value">{vane_display}</div>
+                    </div>
+                    {direction_html}
+                </div>
+
+                <div class="hvac-mini-card">
+                    <div>
+                        <div class="hvac-mini-label">풍량</div>
+                        <div class="hvac-mini-value">{flow_cmm:.0f} CMM</div>
+                    </div>
+                    <div class="flow-bars">{flow_bars_html}</div>
+                    <div class="hvac-card-note">후보 범위 내 상대 세기</div>
+                </div>
+
+                <div class="hvac-mini-card">
+                    <div>
+                        <div class="hvac-mini-label">공급 공기 온도</div>
+                        <div class="hvac-mini-value">{supply_temp_c:.0f}°C</div>
+                    </div>
+                    <div class="hvac-track-wrap">
+                        <div class="hvac-track temp-track">
+                            <span class="hvac-marker" style="left:{temp_pct:.1f}%;"></span>
+                        </div>
+                        <div class="hvac-range">
+                            <span>{supply_min:.0f}°</span>
+                            <span>{supply_max:.0f}°</span>
+                        </div>
+                    </div>
+                    <div class="hvac-card-note">추천 공급 공기 설정</div>
+                </div>
+
+                <div class="hvac-mini-card">
+                    <div>
+                        <div class="hvac-mini-label">예상 냉방 출력</div>
+                        <div class="hvac-mini-value">{q_kw:.2f} kW</div>
+                    </div>
+                    <div class="hvac-track-wrap">
+                        <div class="hvac-track power-track">
+                            <span class="power-fill" style="width:{q_pct:.1f}%;"></span>
+                            <span class="hvac-marker" style="left:{q_pct:.1f}%;"></span>
+                        </div>
+                        <div class="hvac-range">
+                            <span>{q_min:.1f}</span>
+                            <span>{q_max:.1f} kW</span>
+                        </div>
+                    </div>
+                    <div class="hvac-card-note">후보 범위 내 상대 출력</div>
+                </div>
+            </div>
         </div>
         """,
             unsafe_allow_html=True,
