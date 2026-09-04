@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v56
+# FACTOR_UI_BUILD = 2026-09-04-v57
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -3306,79 +3306,67 @@ elif st.session_state.app_view == "RESULTS":
         middle_on = ("Middle" in vane_raw) or ("M" in vane_raw.split(" / ")) or ("중앙" in vane_display)
         right_on = ("Right" in vane_raw) or ("R" in vane_raw.split(" / ")) or ("우측" in vane_display)
 
-        direction_html = f"""
-            <div class="air-direction-wrap">
-                <div class="ac-mini"></div>
-                <div class="air-rays">
-                    <span class="air-ray left {'active' if left_on else ''}">⌄</span>
-                    <span class="air-ray {'active' if middle_on else ''}">↓</span>
-                    <span class="air-ray right {'active' if right_on else ''}">⌄</span>
-                </div>
-            </div>
-        """
-
-        st.markdown(
-            f"""
-        <div class="optimal-dispatch-box">
-            <h4>AI 추천 냉방 설정</h4>
-
-            <div class="hvac-visual-grid">
-                <div class="hvac-mini-card">
-                    <div>
-                        <div class="hvac-mini-label">바람 방향</div>
-                        <div class="hvac-mini-value">{vane_display}</div>
-                    </div>
-                    {direction_html}
-                </div>
-
-                <div class="hvac-mini-card">
-                    <div>
-                        <div class="hvac-mini-label">풍량</div>
-                        <div class="hvac-mini-value">{flow_cmm:.0f} CMM</div>
-                    </div>
-                    <div class="flow-bars">{flow_bars_html}</div>
-                    <div class="hvac-card-note">후보 범위 내 상대 세기</div>
-                </div>
-
-                <div class="hvac-mini-card">
-                    <div>
-                        <div class="hvac-mini-label">공급 공기 온도</div>
-                        <div class="hvac-mini-value">{supply_temp_c:.0f}°C</div>
-                    </div>
-                    <div class="hvac-track-wrap">
-                        <div class="hvac-track temp-track">
-                            <span class="hvac-marker" style="left:{temp_pct:.1f}%;"></span>
-                        </div>
-                        <div class="hvac-range">
-                            <span>{supply_min:.0f}°</span>
-                            <span>{supply_max:.0f}°</span>
-                        </div>
-                    </div>
-                    <div class="hvac-card-note">추천 공급 공기 설정</div>
-                </div>
-
-                <div class="hvac-mini-card">
-                    <div>
-                        <div class="hvac-mini-label">예상 냉방 출력</div>
-                        <div class="hvac-mini-value">{q_kw:.2f} kW</div>
-                    </div>
-                    <div class="hvac-track-wrap">
-                        <div class="hvac-track power-track">
-                            <span class="power-fill" style="width:{q_pct:.1f}%;"></span>
-                            <span class="hvac-marker" style="left:{q_pct:.1f}%;"></span>
-                        </div>
-                        <div class="hvac-range">
-                            <span>{q_min:.1f}</span>
-                            <span>{q_max:.1f} kW</span>
-                        </div>
-                    </div>
-                    <div class="hvac-card-note">후보 범위 내 상대 출력</div>
-                </div>
-            </div>
-        </div>
-        """,
-            unsafe_allow_html=True,
+        direction_html = (
+            f'<div class="air-direction-wrap">'
+            f'<div class="ac-mini"></div>'
+            f'<div class="air-rays">'
+            f'<span class="air-ray left {"active" if left_on else ""}">⌄</span>'
+            f'<span class="air-ray {"active" if middle_on else ""}">↓</span>'
+            f'<span class="air-ray right {"active" if right_on else ""}">⌄</span>'
+            f'</div>'
+            f'</div>'
         )
+
+        recommendation_html = (
+            f'<div class="optimal-dispatch-box">'
+            f'<h4>AI 추천 냉방 설정</h4>'
+            f'<div class="hvac-visual-grid">'
+
+            f'<div class="hvac-mini-card">'
+            f'<div><div class="hvac-mini-label">바람 방향</div>'
+            f'<div class="hvac-mini-value">{vane_display}</div></div>'
+            f'{direction_html}'
+            f'</div>'
+
+            f'<div class="hvac-mini-card">'
+            f'<div><div class="hvac-mini-label">풍량</div>'
+            f'<div class="hvac-mini-value">{flow_cmm:.0f} CMM</div></div>'
+            f'<div class="flow-bars">{flow_bars_html}</div>'
+            f'<div class="hvac-card-note">후보 범위 내 상대 세기</div>'
+            f'</div>'
+
+            f'<div class="hvac-mini-card">'
+            f'<div><div class="hvac-mini-label">공급 공기 온도</div>'
+            f'<div class="hvac-mini-value">{supply_temp_c:.0f}°C</div></div>'
+            f'<div class="hvac-track-wrap">'
+            f'<div class="hvac-track temp-track">'
+            f'<span class="hvac-marker" style="left:{temp_pct:.1f}%;"></span>'
+            f'</div>'
+            f'<div class="hvac-range"><span>{supply_min:.0f}°</span>'
+            f'<span>{supply_max:.0f}°</span></div>'
+            f'</div>'
+            f'<div class="hvac-card-note">추천 공급 공기 설정</div>'
+            f'</div>'
+
+            f'<div class="hvac-mini-card">'
+            f'<div><div class="hvac-mini-label">예상 냉방 출력</div>'
+            f'<div class="hvac-mini-value">{q_kw:.2f} kW</div></div>'
+            f'<div class="hvac-track-wrap">'
+            f'<div class="hvac-track power-track">'
+            f'<span class="power-fill" style="width:{q_pct:.1f}%;"></span>'
+            f'<span class="hvac-marker" style="left:{q_pct:.1f}%;"></span>'
+            f'</div>'
+            f'<div class="hvac-range"><span>{q_min:.1f}</span>'
+            f'<span>{q_max:.1f} kW</span></div>'
+            f'</div>'
+            f'<div class="hvac-card-note">후보 범위 내 상대 출력</div>'
+            f'</div>'
+
+            f'</div>'
+            f'</div>'
+        )
+
+        st.markdown(recommendation_html, unsafe_allow_html=True)
 
         st.markdown(
             """
