@@ -5,7 +5,7 @@ from __future__ import annotations
 # Robust repo-root CFD ZIP auto-discovery (dp*.csv archive detection)
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
-# FACTOR_UI_BUILD = 2026-09-04-v49
+# FACTOR_UI_BUILD = 2026-09-04-v50
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -2543,31 +2543,18 @@ if st.session_state.app_view != "INTRO":
 # 6. SCREEN 0: INTRO + SCREEN 1: HOME / COOLING SETUP
 # ============================================================
 if st.session_state.app_view == "INTRO":
-    st.markdown(
-        f"""
-<div class="coollins-intro-shell">
-    <div class="phone-notch">
-        <div class="notch-cam"></div>
-        <div class="notch-speaker"></div>
-    </div>
-
-    <div class="coollins-intro-target">
-        <img
-            src="data:image/webp;base64,{INTRO_IMAGE_WEBP_B64}"
-            alt="COOLLINS AI Smart Cooling Optimizer 소개 화면"
-        />
-        <a
-            class="coollins-intro-enter"
-            href="?enter=1"
-            target="_self"
-            aria-label="냉방 상태 확인하기"
-            title="냉방 상태 확인하기"
-        ></a>
-    </div>
-</div>
-""",
-        unsafe_allow_html=True,
+    intro_html = (
+        f'<div class="coollins-intro-shell">'
+        f'<div class="phone-notch"><div class="notch-cam"></div><div class="notch-speaker"></div></div>'
+        f'<div class="coollins-intro-target">'
+        f'<img src="data:image/webp;base64,{INTRO_IMAGE_WEBP_B64}" '
+        f'alt="COOLLINS AI Smart Cooling Optimizer 소개 화면" />'
+        f'<a class="coollins-intro-enter" href="?enter=1" target="_self" '
+        f'aria-label="냉방 상태 확인하기" title="냉방 상태 확인하기"></a>'
+        f'</div>'
+        f'</div>'
     )
+    st.markdown(intro_html, unsafe_allow_html=True)
 
 elif st.session_state.app_view == "HOME":
     # Editable CURRENT temperature is a retrieval query, not a synthetic temperature shift.
