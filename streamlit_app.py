@@ -3288,7 +3288,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
                         zone_json=None,
                         target_temp_c=target,
                         comfort_band_c=2.0,
-                        max_zone_range_c=2.0,
+                        max_zone_range_c=1.5,
                         max_hot_fraction=0.05,
                         max_cold_fraction=0.05,
                         max_p95_temp_c=target + 2.0,
