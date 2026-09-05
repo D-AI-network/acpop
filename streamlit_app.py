@@ -1548,54 +1548,15 @@ def load_case_info():
 
 
 @st.cache_resource(show_spinner=False)
-def _load_popfield_backend_cached(
-    checkpoint_path_str: str,
-    checkpoint_size: int,
-    checkpoint_mtime_ns: int,
-    checkpoint_sha256: str,
-):
-    """Load the heavy PopField backend for one exact checkpoint version.
-
-    The checkpoint metadata/hash are cache-key arguments on purpose. If the PT file
-    is replaced, Streamlit automatically creates a fresh resource instead of reusing
-    a stale model. Exceptions are intentionally allowed to escape this cached helper,
-    so a transient/partial checkpoint read is never stored as a cached failure result.
-    """
-    import torch
-
-    checkpoint_path = Path(checkpoint_path_str)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    ckpt, model, scalers, coords = popfield_load_checkpoint(checkpoint_path, device)
-    coords = np.asarray(coords, dtype=np.float32)
-    coords_norm_t = torch.from_numpy(
-        scalers["coord"].transform(coords).astype(np.float32)
-    ).to(device)
-    return {
-        "ok": True,
-        "checkpoint": ckpt,
-        "model": model,
-        "scalers": scalers,
-        "coords": coords,
-        "coords_norm_t": coords_norm_t,
-        "device": device,
-        "checkpoint_path": str(checkpoint_path),
-
-        # Keep the actual callables with the cached backend.
-        # This avoids NoneType-callable errors after Streamlit reruns.
-        "optimize_hvac_fn": popfield_optimize_hvac,
-        "predict_conditions_fn": popfield_predict_conditions,
-    }
-
-
 def load_popfield_backend():
     # PyTorch + PopField architecture are imported only here, when needed.
-    # This wrapper itself is intentionally NOT cached: only successful heavyweight
-    # model loads are cached by _load_popfield_backend_cached().
     if not _lazy_import_popfield_modules():
         return {
             "ok": False,
             "error": f"demo_v3_hackathon_enhanced.py import failed: {POPFIELD_BACKEND_IMPORT_ERROR}",
         }
+
+    import torch
 
     if CHECKPOINT_PATH is None:
         return {
@@ -1604,21 +1565,28 @@ def load_popfield_backend():
         }
 
     try:
-        import hashlib
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        ckpt, model, scalers, coords = popfield_load_checkpoint(CHECKPOINT_PATH, device)
+        coords = np.asarray(coords, dtype=np.float32)
+        coords_norm_t = torch.from_numpy(
+            scalers["coord"].transform(coords).astype(np.float32)
+        ).to(device)
+        return {
+            "ok": True,
+            "checkpoint": ckpt,
+            "model": model,
+            "scalers": scalers,
+            "coords": coords,
+            "coords_norm_t": coords_norm_t,
+            "device": device,
+            "checkpoint_path": str(CHECKPOINT_PATH),
 
-        checkpoint_path = CHECKPOINT_PATH.resolve()
-        stat = checkpoint_path.stat()
-        checkpoint_sha256 = hashlib.sha256(checkpoint_path.read_bytes()).hexdigest()
-
-        return _load_popfield_backend_cached(
-            str(checkpoint_path),
-            int(stat.st_size),
-            int(stat.st_mtime_ns),
-            checkpoint_sha256,
-        )
+            # Keep the actual callables with the cached backend.
+            # This avoids NoneType-callable errors after Streamlit reruns.
+            "optimize_hvac_fn": popfield_optimize_hvac,
+            "predict_conditions_fn": popfield_predict_conditions,
+        }
     except Exception as exc:
-        # Failure is returned to the UI, but it is NOT cached. A later rerun can retry
-        # immediately after a deployment/file replacement without stale-error reuse.
         return {
             "ok": False,
             "error": f"Checkpoint/model load failed: {type(exc).__name__}: {exc}",
@@ -3899,8 +3867,53 @@ elif st.session_state.app_view == "COMPARE":
     after_p05 = float(np.nanpercentile(result_pred_nodes, 5))
     after_p95 = float(np.nanpercentile(result_pred_nodes, 95))
 
-    before_spread = thermal_zone_spread(result_current_nodes)
-    after_spread = thermal_zone_spread(result_pred_nodes)
+    # Thermal-zone balance: max/min difference among the four data-derived zone means.
+    _zone_path = APP_ROOT / "thermal_zones_train140.npz"
+    if not _zone_path.exists():
+        raise FileNotFoundError(f"Thermal zone mask not found: {_zone_path}")
+
+    with np.load(_zone_path) as _zone_data:
+        if "zone_ids" not in _zone_data:
+            raise KeyError("thermal_zones_train140.npz has no 'zone_ids'")
+        _zone_ids = np.asarray(_zone_data["zone_ids"], dtype=np.int64)
+        _zone_coords = (
+            np.asarray(_zone_data["coords"], dtype=np.float32)
+            if "coords" in _zone_data
+            else None
+        )
+
+    if len(_zone_ids) != len(result_current_nodes) or len(_zone_ids) != len(result_pred_nodes):
+        raise ValueError(
+            "Thermal zone/node count mismatch: "
+            f"zones={len(_zone_ids)}, current={len(result_current_nodes)}, predicted={len(result_pred_nodes)}"
+        )
+
+    if _zone_coords is not None:
+        if (
+            _zone_coords.shape != result_current_coords.shape
+            or not np.allclose(_zone_coords, result_current_coords.astype(np.float32), atol=1e-6, rtol=0.0)
+            or _zone_coords.shape != result_pred_coords.shape
+            or not np.allclose(_zone_coords, result_pred_coords.astype(np.float32), atol=1e-6, rtol=0.0)
+        ):
+            raise ValueError(
+                "thermal_zones_train140.npz node ordering/coordinates do not match displayed fields"
+            )
+
+    _zone_labels = np.sort(np.unique(_zone_ids))
+    if len(_zone_labels) != 4:
+        raise ValueError(f"Expected 4 thermal zones, found {len(_zone_labels)}")
+
+    _before_zone_means = np.asarray([
+        np.nanmean(result_current_nodes[_zone_ids == _zid])
+        for _zid in _zone_labels
+    ], dtype=float)
+    _after_zone_means = np.asarray([
+        np.nanmean(result_pred_nodes[_zone_ids == _zid])
+        for _zid in _zone_labels
+    ], dtype=float)
+
+    before_spread = max(0.0, float(np.nanmax(_before_zone_means) - np.nanmin(_before_zone_means)))
+    after_spread = max(0.0, float(np.nanmax(_after_zone_means) - np.nanmin(_after_zone_means)))
 
     # "목표 초과 영역" is easier to understand than HVAC-specific hotspot jargon.
     # We count points more than 1°C above the target.
