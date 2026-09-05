@@ -3899,8 +3899,8 @@ elif st.session_state.app_view == "COMPARE":
     after_p05 = float(np.nanpercentile(result_pred_nodes, 5))
     after_p95 = float(np.nanpercentile(result_pred_nodes, 95))
 
-    before_spread = max(0.0, before_p95 - before_p05)
-    after_spread = max(0.0, after_p95 - after_p05)
+    before_spread = thermal_zone_spread(result_current_nodes)
+    after_spread = thermal_zone_spread(result_pred_nodes)
 
     # "목표 초과 영역" is easier to understand than HVAC-specific hotspot jargon.
     # We count points more than 1°C above the target.
