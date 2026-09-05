@@ -2248,10 +2248,21 @@ def optimize_hvac(
         )
 
         zone_ok = zone_range <= max_zone_range_c
+      
+        # P95-P05 공간 온도 편차도 같은 2°C 제한 적용
+        robust_spread_ok = robust_spread <= max_zone_range_c
+      
         hot_ok = hot_fraction <= max_hot_fraction
         cold_ok = cold_fraction <= max_cold_fraction
         p95_ok = p95_temp <= float(max_p95_temp_c)
-        comfort_ok = bool(zone_ok and hot_ok and cold_ok and p95_ok)
+      
+        comfort_ok = bool(
+          zone_ok
+          and robust_spread_ok
+          and hot_ok
+          and cold_ok
+          and p95_ok
+        )
 
         # --------------------------------------------------------
         # HOTSPOT-SAFETY GUARDRAIL
