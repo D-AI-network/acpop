@@ -1548,16 +1548,54 @@ def load_case_info():
 
 
 @st.cache_resource(show_spinner=False)
+def _load_popfield_backend_cached(
+    checkpoint_path_str: str,
+    checkpoint_size: int,
+    checkpoint_mtime_ns: int,
+    checkpoint_sha256: str,
+):
+    """Load the heavy PopField backend for one exact checkpoint version.
+
+    The checkpoint metadata/hash are cache-key arguments on purpose. If the PT file
+    is replaced, Streamlit automatically creates a fresh resource instead of reusing
+    a stale model. Exceptions are intentionally allowed to escape this cached helper,
+    so a transient/partial checkpoint read is never stored as a cached failure result.
+    """
+    import torch
+
+    checkpoint_path = Path(checkpoint_path_str)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    ckpt, model, scalers, coords = popfield_load_checkpoint(checkpoint_path, device)
+    coords = np.asarray(coords, dtype=np.float32)
+    coords_norm_t = torch.from_numpy(
+        scalers["coord"].transform(coords).astype(np.float32)
+    ).to(device)
+    return {
+        "ok": True,
+        "checkpoint": ckpt,
+        "model": model,
+        "scalers": scalers,
+        "coords": coords,
+        "coords_norm_t": coords_norm_t,
+        "device": device,
+        "checkpoint_path": str(checkpoint_path),
+
+        # Keep the actual callables with the cached backend.
+        # This avoids NoneType-callable errors after Streamlit reruns.
+        "optimize_hvac_fn": popfield_optimize_hvac,
+        "predict_conditions_fn": popfield_predict_conditions,
+    }
+
+
 def load_popfield_backend():
     # PyTorch + PopField architecture are imported only here, when needed.
+    # This wrapper itself is intentionally NOT cached: only successful heavyweight
+    # model loads are cached by _load_popfield_backend_cached().
     if not _lazy_import_popfield_modules():
         return {
             "ok": False,
             "error": f"demo_v3_hackathon_enhanced.py import failed: {POPFIELD_BACKEND_IMPORT_ERROR}",
         }
-
-    import torch
-    import hashlib
 
     if CHECKPOINT_PATH is None:
         return {
@@ -1565,45 +1603,22 @@ def load_popfield_backend():
             "error": "best_deploy.pt (or best.pt) was not found in the repository root.",
         }
 
-    # =========================================================
-    # TEMP DEBUG: 실제 Streamlit 서버가 읽는 checkpoint 확인
-    # =========================================================
-    print("\n=== CHECKPOINT DEBUG ===")
-    print("path:", CHECKPOINT_PATH)
-    print("resolved path:", CHECKPOINT_PATH.resolve())
-    print("exists:", CHECKPOINT_PATH.exists())
-
-    if CHECKPOINT_PATH.exists():
-        raw = CHECKPOINT_PATH.read_bytes()
-        print("size:", len(raw))
-        print("first16:", raw[:16])
-        print("sha256:", hashlib.sha256(raw).hexdigest())
-
-    print("========================\n")
-
     try:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        ckpt, model, scalers, coords = popfield_load_checkpoint(CHECKPOINT_PATH, device)
-        coords = np.asarray(coords, dtype=np.float32)
-        coords_norm_t = torch.from_numpy(
-            scalers["coord"].transform(coords).astype(np.float32)
-        ).to(device)
-        return {
-            "ok": True,
-            "checkpoint": ckpt,
-            "model": model,
-            "scalers": scalers,
-            "coords": coords,
-            "coords_norm_t": coords_norm_t,
-            "device": device,
-            "checkpoint_path": str(CHECKPOINT_PATH),
+        import hashlib
 
-            # Keep the actual callables with the cached backend.
-            # This avoids NoneType-callable errors after Streamlit reruns.
-            "optimize_hvac_fn": popfield_optimize_hvac,
-            "predict_conditions_fn": popfield_predict_conditions,
-        }
+        checkpoint_path = CHECKPOINT_PATH.resolve()
+        stat = checkpoint_path.stat()
+        checkpoint_sha256 = hashlib.sha256(checkpoint_path.read_bytes()).hexdigest()
+
+        return _load_popfield_backend_cached(
+            str(checkpoint_path),
+            int(stat.st_size),
+            int(stat.st_mtime_ns),
+            checkpoint_sha256,
+        )
     except Exception as exc:
+        # Failure is returned to the UI, but it is NOT cached. A later rerun can retry
+        # immediately after a deployment/file replacement without stale-error reuse.
         return {
             "ok": False,
             "error": f"Checkpoint/model load failed: {type(exc).__name__}: {exc}",
