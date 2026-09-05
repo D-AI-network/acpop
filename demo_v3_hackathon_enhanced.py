@@ -2225,6 +2225,7 @@ def optimize_hvac(
         cold_fraction = float(np.mean(temp < lower))
         p95_temp = float(np.percentile(temp, 95))
         p05_temp = float(np.percentile(temp, 5))
+        robust_spread = float(p95_temp - p05_temp)  
         hot_excess_mean = float(np.mean(np.maximum(temp - upper, 0.0)))
         cold_excess_mean = float(np.mean(np.maximum(lower - temp, 0.0)))
 
@@ -2235,13 +2236,15 @@ def optimize_hvac(
 
         # Comfort score includes both global uniformity and local hot/cold risk.
         p95_excess = max(p95_temp - float(max_p95_temp_c), 0.0)
+          
         comfort_raw = (
-            1.5 * zone_range
-            + 0.50 * spatial_std
-            + 2.0 * band_violation
-            + 2.0 * hot_fraction
-            + 2.0 * cold_fraction
-            + 1.5 * p95_excess
+          1.5 * zone_range
+          + 1.5 * robust_spread
+          + 0.50 * spatial_std
+          + 2.0 * band_violation
+          + 2.0 * hot_fraction
+          + 2.0 * cold_fraction
+          + 1.5 * p95_excess
         )
 
         zone_ok = zone_range <= max_zone_range_c
