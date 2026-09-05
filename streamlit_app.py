@@ -1557,29 +1557,12 @@ def load_popfield_backend():
         }
 
     import torch
-    import hashlib
 
     if CHECKPOINT_PATH is None:
         return {
             "ok": False,
             "error": "best_deploy.pt (or best.pt) was not found in the repository root.",
         }
-
-    # =========================================================
-    # TEMP DEBUG: 실제 Streamlit 서버가 읽는 checkpoint 확인
-    # =========================================================
-    print("\n=== CHECKPOINT DEBUG ===")
-    print("path:", CHECKPOINT_PATH)
-    print("resolved path:", CHECKPOINT_PATH.resolve())
-    print("exists:", CHECKPOINT_PATH.exists())
-
-    if CHECKPOINT_PATH.exists():
-        raw = CHECKPOINT_PATH.read_bytes()
-        print("size:", len(raw))
-        print("first16:", raw[:16])
-        print("sha256:", hashlib.sha256(raw).hexdigest())
-
-    print("========================\n")
 
     try:
         device = "cuda" if torch.cuda.is_available() else "cpu"
