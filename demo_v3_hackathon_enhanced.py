@@ -446,11 +446,64 @@ class ConditionEncoder(nn.Module):
         return self.net(c)
 
 
-class CoordinateEncoder(nn.Module):
-    def __init__(self, d_model: int, dropout: float) -> None:
+class FourierCoordinateFeatures(nn.Module):
+    """Deterministic multi-frequency encoding for normalized XYZ coordinates.
+
+    The raw normalized XYZ values are retained and augmented with sin/cos features.
+    Frequencies are fixed (not learned), so this adds spatial expressiveness without
+    introducing a large parameter cost. `persistent=False` keeps old checkpoints clean.
+    """
+
+    def __init__(self, num_bands: int = 6) -> None:
         super().__init__()
+        self.num_bands = max(0, int(num_bands))
+        if self.num_bands > 0:
+            freq = (2.0 ** torch.arange(self.num_bands, dtype=torch.float32)) * math.pi
+        else:
+            freq = torch.empty(0, dtype=torch.float32)
+        self.register_buffer("frequencies", freq, persistent=False)
+
+    @property
+    def out_dim(self) -> int:
+        return 3 * (1 + 2 * self.num_bands)
+
+    def forward(self, xyz: torch.Tensor) -> torch.Tensor:
+        if self.num_bands <= 0:
+            return xyz
+        # [..., 3, F]
+        phase = xyz.unsqueeze(-1) * self.frequencies
+        sin_feat = torch.sin(phase).flatten(start_dim=-2)
+        cos_feat = torch.cos(phase).flatten(start_dim=-2)
+        return torch.cat([xyz, sin_feat, cos_feat], dim=-1)
+
+
+class CoordinateEncoder(nn.Module):
+    """XYZ encoder with an optional Fourier spatial basis.
+
+    `use_fourier=False` reproduces the original 3->D encoder exactly. This is important
+    for loading legacy best.pt checkpoints created before the feedback-driven upgrade.
+    New training defaults to Fourier coordinates via the CLI.
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        dropout: float,
+        use_fourier: bool = False,
+        fourier_bands: int = 6,
+    ) -> None:
+        super().__init__()
+        self.use_fourier = bool(use_fourier)
+        self.fourier_bands = int(fourier_bands)
+        if self.use_fourier:
+            self.fourier = FourierCoordinateFeatures(self.fourier_bands)
+            in_dim = self.fourier.out_dim
+        else:
+            self.fourier = None
+            in_dim = 3
+
         self.net = nn.Sequential(
-            nn.Linear(3, d_model),
+            nn.Linear(in_dim, d_model),
             nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(d_model, d_model),
@@ -458,6 +511,8 @@ class CoordinateEncoder(nn.Module):
         )
 
     def forward(self, xyz: torch.Tensor) -> torch.Tensor:
+        if self.fourier is not None:
+            xyz = self.fourier(xyz)
         return self.net(xyz)
 
 
@@ -477,28 +532,73 @@ class FFNFusionLayer(nn.Module):
 
 
 class HVACMeanFieldMixer(nn.Module):
+    """Graph-free population-field interaction for HVAC/CFD surrogate modeling.
+
+    Legacy mode (num_fields=1)
+    --------------------------
+    Exactly preserves the original single global-mean PopField parameterization so
+    checkpoints created by the previous code remain loadable.
+
+    Multi-field mode (num_fields>1)
+    --------------------------------
+    Instead of compressing all spatial nodes into only one global mean, K latent fields
+    are learned. Each field uses condition-aware soft assignment over nodes, then each
+    node routes the K field contexts back to itself with a node-specific mixture.
+
+        node states -> K condition-aware population fields -> node-specific routing
+
+    This keeps the graph-free O(N*K) character while removing the strongest bottleneck
+    of a single global mean. K is intentionally small (default 8 for new training).
     """
-    Graph-free population-field interaction.
 
-    Key idea kept from PopField:
-      1) all nodes contribute to one shared latent population field z_global,
-      2) a sample-specific gate scales that shared field,
-      3) each node responds differently through a node-conditioned output gate.
-
-    Difference from the traffic model:
-      - no time-window statistics;
-      - the field gate is driven by HVAC + heat-load conditions.
-    """
-
-    def __init__(self, cond_dim: int, d_model: int, dropout: float) -> None:
+    def __init__(
+        self,
+        cond_dim: int,
+        d_model: int,
+        dropout: float,
+        num_fields: int = 1,
+    ) -> None:
         super().__init__()
-        self.field_gate = nn.Sequential(
-            nn.Linear(cond_dim, d_model // 2),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(d_model // 2, 1),
-            nn.Sigmoid(),
-        )
+        self.num_fields = max(1, int(num_fields))
+        self.d_model = int(d_model)
+
+        # Keep the exact legacy modules/shapes when K=1.
+        if self.num_fields == 1:
+            self.field_gate = nn.Sequential(
+                nn.Linear(cond_dim, d_model // 2),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(d_model // 2, 1),
+                nn.Sigmoid(),
+            )
+            self.field_assign = None
+            self.field_condition_bias = None
+            self.node_field_router = None
+        else:
+            # One gate per latent field.
+            self.field_gate = nn.Sequential(
+                nn.Linear(cond_dim, d_model),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(d_model, self.num_fields),
+                nn.Sigmoid(),
+            )
+            # Condition-aware node -> field aggregation.
+            self.field_assign = nn.Sequential(
+                nn.Linear(d_model, d_model),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(d_model, self.num_fields),
+            )
+            self.field_condition_bias = nn.Linear(cond_dim, self.num_fields, bias=False)
+            # Node-specific field redistribution. h and condition latent are both used.
+            self.node_field_router = nn.Sequential(
+                nn.Linear(d_model * 2, d_model),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(d_model, self.num_fields),
+            )
+
         self.context_norm = nn.LayerNorm(d_model)
         self.context_mlp = nn.Sequential(
             nn.Linear(d_model, d_model * 2),
@@ -518,12 +618,12 @@ class HVACMeanFieldMixer(nn.Module):
         )
         self.norm = nn.LayerNorm(d_model)
 
-    def forward(
+    def _forward_legacy(
         self,
         h: torch.Tensor,
         cond_norm: torch.Tensor,
         cond_latent: torch.Tensor,
-        return_diag: bool = False,
+        return_diag: bool,
     ):
         b, n, d = h.shape
         z_global = h.mean(dim=1)
@@ -541,7 +641,6 @@ class HVACMeanFieldMixer(nn.Module):
 
         if not return_diag:
             return out, None
-
         diag = {
             "field_gate_mean": float(field_gate.mean().detach().cpu()),
             "field_gate_std": float(field_gate.std(unbiased=False).detach().cpu()),
@@ -549,6 +648,65 @@ class HVACMeanFieldMixer(nn.Module):
             "out_gate_std": float(alpha.std(unbiased=False).detach().cpu()),
             "z_global_norm": float(z_global.norm(dim=-1).mean().detach().cpu()),
             "context_norm": float(context.norm(dim=-1).mean().detach().cpu()),
+            "spatial_update_norm": float(h_sp.norm(dim=-1).mean().detach().cpu()),
+        }
+        return out, diag
+
+    def forward(
+        self,
+        h: torch.Tensor,
+        cond_norm: torch.Tensor,
+        cond_latent: torch.Tensor,
+        return_diag: bool = False,
+    ):
+        if self.num_fields == 1:
+            return self._forward_legacy(h, cond_norm, cond_latent, return_diag)
+
+        b, n, d = h.shape
+        assert self.field_assign is not None
+        assert self.field_condition_bias is not None
+        assert self.node_field_router is not None
+
+        # [B,N,K]: each latent field receives a normalized weighted population of nodes.
+        assign_logits = self.field_assign(h)
+        assign_logits = assign_logits + self.field_condition_bias(cond_norm)[:, None, :]
+        assign = torch.softmax(assign_logits, dim=1)
+        z_fields = torch.einsum("bnk,bnd->bkd", assign, h)            # [B,K,D]
+
+        # Condition-dependent activation of each field.
+        field_gate = self.field_gate(cond_norm)                       # [B,K]
+        context_raw = self.context_mlp(self.context_norm(z_fields))   # [B,K,D]
+        field_context = context_raw * field_gate[:, :, None]
+
+        # Each node chooses a different mixture of the K fields.
+        cnd = cond_latent[:, None, :].expand(-1, n, -1)
+        route_logits = self.node_field_router(torch.cat([h, cnd], dim=-1))
+        route = torch.softmax(route_logits, dim=-1)                   # [B,N,K]
+        ctx = torch.einsum("bnk,bkd->bnd", route, field_context)     # [B,N,D]
+
+        node_context = torch.cat([h, ctx, cnd], dim=-1)
+        update = self.node_update(node_context)
+        alpha = self.out_gate(node_context)
+        h_sp = alpha * update
+        out = self.norm(h + h_sp)
+
+        if not return_diag:
+            return out, None
+
+        # Entropies are useful diagnostics: collapse toward one field is visible immediately.
+        eps = 1e-8
+        assign_entropy = -(assign.clamp_min(eps) * assign.clamp_min(eps).log()).sum(dim=1).mean()
+        route_entropy = -(route.clamp_min(eps) * route.clamp_min(eps).log()).sum(dim=-1).mean()
+        diag = {
+            "num_fields": float(self.num_fields),
+            "field_gate_mean": float(field_gate.mean().detach().cpu()),
+            "field_gate_std": float(field_gate.std(unbiased=False).detach().cpu()),
+            "field_bank_norm": float(z_fields.norm(dim=-1).mean().detach().cpu()),
+            "field_assignment_entropy": float(assign_entropy.detach().cpu()),
+            "node_route_entropy": float(route_entropy.detach().cpu()),
+            "out_gate_mean": float(alpha.mean().detach().cpu()),
+            "out_gate_std": float(alpha.std(unbiased=False).detach().cpu()),
+            "context_norm": float(ctx.norm(dim=-1).mean().detach().cpu()),
             "spatial_update_norm": float(h_sp.norm(dim=-1).mean().detach().cpu()),
         }
         return out, diag
@@ -564,6 +722,9 @@ class PopFieldHVACTwin(nn.Module):
         dropout: float = 0.1,
         use_node_embedding: bool = True,
         stable_init: bool = False,
+        num_fields: int = 1,
+        use_fourier_coordinates: bool = False,
+        fourier_bands: int = 6,
     ) -> None:
         super().__init__()
         self.num_nodes = int(num_nodes)
@@ -571,9 +732,17 @@ class PopFieldHVACTwin(nn.Module):
         self.d_model = int(d_model)
         self.num_layers = int(num_layers)
         self.use_node_embedding = bool(use_node_embedding)
+        self.num_fields = max(1, int(num_fields))
+        self.use_fourier_coordinates = bool(use_fourier_coordinates)
+        self.fourier_bands = max(0, int(fourier_bands))
 
         self.condition_encoder = ConditionEncoder(cond_dim, d_model, dropout)
-        self.coordinate_encoder = CoordinateEncoder(d_model, dropout)
+        self.coordinate_encoder = CoordinateEncoder(
+            d_model,
+            dropout,
+            use_fourier=self.use_fourier_coordinates,
+            fourier_bands=self.fourier_bands,
+        )
         self.condition_to_nodes = nn.Linear(d_model, d_model)
 
         if self.use_node_embedding:
@@ -584,8 +753,11 @@ class PopFieldHVACTwin(nn.Module):
         self.input_norm = nn.LayerNorm(d_model)
         self.layers = nn.ModuleList([FFNFusionLayer(d_model, dropout) for _ in range(num_layers)])
 
-        # Shared across layer positions, matching the user's original PopField implementation.
-        self.spatial_mixer = HVACMeanFieldMixer(cond_dim, d_model, dropout)
+        # Shared across layer positions, matching the original PopField implementation.
+        # num_fields=1 is the exact legacy single-mean mixer; K>1 enables the upgraded field bank.
+        self.spatial_mixer = HVACMeanFieldMixer(
+            cond_dim, d_model, dropout, num_fields=self.num_fields
+        )
 
         self.field_decoder = nn.Sequential(
             nn.Linear(d_model, d_model),
