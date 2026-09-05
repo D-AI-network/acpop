@@ -2236,7 +2236,7 @@ def optimize_hvac(
         # Comfort score includes both global uniformity and local hot/cold risk.
         p95_excess = max(p95_temp - float(max_p95_temp_c), 0.0)
         comfort_raw = (
-            zone_range
+            1.5 * zone_range
             + 0.50 * spatial_std
             + 2.0 * band_violation
             + 2.0 * hot_fraction
