@@ -1991,7 +1991,7 @@ def optimize_hvac(
     Counterfactual HVAC search with STRICT comfort constraints.
 
     Feasibility requires all of:
-      1) worst-zone internal P95-P05 spread <= max_zone_range_c and does not exceed the current field when provided
+      1) worst-zone internal P95-P05 spread <= max_zone_range_c
       2) hot fraction <= max_hot_fraction
       3) cold fraction <= max_cold_fraction
       4) 95th-percentile temperature <= max_p95_temp_c
