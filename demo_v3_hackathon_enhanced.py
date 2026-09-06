@@ -1715,8 +1715,11 @@ def field_comfort_metrics(
     velocity_xyz = np.asarray(velocity_xyz, dtype=np.float32)
     vel = np.linalg.norm(velocity_xyz, axis=-1)
     zone_means = {name: float(np.mean(temp[mask])) for name, mask in zones.items()}
-    zvals = np.asarray(list(zone_means.values()), dtype=float)
-    zone_range = float(zvals.max() - zvals.min())
+    zone_spreads = {
+        name: float(np.percentile(temp[mask], 95) - np.percentile(temp[mask], 5))
+        for name, mask in zones.items()
+    }
+    zone_range = float(max(zone_spreads.values()))
     spatial_std = float(np.std(temp))
     upper = float(target_temp_c + comfort_band_c)
     lower = float(target_temp_c - comfort_band_c)
@@ -1978,6 +1981,7 @@ def optimize_hvac(
     target_temp_c: float = 24.0,
     comfort_band_c: float = 2.0,
     max_zone_range_c: float = 2.0,
+    baseline_zone_range_c: Optional[float] = None,
     max_hot_fraction: float = 0.05,
     max_cold_fraction: float = 0.05,
     max_p95_temp_c: Optional[float] = None,
@@ -1987,7 +1991,7 @@ def optimize_hvac(
     Counterfactual HVAC search with STRICT comfort constraints.
 
     Feasibility requires all of:
-      1) zone mean spread <= max_zone_range_c
+      1) worst-zone internal P95-P05 spread <= max_zone_range_c and does not exceed the current field when provided
       2) hot fraction <= max_hot_fraction
       3) cold fraction <= max_cold_fraction
       4) 95th-percentile temperature <= max_p95_temp_c
@@ -2021,9 +2025,12 @@ def optimize_hvac(
         temp = field[i, :, 0]
         vel = np.linalg.norm(field[i, :, 1:4], axis=-1)
         zone_means = {name: float(np.mean(temp[mask])) for name, mask in zones.items()}
-        zvals = np.asarray(list(zone_means.values()), dtype=float)
+        zone_spreads = {
+            name: float(np.percentile(temp[mask], 95) - np.percentile(temp[mask], 5))
+            for name, mask in zones.items()
+        }
 
-        zone_range = float(zvals.max() - zvals.min())
+        zone_range = float(max(zone_spreads.values()))
         spatial_std = float(np.std(temp))
         band_violation = float(np.mean(np.maximum(np.abs(temp - target_temp_c) - comfort_band_c, 0.0)))
         hot_fraction = float(np.mean(temp > upper))
@@ -2049,7 +2056,10 @@ def optimize_hvac(
             + 1.5 * p95_excess
         )
 
-        zone_ok = zone_range <= max_zone_range_c
+        effective_zone_limit_c = float(max_zone_range_c)
+        if baseline_zone_range_c is not None:
+            effective_zone_limit_c = min(effective_zone_limit_c, float(baseline_zone_range_c))
+        zone_ok = zone_range <= effective_zone_limit_c + 1e-8
         hot_ok = hot_fraction <= max_hot_fraction
         cold_ok = cold_fraction <= max_cold_fraction
         p95_ok = p95_temp <= float(max_p95_temp_c)
@@ -2057,7 +2067,7 @@ def optimize_hvac(
 
         # Dimensionless violation score for graceful fallback if no action is fully feasible.
         violation = (
-            max(zone_range - max_zone_range_c, 0.0) / max(max_zone_range_c, 1e-6)
+            max(zone_range - effective_zone_limit_c, 0.0) / max(effective_zone_limit_c, 1e-6)
             + max(hot_fraction - max_hot_fraction, 0.0) / max(max_hot_fraction, 1e-6)
             + max(cold_fraction - max_cold_fraction, 0.0) / max(max_cold_fraction, 1e-6)
             + max(p95_temp - float(max_p95_temp_c), 0.0) / max(comfort_band_c, 1e-6)
