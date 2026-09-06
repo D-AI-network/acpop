@@ -2056,9 +2056,9 @@ def optimize_hvac(
             + 1.5 * p95_excess
         )
 
+        # Keep the configured 2°C ceiling. The current-field spread is diagnostic only;
+        # do not make the optimizer stricter than the configured comfort limit.
         effective_zone_limit_c = float(max_zone_range_c)
-        if baseline_zone_range_c is not None:
-            effective_zone_limit_c = min(effective_zone_limit_c, float(baseline_zone_range_c))
         zone_ok = zone_range <= effective_zone_limit_c + 1e-8
         hot_ok = hot_fraction <= max_hot_fraction
         cold_ok = cold_fraction <= max_cold_fraction
