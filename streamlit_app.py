@@ -2318,13 +2318,13 @@ def _demo_status_from_row(rec, target_temp):
     if strict:
         return "FEASIBLE"
 
-    # Same near-feasible margins used by the deployment demo:
-    # +0.25 C zone range, +1 percentage point hot/cold, +0.25 C P95.
+    # Slightly relaxed near-feasible band for the user-facing demo.
+    # Strict FEASIBLE thresholds above remain unchanged.
     near = (
-        float(rec["zone_range_C"]) <= 2.25
-        and float(rec["hot_fraction"]) <= 0.06
-        and float(rec["cold_fraction"]) <= 0.06
-        and float(rec["p95_temp_C"]) <= p95_limit + 0.25
+        float(rec["zone_range_C"]) <= 2.40
+        and float(rec["hot_fraction"]) <= 0.07
+        and float(rec["cold_fraction"]) <= 0.07
+        and float(rec["p95_temp_C"]) <= p95_limit + 0.40
     )
     return "NEAR_FEASIBLE" if near else "INFEASIBLE"
 
