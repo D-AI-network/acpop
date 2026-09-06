@@ -3252,6 +3252,43 @@ elif st.session_state.app_view == "HEAT_LOAD":
                 # the matched scenario's ACTUAL four heat loads. Only HVAC actions change.
                 loads = dict(retrieval["matched_loads"])
 
+                # Current spatial imbalance = worst internal P95-P05 among the four XY thermal zones.
+                _opt_zone_path = APP_ROOT / "thermal_zones_train140.npz"
+                if not _opt_zone_path.exists():
+                    raise FileNotFoundError(f"Thermal zone mask not found: {_opt_zone_path}")
+                with np.load(_opt_zone_path) as _opt_zone_data:
+                    if "zone_ids" not in _opt_zone_data:
+                        raise KeyError("thermal_zones_train140.npz has no 'zone_ids'")
+                    _opt_zone_ids = np.asarray(_opt_zone_data["zone_ids"], dtype=np.int64)
+                    _opt_zone_coords = (
+                        np.asarray(_opt_zone_data["coords"], dtype=np.float32)
+                        if "coords" in _opt_zone_data
+                        else None
+                    )
+
+                _current_opt_temp = np.asarray(matched_current["temp_c"], dtype=float)
+                _current_opt_coords = np.asarray(matched_current["coords"], dtype=np.float32)
+                if len(_opt_zone_ids) != len(_current_opt_temp):
+                    raise ValueError(
+                        f"Thermal zone/node count mismatch: zones={len(_opt_zone_ids)}, current={len(_current_opt_temp)}"
+                    )
+                if _opt_zone_coords is not None and (
+                    _opt_zone_coords.shape != _current_opt_coords.shape
+                    or not np.allclose(_opt_zone_coords, _current_opt_coords, atol=1e-6, rtol=0.0)
+                ):
+                    raise ValueError(
+                        "thermal_zones_train140.npz node ordering/coordinates do not match current CFD field"
+                    )
+                _opt_zone_labels = np.sort(np.unique(_opt_zone_ids))
+                if len(_opt_zone_labels) != 4:
+                    raise ValueError(f"Expected 4 thermal zones, found {len(_opt_zone_labels)}")
+                _current_zone_spreads = np.asarray([
+                    np.nanpercentile(_current_opt_temp[_opt_zone_ids == _zid], 95)
+                    - np.nanpercentile(_current_opt_temp[_opt_zone_ids == _zid], 5)
+                    for _zid in _opt_zone_labels
+                ], dtype=float)
+                current_worst_zone_spread_c = float(np.nanmax(_current_zone_spreads))
+
                 runtime_dir = Path(tempfile.gettempdir()) / "acpop_streamlit_runtime"
                 runtime_dir.mkdir(parents=True, exist_ok=True)
 
@@ -3289,6 +3326,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
                         target_temp_c=target,
                         comfort_band_c=2.0,
                         max_zone_range_c=2.0,
+                        baseline_zone_range_c=current_worst_zone_spread_c,
                         max_hot_fraction=0.05,
                         max_cold_fraction=0.05,
                         max_p95_temp_c=target + 2.0,
@@ -3899,7 +3937,7 @@ elif st.session_state.app_view == "COMPARE":
     after_p05 = float(np.nanpercentile(result_pred_nodes, 5))
     after_p95 = float(np.nanpercentile(result_pred_nodes, 95))
 
-    # Thermal-zone balance: max/min difference among the four data-derived zone means.
+    # Spatial temperature spread: worst internal P95-P05 among the four data-derived XY thermal zones.
     _zone_path = APP_ROOT / "thermal_zones_train140.npz"
     if not _zone_path.exists():
         raise FileNotFoundError(f"Thermal zone mask not found: {_zone_path}")
@@ -3935,17 +3973,19 @@ elif st.session_state.app_view == "COMPARE":
     if len(_zone_labels) != 4:
         raise ValueError(f"Expected 4 thermal zones, found {len(_zone_labels)}")
 
-    _before_zone_means = np.asarray([
-        np.nanmean(result_current_nodes[_zone_ids == _zid])
+    _before_zone_spreads = np.asarray([
+        np.nanpercentile(result_current_nodes[_zone_ids == _zid], 95)
+        - np.nanpercentile(result_current_nodes[_zone_ids == _zid], 5)
         for _zid in _zone_labels
     ], dtype=float)
-    _after_zone_means = np.asarray([
-        np.nanmean(result_pred_nodes[_zone_ids == _zid])
+    _after_zone_spreads = np.asarray([
+        np.nanpercentile(result_pred_nodes[_zone_ids == _zid], 95)
+        - np.nanpercentile(result_pred_nodes[_zone_ids == _zid], 5)
         for _zid in _zone_labels
     ], dtype=float)
 
-    before_spread = max(0.0, float(np.nanmax(_before_zone_means) - np.nanmin(_before_zone_means)))
-    after_spread = max(0.0, float(np.nanmax(_after_zone_means) - np.nanmin(_after_zone_means)))
+    before_spread = max(0.0, float(np.nanmax(_before_zone_spreads)))
+    after_spread = max(0.0, float(np.nanmax(_after_zone_spreads)))
 
     # "목표 초과 영역" is easier to understand than HVAC-specific hotspot jargon.
     # We count points more than 1°C above the target.
