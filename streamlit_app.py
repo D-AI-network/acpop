@@ -6,7 +6,7 @@ from __future__ import annotations
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
 # FACTOR_UI_BUILD = 2026-09-04-v69
-# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v5_SMART_POPUP_4ZONE_TITLE_TEMP32
+# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v6_REMOVE_SUMMARY_HOME_TEMP30
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -3156,9 +3156,11 @@ def _select_adaptive_sensor_points(coords_xyz, temp_nodes, sensor_count):
 
 
 
-def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, coords_xyz=None, temp_nodes=None):
+def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, coords_xyz=None, temp_nodes=None, temp_max=32.0):
     """Classic top-down 2D temperature map used when the user selects 2D."""
     heatmap_data = np.asarray(grid_data, dtype=float)
+    temp_max = float(temp_max)
+    temp_ticks = [18, 21, 24, 27, 30] if temp_max <= 30.0 else [18, 22, 26, 30, 32]
 
     temp_scale = [
         [0.00, "#8ee7ff"],
@@ -3179,13 +3181,13 @@ def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, co
             colorscale=temp_scale,
             hoverongaps=False,
             zmin=18.0,
-            zmax=32.0,
+            zmax=temp_max,
             colorbar=dict(
                 title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
                 thickness=5,
                 len=0.68,
                 x=0.99,
-                tickvals=[18, 22, 26, 30, 32],
+                tickvals=temp_ticks,
                 tickfont=dict(size=8, color="#d9f3ff"),
                 outlinecolor="rgba(174,228,255,0.18)",
             ),
@@ -3272,9 +3274,11 @@ def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, co
     )
     return fig
 
-def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5):
+def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5, temp_max=32.0):
     """Interactive 3D spatial-temperature surface used by HOME and RESULTS."""
     surface_data = np.asarray(grid_data, dtype=float)
+    temp_max = float(temp_max)
+    temp_ticks = [18, 21, 24, 27, 30] if temp_max <= 30.0 else [18, 22, 26, 30, 32]
 
     fig = go.Figure()
 
@@ -3295,7 +3299,7 @@ def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5
                     [1.00, "#e63a32"],
                 ],
             cmin=18.0,
-            cmax=32.0,
+            cmax=temp_max,
             showscale=True,
             colorbar=dict(
                 title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
@@ -3380,7 +3384,7 @@ def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5
             ),
             zaxis=dict(
                 title="",
-                range=[18.0, 32.0],
+                range=[18.0, temp_max],
                 showbackground=False,
                 showgrid=False,
                 zeroline=False,
@@ -3399,7 +3403,7 @@ def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5
     return fig
 
 
-def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show_sensors=True, sensor_count=5):
+def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show_sensors=True, sensor_count=5, temp_max=32.0):
     """
     Clean 3D room-style temperature map.
 
@@ -3409,6 +3413,8 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
     """
     coords_xyz = np.asarray(coords_xyz, dtype=float)
     temp_nodes = np.asarray(temp_nodes, dtype=float).reshape(-1)
+    temp_max = float(temp_max)
+    temp_ticks = [18, 21, 24, 27, 30] if temp_max <= 30.0 else [18, 22, 26, 30, 32]
 
     valid = (
         coords_xyz.ndim == 2
@@ -3416,14 +3422,14 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
         and len(coords_xyz) == len(temp_nodes)
     )
     if not valid:
-        return make_mobile_heatmap(field_current_grid, height=height, show_sensors=show_sensors, sensor_count=sensor_count)
+        return make_mobile_heatmap(field_current_grid, height=height, show_sensors=show_sensors, sensor_count=sensor_count, temp_max=temp_max)
 
     finite = np.isfinite(coords_xyz[:, :3]).all(axis=1) & np.isfinite(temp_nodes)
     coords = coords_xyz[finite, :3]
     temps = temp_nodes[finite]
 
     if len(coords) == 0:
-        return make_mobile_heatmap(field_current_grid, height=height, show_sensors=show_sensors, sensor_count=sensor_count)
+        return make_mobile_heatmap(field_current_grid, height=height, show_sensors=show_sensors, sensor_count=sensor_count, temp_max=temp_max)
 
     xmin, ymin, zmin = np.min(coords, axis=0)
     xmax, ymax, zmax = np.max(coords, axis=0)
@@ -3478,7 +3484,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
                 color=interp_temp,
                 colorscale=temp_scale,
                 cmin=18.0,
-                cmax=32.0,
+                cmax=temp_max,
                 opacity=0.82,
                 colorbar=dict(
                     title=dict(text="°C", font=dict(size=11, color="#eefaff")),
@@ -3486,7 +3492,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
                     len=0.56,
                     x=0.992,
                     xpad=2,
-                    tickvals=[18, 22, 26, 30, 32],
+                    tickvals=temp_ticks,
                     tickfont=dict(size=8, color="#dff4ff"),
                     outlinecolor="rgba(174,228,255,0.20)",
                 ),
@@ -3704,9 +3710,9 @@ if st.session_state.app_view == "HOME":
     with st.container(key="temperature_map_card"):
         home_field_view = field_view_selector("home_field_view")
         if home_field_view == "3D":
-            home_fig = make_true_3d_field(current_coords, current_temp_nodes, height=410, show_sensors=False)
+            home_fig = make_true_3d_field(current_coords, current_temp_nodes, height=410, show_sensors=False, temp_max=30.0)
         else:
-            home_fig = make_2d_heatmap(field_current_grid, height=315, show_sensors=False)
+            home_fig = make_2d_heatmap(field_current_grid, height=315, show_sensors=False, temp_max=30.0)
 
         st.plotly_chart(
             home_fig,
@@ -5085,21 +5091,6 @@ elif st.session_state.app_view == "COMPARE":
             config={"displayModeBar": False},
             key=f"compare_plot_{compare_field_mode}_{compare_view}",
         )
-
-    conclusion = (
-        "AI 추천 제어안 적용 후 공간 온도 분포 예측이 완료되었습니다. "
-        "3D·2D·ZONE 화면에서 전체 분포와 4개 구역별 변화를 비교할 수 있습니다."
-    )
-
-    st.markdown(
-        f"""
-        <div class="compare-summary">
-            <strong>✓ 최적화 결과 분석 완료</strong><br>
-            {conclusion}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
     st.markdown(
         """
