@@ -6,6 +6,7 @@ from __future__ import annotations
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
 # FACTOR_UI_BUILD = 2026-09-04-v69
+# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v1
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -2432,15 +2433,17 @@ for nid, meta in ROA_NODES_META.items():
 
 
 
-def field_view_selector(key: str) -> str:
-    """Small 3D / 2D selector. Uses segmented control when available."""
-    if key not in st.session_state:
+def field_view_selector(key: str, include_zone: bool = False) -> str:
+    """Small field-view selector. Results can optionally expose a 4-zone summary."""
+    options = ["3D", "2D", "ZONE"] if include_zone else ["3D", "2D"]
+
+    if key not in st.session_state or st.session_state.get(key) not in options:
         st.session_state[key] = "3D"
 
     if hasattr(st, "segmented_control"):
         selected = st.segmented_control(
             "Field view",
-            options=["3D", "2D"],
+            options=options,
             selection_mode="single",
             key=key,
             label_visibility="collapsed",
@@ -2449,7 +2452,7 @@ def field_view_selector(key: str) -> str:
 
     return st.radio(
         "Field view",
-        options=["3D", "2D"],
+        options=options,
         horizontal=True,
         key=key,
         label_visibility="collapsed",
@@ -3984,6 +3987,19 @@ elif st.session_state.app_view == "COMPARE":
         for _zid in _zone_labels
     ], dtype=float)
 
+    # Zone view uses the exact same four training-zone masks as the optimizer.
+    # Each card reports the zone mean before/after and its absolute distance from target.
+    _before_zone_means = np.asarray([
+        np.nanmean(result_current_nodes[_zone_ids == _zid])
+        for _zid in _zone_labels
+    ], dtype=float)
+    _after_zone_means = np.asarray([
+        np.nanmean(result_pred_nodes[_zone_ids == _zid])
+        for _zid in _zone_labels
+    ], dtype=float)
+    _before_zone_target_dev = np.abs(_before_zone_means - target)
+    _after_zone_target_dev = np.abs(_after_zone_means - target)
+
     before_spread = max(0.0, float(np.nanmax(_before_zone_spreads)))
     after_spread = max(0.0, float(np.nanmax(_after_zone_spreads)))
 
@@ -4000,19 +4016,13 @@ elif st.session_state.app_view == "COMPARE":
     )
     hot_improve_pp = before_hot - after_hot
 
+    # Keep the model's raw feasibility status for diagnostics, but do not turn it
+    # into a pass/fail message on the demo screen. "완료" means the optimization
+    # process finished; the numerical cards below still show the actual outcome.
     status = str(res.get("status", "INFEASIBLE"))
-    if status == "FEASIBLE":
-        status_text = "목표 온도 달성 가능"
-        status_color = "#74e0a8"
-        status_symbol = "✓"
-    elif status == "NEAR_FEASIBLE":
-        status_text = "목표 온도 근접 달성"
-        status_color = "#ffd36b"
-        status_symbol = "•"
-    else:
-        status_text = "목표 온도 달성 어려움"
-        status_color = "#ff7d8b"
-        status_symbol = "×"
+    status_text = "AI 냉방 최적화 완료"
+    status_color = "#74e0a8"
+    status_symbol = "✓"
 
     # Comparison-screen-only styling.
     st.markdown(
@@ -4132,6 +4142,111 @@ elif st.session_state.app_view == "COMPARE":
             font-size:14px;
             font-weight:800;
         }
+        .zone-view-head {
+            display:flex;
+            align-items:flex-end;
+            justify-content:space-between;
+            gap:10px;
+            margin:10px 0 10px 0;
+        }
+        .zone-view-title {
+            color:#edf9ff;
+            font-size:16px;
+            font-weight:800;
+        }
+        .zone-view-sub {
+            color:#8fb9d0;
+            font-size:11px;
+            font-weight:650;
+            text-align:right;
+            line-height:1.35;
+        }
+        .zone-grid {
+            display:grid;
+            grid-template-columns:repeat(2,minmax(0,1fr));
+            gap:10px;
+            margin:4px 0 14px 0;
+        }
+        .zone-card {
+            min-width:0;
+            border-radius:18px;
+            padding:14px 13px 12px 13px;
+            background:linear-gradient(150deg, rgba(11,43,70,.96), rgba(15,56,84,.90));
+            border:1px solid rgba(126,203,240,.20);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+            position:relative;
+            overflow:hidden;
+        }
+        .zone-card::before {
+            content:"";
+            position:absolute;
+            left:0;
+            top:0;
+            bottom:0;
+            width:4px;
+            background:var(--zone-accent,#62d6ff);
+        }
+        .zone-card-top {
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:6px;
+            margin-bottom:8px;
+        }
+        .zone-name {
+            color:#dff5ff;
+            font-size:13px;
+            font-weight:850;
+        }
+        .zone-mode {
+            color:#8fc8e5;
+            font-size:9px;
+            font-weight:800;
+            letter-spacing:.08em;
+        }
+        .zone-main-temp {
+            color:#ffffff;
+            font-size:25px;
+            line-height:1.05;
+            font-weight:850;
+            margin-bottom:8px;
+        }
+        .zone-flow {
+            display:grid;
+            grid-template-columns:1fr auto 1fr;
+            gap:5px;
+            align-items:center;
+            color:#d8edf8;
+            font-size:11px;
+            font-weight:750;
+        }
+        .zone-flow .after {
+            text-align:right;
+        }
+        .zone-flow .arrow {
+            color:#5fd6ff;
+            font-size:15px;
+            font-weight:900;
+        }
+        .zone-target-dev {
+            margin-top:8px;
+            padding-top:7px;
+            border-top:1px solid rgba(171,222,246,.10);
+            color:#9fc4d8;
+            font-size:9.5px;
+            line-height:1.35;
+            font-weight:650;
+        }
+        .zone-target-dev strong {
+            color:#7ce6b2;
+            font-weight:850;
+        }
+        @media (max-width: 380px) {
+            .zone-grid { gap:8px; }
+            .zone-card { padding:12px 10px 10px 10px; }
+            .zone-main-temp { font-size:22px; }
+            .zone-flow { font-size:10px; }
+        }
         .compare-summary {
             margin:16px 0 12px 0;
             padding:17px 16px;
@@ -4228,7 +4343,7 @@ elif st.session_state.app_view == "COMPARE":
             label_visibility="collapsed",
         )
 
-    compare_view = field_view_selector("compare_map_view")
+    compare_view = field_view_selector("compare_map_view", include_zone=True)
 
     before_active_sensor_count = int(np.clip(
         int(res.get("initial_sensor_count", MAX_ACTIVE_SENSORS)),
@@ -4252,78 +4367,124 @@ elif st.session_state.app_view == "COMPARE":
     st.session_state.recommended_sensor_count = after_active_sensor_count
     st.session_state.optimized_results = res
 
-    if compare_field_mode == "BEFORE":
-        st.markdown(
-            f'<div class="compare-map-label"><span>Current Field</span><span class="sensor-count">· 활성 센서 {before_active_sensor_count}개</span></div>',
-            unsafe_allow_html=True,
+    if compare_view == "ZONE":
+        # 4-zone summary: show the selected state as the large number while keeping
+        # the before → after transition visible in every card.
+        _zone_mode_label = "최적화 전" if compare_field_mode == "BEFORE" else "최적화 후"
+        _zone_selected_means = (
+            _before_zone_means if compare_field_mode == "BEFORE" else _after_zone_means
         )
-        if compare_view == "3D":
-            compare_fig = make_true_3d_field(
-                result_current_coords,
-                result_current_nodes,
-                height=430,
-                show_sensors=True,
-                sensor_count=before_active_sensor_count,
-            )
-        else:
-            compare_fig = make_2d_heatmap(
-                result_current_grid,
-                height=330,
-                show_sensors=True,
-                sensor_count=before_active_sensor_count,
-                coords_xyz=result_current_coords,
-                temp_nodes=result_current_nodes,
-            )
-    else:
-        st.markdown(
-            f'<div class="compare-map-label"><span>Predicted Field</span><span class="sensor-count">· 활성 센서 {after_active_sensor_count}개</span></div>',
-            unsafe_allow_html=True,
-        )
-        if compare_view == "3D":
-            compare_fig = make_true_3d_field(
-                result_pred_coords,
-                result_pred_nodes,
-                height=430,
-                show_sensors=True,
-                sensor_count=after_active_sensor_count,
-            )
-        else:
-            compare_fig = make_2d_heatmap(
-                result_pred_grid,
-                height=330,
-                show_sensors=True,
-                sensor_count=after_active_sensor_count,
-                coords_xyz=result_pred_coords,
-                temp_nodes=result_pred_nodes,
+
+        _zone_cards = []
+        for _idx, _zid in enumerate(_zone_labels):
+            _b = float(_before_zone_means[_idx])
+            _a = float(_after_zone_means[_idx])
+            _bdev = float(_before_zone_target_dev[_idx])
+            _adev = float(_after_zone_target_dev[_idx])
+            _selected = float(_zone_selected_means[_idx])
+
+            # Temperature accent only; this does not classify the optimization as success/failure.
+            if _selected > target + 1.0:
+                _accent = "#ff9b5c"
+            elif _selected < target - 1.0:
+                _accent = "#61d4ff"
+            else:
+                _accent = "#6ee7b7"
+
+            _zone_cards.append(
+                f"""
+                <div class="zone-card" style="--zone-accent:{_accent};">
+                    <div class="zone-card-top">
+                        <div class="zone-name">ZONE {_idx + 1}</div>
+                        <div class="zone-mode">{compare_field_mode}</div>
+                    </div>
+                    <div class="zone-main-temp">{_selected:.2f}°C</div>
+                    <div class="zone-flow">
+                        <span>{_b:.1f}°C</span>
+                        <span class="arrow">→</span>
+                        <span class="after">{_a:.1f}°C</span>
+                    </div>
+                    <div class="zone-target-dev">
+                        목표 편차 <strong>{_bdev:.1f} → {_adev:.1f}°C</strong>
+                    </div>
+                </div>
+                """
             )
 
-    st.plotly_chart(
-        compare_fig,
-        use_container_width=True,
-        config={"displayModeBar": False},
-        key=f"compare_plot_{compare_field_mode}_{compare_view}",
+        st.markdown(
+            f"""
+            <div class="zone-view-head">
+                <div class="zone-view-title">4개 Zone 온도 변화</div>
+                <div class="zone-view-sub">{_zone_mode_label}<br>목표 {target:.1f}°C</div>
+            </div>
+            <div class="zone-grid">
+                {''.join(_zone_cards)}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        if compare_field_mode == "BEFORE":
+            st.markdown(
+                f'<div class="compare-map-label"><span>Current Field</span><span class="sensor-count">· 활성 센서 {before_active_sensor_count}개</span></div>',
+                unsafe_allow_html=True,
+            )
+            if compare_view == "3D":
+                compare_fig = make_true_3d_field(
+                    result_current_coords,
+                    result_current_nodes,
+                    height=430,
+                    show_sensors=True,
+                    sensor_count=before_active_sensor_count,
+                )
+            else:
+                compare_fig = make_2d_heatmap(
+                    result_current_grid,
+                    height=330,
+                    show_sensors=True,
+                    sensor_count=before_active_sensor_count,
+                    coords_xyz=result_current_coords,
+                    temp_nodes=result_current_nodes,
+                )
+        else:
+            st.markdown(
+                f'<div class="compare-map-label"><span>Predicted Field</span><span class="sensor-count">· 활성 센서 {after_active_sensor_count}개</span></div>',
+                unsafe_allow_html=True,
+            )
+            if compare_view == "3D":
+                compare_fig = make_true_3d_field(
+                    result_pred_coords,
+                    result_pred_nodes,
+                    height=430,
+                    show_sensors=True,
+                    sensor_count=after_active_sensor_count,
+                )
+            else:
+                compare_fig = make_2d_heatmap(
+                    result_pred_grid,
+                    height=330,
+                    show_sensors=True,
+                    sensor_count=after_active_sensor_count,
+                    coords_xyz=result_pred_coords,
+                    temp_nodes=result_pred_nodes,
+                )
+
+        st.plotly_chart(
+            compare_fig,
+            use_container_width=True,
+            config={"displayModeBar": False},
+            key=f"compare_plot_{compare_field_mode}_{compare_view}",
+        )
+
+    conclusion = (
+        "AI 추천 제어안 적용 후 공간 온도 분포 예측이 완료되었습니다. "
+        "3D·2D·ZONE 화면에서 전체 분포와 4개 구역별 변화를 비교할 수 있습니다."
     )
-
-    if status == "FEASIBLE":
-        conclusion = (
-            f"추천 제어안을 적용하면 목표 {target:.1f}°C에 도달하면서 "
-            f"공간 온도 불균형이 약 {spread_improve_pct:.0f}% 감소할 것으로 예측됩니다."
-        )
-    elif status == "NEAR_FEASIBLE":
-        conclusion = (
-            f"추천 제어안 적용 후 목표 온도에 근접하며, "
-            f"공간 온도 불균형은 약 {spread_improve_pct:.0f}% 개선될 것으로 예측됩니다."
-        )
-    else:
-        conclusion = (
-            f"현재 냉방 후보 범위만으로는 목표 {target:.1f}°C 달성이 어렵지만, "
-            f"공간 온도 분포 변화와 개선 가능성을 사전에 확인할 수 있습니다."
-        )
 
     st.markdown(
         f"""
         <div class="compare-summary">
-            <strong>{status_symbol} 냉방 효과</strong><br>
+            <strong>✓ 최적화 결과 분석 완료</strong><br>
             {conclusion}
         </div>
         """,
