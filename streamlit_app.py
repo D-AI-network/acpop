@@ -1849,163 +1849,28 @@ if st.session_state.app_view == "INTRO":
             position: relative;
             width: min(440px, calc(100vw - 12px));
             margin: 0 auto;
-            padding: 0;
+            padding: 14px;
             box-sizing: border-box;
-            background: #102f4d;
+            background: linear-gradient(180deg, #17385a 0%, #143454 100%);
             border: 1.5px solid rgba(118, 196, 242, 0.32);
             border-radius: 42px;
             box-shadow: 0 22px 48px -16px rgba(0, 8, 20, 0.48);
             overflow: hidden;
         }
 
-        /* Seamless phone status area. */
-        .coollins-intro-statusbar {
-            position: relative;
-            height: 50px;
-            width: 100%;
-            background: linear-gradient(90deg, rgb(21,33,48) 0%, rgb(14,37,64) 48%, rgb(30,61,95) 100%);
-            color: #fff;
-            z-index: 30;
-            line-height: 1;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        }
-
-        .coollins-intro-time {
-            position: absolute;
-            left: 28px;
-            top: 16px;
-            color: #fff !important;
-            font-size: 15px;
-            font-weight: 800;
-            letter-spacing: -0.2px;
-        }
-
-        .coollins-intro-island {
-            position: absolute;
-            left: 50%;
-            top: 8px;
-            transform: translateX(-50%);
-            width: 112px;
-            height: 28px;
-            border-radius: 18px;
-            background: #020811;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .coollins-intro-island-cam {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #0a5aa7;
-            box-shadow: inset 0 0 0 2px #04233d, 0 0 3px rgba(53,163,255,0.42);
-        }
-
-        .coollins-intro-island-speaker {
-            width: 30px;
-            height: 4px;
-            border-radius: 99px;
-            background: #12618d;
-        }
-
-        .coollins-intro-status-icons {
-            position: absolute;
-            right: 25px;
-            top: 14px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            gap: 7px;
-        }
-
-        .intro-signal {
-            height: 14px;
-            display: flex;
-            align-items: flex-end;
-            gap: 2px;
-        }
-        .intro-signal i {
-            display: block;
-            width: 3px;
-            border-radius: 1px;
-            background: #fff;
-        }
-        .intro-signal i:nth-child(1) { height: 5px; }
-        .intro-signal i:nth-child(2) { height: 8px; }
-        .intro-signal i:nth-child(3) { height: 11px; }
-        .intro-signal i:nth-child(4) { height: 14px; }
-
-        .intro-wifi {
-            width: 18px;
-            height: 14px;
-            position: relative;
-        }
-        .intro-wifi::before,
-        .intro-wifi::after {
-            content: "";
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%) rotate(45deg);
-            border: 2px solid #fff;
-            border-left-color: transparent;
-            border-top-color: transparent;
-            border-radius: 2px;
-        }
-        .intro-wifi::before { width: 12px; height: 12px; top: -2px; }
-        .intro-wifi::after { width: 6px; height: 6px; top: 4px; }
-        .intro-wifi-dot {
-            position: absolute;
-            left: 50%;
-            bottom: 0;
-            width: 3px;
-            height: 3px;
-            transform: translateX(-50%);
-            border-radius: 50%;
-            background: #fff;
-        }
-
-        .intro-battery {
-            width: 23px;
-            height: 11px;
-            border: 1.5px solid rgba(255,255,255,0.95);
-            border-radius: 3px;
-            padding: 1.5px;
-            box-sizing: border-box;
-            position: relative;
-        }
-        .intro-battery::before {
-            content: "";
-            display: block;
-            width: 84%;
-            height: 100%;
-            border-radius: 1px;
-            background: #fff;
-        }
-        .intro-battery::after {
-            content: "";
-            position: absolute;
-            right: -3px;
-            top: 3px;
-            width: 2px;
-            height: 4px;
-            border-radius: 0 1px 1px 0;
-            background: rgba(255,255,255,0.85);
-        }
-
-        /* No inner margins/rounded box: the artwork touches the phone screen edges. */
-        .coollins-intro-target {
+        /* Visible phone bezel/frame around the artwork. */
+        .coollins-intro-display {
             position: relative;
             width: 100%;
-            margin: 0;
-            line-height: 0;
             overflow: hidden;
+            border-radius: 34px;
             background: #071a2f;
-            border-radius: 0 0 40px 40px;
+            border: 1.2px solid rgba(85, 167, 232, 0.22);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+            line-height: 0;
         }
 
-        .coollins-intro-target img {
+        .coollins-intro-display img {
             display: block;
             width: 100%;
             height: auto;
@@ -2016,7 +1881,7 @@ if st.session_state.app_view == "INTRO":
             border-radius: 0;
         }
 
-        /* Clickable area remains aligned with START in the embedded artwork. */
+        /* START hotspot based on the intro artwork itself. */
         .coollins-intro-enter {
             position: absolute;
             left: 27.0%;
@@ -2043,11 +1908,10 @@ if st.session_state.app_view == "INTRO":
             .coollins-intro-shell {
                 width: calc(100vw - 8px);
                 max-width: 440px;
+                padding: 12px;
                 border-radius: 38px;
             }
-            .coollins-intro-target { border-radius: 0 0 36px 36px; }
-            .coollins-intro-time { left: 24px; }
-            .coollins-intro-status-icons { right: 22px; }
+            .coollins-intro-display { border-radius: 30px; }
         }
         </style>
         """,
@@ -2061,19 +1925,7 @@ if st.session_state.app_view == "INTRO":
 if st.session_state.app_view == "INTRO":
     intro_html = (
         f'<div class="coollins-intro-shell">'
-        f'<div class="coollins-intro-statusbar">'
-        f'<div class="coollins-intro-time">9:41</div>'
-        f'<div class="coollins-intro-island">'
-        f'<div class="coollins-intro-island-cam"></div>'
-        f'<div class="coollins-intro-island-speaker"></div>'
-        f'</div>'
-        f'<div class="coollins-intro-status-icons">'
-        f'<div class="intro-signal"><i></i><i></i><i></i><i></i></div>'
-        f'<div class="intro-wifi"><span class="intro-wifi-dot"></span></div>'
-        f'<div class="intro-battery"></div>'
-        f'</div>'
-        f'</div>'
-        f'<div class="coollins-intro-target">'
+        f'<div class="coollins-intro-display">'
         f'<img src="data:image/png;base64,{INTRO_IMAGE_PNG_B64}" '
         f'alt="COOLLINS AI Smart Cooling Optimizer 시작 화면" />'
         f'<a class="coollins-intro-enter" href="?enter=1" target="_self" '
