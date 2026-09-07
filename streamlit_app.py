@@ -6,7 +6,7 @@ from __future__ import annotations
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
 # FACTOR_UI_BUILD = 2026-09-04-v69
-# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v2_NAVY_OUTLINE
+# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v1
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -2494,7 +2494,7 @@ def make_zone_mean_map(
     target,
     height=335,
 ):
-    """Render the four training zones on a navy field and emphasize zone-wise temperature reduction."""
+    """Render a dark zone-outline map that emphasizes temperature reduction per zone."""
     zone_xy, xy_zone_ids = _collapse_zone_ids_to_xy(zone_coords_xyz, zone_ids)
     if len(zone_xy) == 0:
         return go.Figure()
@@ -2512,136 +2512,193 @@ def make_zone_mean_map(
     after_zone_means = np.asarray(after_zone_means, dtype=float)
     drop_values = np.maximum(0.0, before_zone_means - after_zone_means)
 
-    # Fixed categorical accents: the zone interior stays navy; only borders/labels carry color.
-    # Order follows ZONE 1, 2, 3, 4.
-    zone_accents = ["#39ddff", "#a66cff", "#ff9a3d", "#4de6b1"]
+    # Requested fixed color assignment:
+    # Zone 1 = orange, Zone 2 = sky blue, Zone 3 = green, Zone 4 = purple
+    zone_palette = {
+        0: "#ffad47",  # zone 1
+        1: "#45d2ff",  # zone 2
+        2: "#54e39b",  # zone 3
+        3: "#a86bff",  # zone 4
+    }
 
     fig = go.Figure()
 
-    # Invisible numeric trace used only for the reduction legend on the right.
-    # Keep the title to a single line ("감소량") as requested.
-    legend_max = max(4.0, float(np.ceil(np.nanmax(drop_values))) if len(drop_values) else 4.0)
+    # Navy room background so only the zone outlines carry color.
+    room_bg = np.zeros_like(zone_grid_idx, dtype=float)
     fig.add_trace(
         go.Heatmap(
-            z=[[0.0, legend_max]],
-            x=[float(grid_len_axis.min()), float(grid_len_axis.max())],
-            y=[float(grid_wid_axis.min()), float(grid_wid_axis.min())],
-            colorscale=[
-                [0.00, "#a66cff"],
-                [0.45, "#6d86ff"],
-                [1.00, "#35ddff"],
-            ],
-            zmin=0.0,
-            zmax=legend_max,
-            opacity=0.0,
+            z=room_bg,
+            x=grid_len_axis,
+            y=grid_wid_axis,
+            colorscale=[[0.0, "#0a2d4b"], [1.0, "#0a2d4b"]],
+            showscale=False,
             hoverinfo="skip",
-            showscale=True,
-            colorbar=dict(
-                title=dict(text="감소량", side="top", font=dict(size=10, color="#bcd9ea")),
-                thickness=6,
-                len=0.62,
-                x=1.01,
-                y=0.50,
-                tickmode="array",
-                tickvals=list(range(0, int(legend_max) + 1)),
-                ticktext=[str(v) for v in range(0, int(legend_max) + 1)],
-                tickfont=dict(size=9, color="#c7dfed"),
-                outlinecolor="rgba(174,228,255,0.20)",
-                outlinewidth=1,
-            ),
         )
     )
 
-    # Draw each zone boundary independently. A soft thick pass underneath creates
-    # the neon-like outline without filling the zone interior.
+    # Draw each zone boundary separately so each one gets its own color.
     for idx, zid in enumerate(zone_labels):
-        accent = zone_accents[idx % len(zone_accents)]
-        mask_grid = np.where(
-            np.isclose(zone_grid_idx, float(idx), atol=0.49),
-            1.0,
-            0.0,
-        )
+        zone_mask = np.where(np.isclose(zone_grid_idx, float(idx), atol=0.49), 1.0, 0.0)
+        zone_color = zone_palette.get(idx, "#aee4ff")
 
-        # soft glow
+        # Outer soft glow
         fig.add_trace(
             go.Contour(
-                z=mask_grid,
+                z=zone_mask,
                 x=grid_len_axis,
                 y=grid_wid_axis,
                 showscale=False,
                 hoverinfo="skip",
                 contours=dict(start=0.5, end=0.5, size=1, coloring="none", showlines=True),
-                line=dict(color=accent, width=6.0),
+                line=dict(color=zone_color, width=8.0),
                 opacity=0.18,
             )
         )
-        # crisp colored zone border
+        # Crisp main outline
         fig.add_trace(
             go.Contour(
-                z=mask_grid,
+                z=zone_mask,
                 x=grid_len_axis,
                 y=grid_wid_axis,
                 showscale=False,
                 hoverinfo="skip",
                 contours=dict(start=0.5, end=0.5, size=1, coloring="none", showlines=True),
-                line=dict(color=accent, width=2.4),
-                opacity=1.0,
+                line=dict(color=zone_color, width=3.2),
+                opacity=0.98,
             )
         )
 
-    # Zone result cards. Emphasize the drop first; make BEFORE → AFTER bold and readable.
+    # Card positions follow zone centroids with small manual nudges for readability.
+    centroids = {}
     for idx, zid in enumerate(zone_labels):
         mask = xy_zone_ids == int(zid)
-        if not np.any(mask):
-            continue
+        if np.any(mask):
+            centroids[idx] = [
+                float(np.nanmean(zone_xy[mask, 0])),
+                float(np.nanmean(zone_xy[mask, 1])),
+            ]
+        else:
+            centroids[idx] = [
+                float(np.nanmean(grid_len_axis)),
+                float(np.nanmean(grid_wid_axis)),
+            ]
 
-        cx = float(np.nanmean(zone_xy[mask, 0]))
-        cy = float(np.nanmean(zone_xy[mask, 1]))
+    offsets = {
+        0: (0.45, 0.45),   # zone 1
+        1: (0.55, -0.40),  # zone 2
+        2: (-0.55, 0.25),  # zone 3
+        3: (-0.25, -0.35), # zone 4
+    }
+
+    x_span = float(grid_len_axis.max() - grid_len_axis.min())
+    y_span = float(grid_wid_axis.max() - grid_wid_axis.min())
+    card_w = 0.30 * x_span
+    card_h = 0.23 * y_span
+
+    def _clamp(v, lo, hi):
+        return max(lo, min(hi, v))
+
+    x_lo = float(grid_len_axis.min()) + card_w * 0.55
+    x_hi = float(grid_len_axis.max()) - card_w * 0.55
+    y_lo = float(grid_wid_axis.min()) + card_h * 0.55
+    y_hi = float(grid_wid_axis.max()) - card_h * 0.55
+
+    for idx, zid in enumerate(zone_labels):
+        zone_color = zone_palette.get(idx, "#aee4ff")
+        cx, cy = centroids[idx]
+        dx, dy = offsets.get(idx, (0.0, 0.0))
+        ax = _clamp(cx + dx, x_lo, x_hi)
+        ay = _clamp(cy + dy, y_lo, y_hi)
+        half_w = card_w / 2.0
+        half_h = card_h / 2.0
+
+        fig.add_shape(
+            type="rect",
+            x0=ax - half_w,
+            x1=ax + half_w,
+            y0=ay - half_h,
+            y1=ay + half_h,
+            fillcolor="rgba(8, 31, 52, 0.82)",
+            line=dict(color=zone_color, width=1.6),
+            layer="above",
+        )
+        fig.add_shape(
+            type="line",
+            x0=ax - half_w + 0.10,
+            x1=ax - half_w + 0.10,
+            y0=ay + half_h - 0.14,
+            y1=ay + half_h - 0.30,
+            line=dict(color=zone_color, width=8),
+            layer="above",
+        )
+        fig.add_shape(
+            type="line",
+            x0=ax - half_w + 0.15,
+            x1=ax + half_w - 0.15,
+            y0=ay - 0.02,
+            y1=ay - 0.02,
+            line=dict(color="rgba(214,238,255,0.36)", width=1.2),
+            layer="above",
+        )
+
         b = float(before_zone_means[idx])
         a = float(after_zone_means[idx])
         drop = float(drop_values[idx])
         bdev = abs(b - float(target))
         adev = abs(a - float(target))
-        accent = zone_accents[idx % len(zone_accents)]
-
-        label = (
-            f"<span style='color:{accent};font-size:13px'>▌</span> "
-            f"<b>ZONE {idx + 1}</b><br>"
-            f"<span style='color:{accent};font-size:19px'><b>↓ {drop:.1f}°C</b></span><br>"
-            f"<span style='font-size:12.5px;color:#ffffff'><b>{b:.1f} → {a:.1f}°C</b></span><br>"
-            f"<span style='font-size:9.5px;color:#c6dce8'>목표 편차 {bdev:.1f} → {adev:.1f}°C</span>"
-        )
 
         fig.add_annotation(
-            x=cx,
-            y=cy,
-            text=label,
+            x=ax - half_w + 0.34,
+            y=ay + half_h - 0.18,
+            text=f"<b>ZONE {idx + 1}</b>",
             showarrow=False,
-            align="center",
-            font=dict(size=11, color="#eaf7ff"),
-            bgcolor="rgba(7, 31, 52, 0.88)",
-            bordercolor=accent,
-            borderwidth=1.0,
-            borderpad=7,
-            xanchor="center",
+            xanchor="left",
+            yanchor="top",
+            align="left",
+            font=dict(size=13, color="#eefaff"),
+        )
+        fig.add_annotation(
+            x=ax - half_w + 0.22,
+            y=ay + 0.16,
+            text=f"<b>↓ {drop:.1f}°C</b>",
+            showarrow=False,
+            xanchor="left",
             yanchor="middle",
+            align="left",
+            font=dict(size=24, color=zone_color),
+        )
+        fig.add_annotation(
+            x=ax - half_w + 0.18,
+            y=ay - 0.14,
+            text=f"<b>{b:.1f} → {a:.1f}°C</b>",
+            showarrow=False,
+            xanchor="left",
+            yanchor="middle",
+            align="left",
+            font=dict(size=15, color="#f7fbff"),
+        )
+        fig.add_annotation(
+            x=ax - half_w + 0.18,
+            y=ay - 0.34,
+            text=f"목표 편차 {bdev:.1f} → {adev:.1f}°C",
+            showarrow=False,
+            xanchor="left",
+            yanchor="middle",
+            align="left",
+            font=dict(size=10, color="#d9ecfb"),
         )
 
     fig.update_layout(
         height=height,
-        margin=dict(l=4, r=34, t=4, b=4),
+        margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#0b2b47",
+        plot_bgcolor="rgba(0,0,0,0)",
         showlegend=False,
         xaxis=dict(
             range=[float(grid_len_axis.min()), float(grid_len_axis.max())],
             showgrid=False,
             zeroline=False,
             showticklabels=False,
-            showline=True,
-            linecolor="rgba(82,164,216,0.42)",
-            linewidth=1,
-            mirror=True,
             fixedrange=True,
         ),
         yaxis=dict(
@@ -2649,10 +2706,6 @@ def make_zone_mean_map(
             showgrid=False,
             zeroline=False,
             showticklabels=False,
-            showline=True,
-            linecolor="rgba(82,164,216,0.42)",
-            linewidth=1,
-            mirror=True,
             scaleanchor="x",
             scaleratio=1,
             fixedrange=True,
@@ -2722,11 +2775,12 @@ def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, co
 
     temp_scale = [
         [0.00, "#8ee7ff"],
-        [0.18, "#50c9ff"],
-        [0.36, "#17bed0"],
-        [0.54, "#4edb78"],
-        [0.70, "#b9e63d"],
-        [0.84, "#ffa13a"],
+        [0.14, "#63d6ff"],
+        [0.28, "#41b8ff"],
+        [0.42, "#1fc9d2"],
+        [0.57, "#53dd84"],
+        [0.72, "#c4e45a"],
+        [0.86, "#ffae47"],
         [1.00, "#e63a32"],
     ]
 
@@ -2738,13 +2792,13 @@ def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, co
             colorscale=temp_scale,
             hoverongaps=False,
             zmin=18.0,
-            zmax=28.0,
+            zmax=35.0,
             colorbar=dict(
                 title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
                 thickness=5,
                 len=0.68,
                 x=0.99,
-                tickvals=[18, 20, 22, 24, 26, 28],
+                tickvals=[18, 22, 26, 30, 35],
                 tickfont=dict(size=8, color="#d9f3ff"),
                 outlinecolor="rgba(174,228,255,0.18)",
             ),
@@ -2845,14 +2899,16 @@ def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5
             surfacecolor=surface_data,
             colorscale=[
                     [0.00, "#8ee7ff"],
-                    [0.18, "#5cc8ff"],
-                    [0.38, "#43d8b1"],
-                    [0.58, "#b7ef4a"],
-                    [0.78, "#ffb347"],
-                    [1.00, "#e53935"],
+                    [0.14, "#63d6ff"],
+                    [0.28, "#41b8ff"],
+                    [0.42, "#1fc9d2"],
+                    [0.57, "#53dd84"],
+                    [0.72, "#c4e45a"],
+                    [0.86, "#ffae47"],
+                    [1.00, "#e63a32"],
                 ],
             cmin=18.0,
-            cmax=28.0,
+            cmax=35.0,
             showscale=True,
             colorbar=dict(
                 title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
@@ -2936,7 +2992,7 @@ def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5
             ),
             zaxis=dict(
                 title="",
-                range=[18.0, 28.0],
+                range=[18.0, 35.0],
                 showbackground=False,
                 showgrid=False,
                 zeroline=False,
@@ -3010,13 +3066,14 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
     interp_temp = interp_temp[good]
 
     temp_scale = [
-        [0.00, "#8ee7ff"],  # 18 C - sky blue
-        [0.18, "#50c9ff"],
-        [0.36, "#17bed0"],
-        [0.54, "#4edb78"],
-        [0.70, "#b9e63d"],
-        [0.84, "#ffa13a"],
-        [1.00, "#e63a32"],  # 28 C - red
+        [0.00, "#8ee7ff"],
+        [0.14, "#63d6ff"],
+        [0.28, "#41b8ff"],
+        [0.42, "#1fc9d2"],
+        [0.57, "#53dd84"],
+        [0.72, "#c4e45a"],
+        [0.86, "#ffae47"],
+        [1.00, "#e63a32"],
     ]
 
     fig = go.Figure()
@@ -3033,7 +3090,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
                 color=interp_temp,
                 colorscale=temp_scale,
                 cmin=18.0,
-                cmax=28.0,
+                cmax=35.0,
                 opacity=0.82,
                 colorbar=dict(
                     title=dict(text="°C", font=dict(size=11, color="#eefaff")),
@@ -3041,7 +3098,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
                     len=0.56,
                     x=0.992,
                     xpad=2,
-                    tickvals=[18, 20, 22, 24, 26, 28],
+                    tickvals=[18, 22, 26, 30, 35],
                     tickfont=dict(size=8, color="#dff4ff"),
                     outlinecolor="rgba(174,228,255,0.20)",
                 ),
