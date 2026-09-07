@@ -6,7 +6,7 @@ from __future__ import annotations
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
 # FACTOR_UI_BUILD = 2026-09-04-v69
-# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v7_NEW_INTRO_IMAGE
+# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v6_REMOVE_SUMMARY_HOME_TEMP30
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -1821,15 +1821,15 @@ if st.session_state.app_view == "INTRO":
     st.markdown(
         """
         <style>
-        /* INTRO: restore a darker navy page and add a mobile-app shell. */
+        /* INTRO: use the selected first image directly as the splash screen. */
         .stApp {
             background: linear-gradient(180deg, #061427 0%, #071a2f 100%) !important;
         }
 
         .block-container {
-            max-width: 430px !important;
-            padding: 0.15rem 0.35rem 0.45rem 0.35rem !important;
-            margin: 0.15rem auto 0.35rem auto !important;
+            max-width: 440px !important;
+            padding: 0.35rem 0.35rem 0.6rem 0.35rem !important;
+            margin: 0.15rem auto 0.45rem auto !important;
             background: transparent !important;
             border: none !important;
             border-radius: 0 !important;
@@ -1842,7 +1842,7 @@ if st.session_state.app_view == "INTRO":
 
         .coollins-intro-shell {
             width: 100%;
-            max-width: 410px;
+            max-width: 420px;
             margin: 0 auto;
             padding: 0;
             background: transparent;
@@ -1850,10 +1850,6 @@ if st.session_state.app_view == "INTRO":
             border-radius: 0;
             box-shadow: none;
             overflow: visible;
-        }
-
-        .coollins-intro-shell .phone-notch {
-            display: none !important;
         }
 
         .coollins-intro-target {
@@ -1877,15 +1873,15 @@ if st.session_state.app_view == "INTRO":
             border-radius: 0;
         }
 
-        /* Transparent real click target placed exactly over the button in the artwork. */
+        /* Invisible real click target aligned to the START button in the selected artwork. */
         .coollins-intro-enter {
             position: absolute;
-            left: 26.5%;
-            top: 90.9%;
-            width: 47.0%;
-            height: 7.7%;
+            left: 19.0%;
+            top: 84.8%;
+            width: 62.0%;
+            height: 8.7%;
             display: block;
-            border-radius: 22px;
+            border-radius: 24px;
             cursor: pointer;
             text-decoration: none !important;
             background: rgba(0,0,0,0.001);
@@ -1896,7 +1892,7 @@ if st.session_state.app_view == "INTRO":
 
         .coollins-intro-enter:focus-visible {
             outline: 2px solid #38bdf8;
-            outline-offset: -5px;
+            outline-offset: -4px;
         }
         </style>
         """,
@@ -1921,7 +1917,6 @@ if st.session_state.app_view == "INTRO":
     )
     st.markdown(intro_html, unsafe_allow_html=True)
     st.stop()
-
 
 # From HOME onward, initialize data assets.
 FIELD_ZIP_PATH, FIELD_ZIP_ERROR, FIELD_ZIP_DP_COUNT = _discover_cfd_zip()
