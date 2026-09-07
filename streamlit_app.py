@@ -1918,16 +1918,30 @@ if st.session_state.app_view == "INTRO":
             background: #071a2f;
             line-height: 0;
             box-shadow: inset 0 0 0 1px rgba(255,255,255,0.035);
+            isolation: isolate;
         }
 
-        /* Top phone bezel lives ABOVE the artwork, so it never darkens or cuts the COOLLINS logo. */
+        .coollins-phone-screen::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+            pointer-events: none;
+            z-index: 45;
+        }
+
+        /* Float only the notch/island over the artwork so there is no rectangular seam. */
         .coollins-phone-hardware {
-            position: relative;
-            height: 46px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 54px;
             width: 100%;
             margin: 0;
             background: transparent;
-            z-index: 30;
+            z-index: 40;
             pointer-events: none;
         }
 
@@ -1970,7 +1984,7 @@ if st.session_state.app_view == "INTRO":
             line-height: 0;
             overflow: hidden;
             background: #071a2f;
-            border-radius: 40px;
+            border-radius: inherit;
         }
 
         .coollins-intro-target img {
@@ -1981,7 +1995,7 @@ if st.session_state.app_view == "INTRO":
             padding: 0;
             user-select: none;
             -webkit-user-drag: none;
-            border-radius: 40px;
+            border-radius: inherit;
             object-fit: cover;
         }
 
@@ -2042,7 +2056,7 @@ if st.session_state.app_view == "INTRO":
             .coollins-phone-screen { border-radius: 36px; }
             .coollins-intro-target,
             .coollins-intro-target img { border-radius: 36px; }
-            .coollins-phone-hardware { height: 44px; }
+            .coollins-phone-hardware { height: 50px; }
         }
         </style>
         """,
@@ -2067,10 +2081,10 @@ if st.session_state.app_view == "INTRO":
         f'<span class="coollins-side-button coollins-side-left-2"></span>'
         f'<span class="coollins-side-button coollins-side-right"></span>'
         f'<div class="coollins-phone-bezel">'
+        f'<div class="coollins-phone-screen">'
         f'<div class="coollins-phone-hardware">'
         f'<div class="coollins-dynamic-island"><span class="camera"></span><span class="speaker"></span></div>'
         f'</div>'
-        f'<div class="coollins-phone-screen">'
         f'<div class="coollins-intro-target">'
         f'<img src="{INTRO_IMAGE_DATA_URI or ""}" '
         f'alt="COOLLINS AI Smart Cooling Optimizer 소개 화면" />'
