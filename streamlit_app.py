@@ -6,7 +6,7 @@ from __future__ import annotations
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
 # FACTOR_UI_BUILD = 2026-09-04-v69
-# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v1
+# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v2_NAVY_OUTLINE
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -2494,7 +2494,7 @@ def make_zone_mean_map(
     target,
     height=335,
 ):
-    """Render a top-down map that emphasizes average temperature reduction by zone."""
+    """Render the four training zones on a navy field and emphasize zone-wise temperature reduction."""
     zone_xy, xy_zone_ids = _collapse_zone_ids_to_xy(zone_coords_xyz, zone_ids)
     if len(zone_xy) == 0:
         return go.Figure()
@@ -2512,65 +2512,89 @@ def make_zone_mean_map(
     after_zone_means = np.asarray(after_zone_means, dtype=float)
     drop_values = np.maximum(0.0, before_zone_means - after_zone_means)
 
-    drop_grid = np.full(zone_grid_idx.shape, np.nan, dtype=float)
-    for idx, _ in enumerate(zone_labels):
-        drop_grid[np.isclose(zone_grid_idx, float(idx), atol=0.49)] = float(drop_values[idx])
-
-    max_drop = float(np.nanmax(drop_values)) if len(drop_values) else 0.0
-    color_max = max(0.5, max_drop)
-    drop_scale = [
-        [0.00, "#d7f4ff"],
-        [0.20, "#a8e7ff"],
-        [0.40, "#73d8ff"],
-        [0.60, "#43c8ff"],
-        [0.80, "#1caee8"],
-        [1.00, "#0e84c7"],
-    ]
+    # Fixed categorical accents: the zone interior stays navy; only borders/labels carry color.
+    # Order follows ZONE 1, 2, 3, 4.
+    zone_accents = ["#39ddff", "#a66cff", "#ff9a3d", "#4de6b1"]
 
     fig = go.Figure()
+
+    # Invisible numeric trace used only for the reduction legend on the right.
+    # Keep the title to a single line ("감소량") as requested.
+    legend_max = max(4.0, float(np.ceil(np.nanmax(drop_values))) if len(drop_values) else 4.0)
     fig.add_trace(
         go.Heatmap(
-            z=drop_grid,
-            x=grid_len_axis,
-            y=grid_wid_axis,
-            colorscale=drop_scale,
-            hoverongaps=False,
+            z=[[0.0, legend_max]],
+            x=[float(grid_len_axis.min()), float(grid_len_axis.max())],
+            y=[float(grid_wid_axis.min()), float(grid_wid_axis.min())],
+            colorscale=[
+                [0.00, "#a66cff"],
+                [0.45, "#6d86ff"],
+                [1.00, "#35ddff"],
+            ],
             zmin=0.0,
-            zmax=color_max,
-            colorbar=dict(
-                title=dict(text="Δ°C", font=dict(size=10, color="#d9f3ff")),
-                thickness=5,
-                len=0.68,
-                x=0.99,
-                tickfont=dict(size=8, color="#d9f3ff"),
-                outlinecolor="rgba(174,228,255,0.18)",
-            ),
-            hovertemplate="X: %{x:.2f} m<br>Y: %{y:.2f} m<br>평균 온도 감소: %{z:.2f} °C<extra></extra>",
-        )
-    )
-
-    fig.add_trace(
-        go.Contour(
-            z=zone_grid_idx,
-            x=grid_len_axis,
-            y=grid_wid_axis,
-            showscale=False,
+            zmax=legend_max,
+            opacity=0.0,
             hoverinfo="skip",
-            contours=dict(
-                start=0.5,
-                end=max(0.5, len(zone_labels) - 0.5),
-                size=1,
-                coloring="none",
-                showlines=True,
+            showscale=True,
+            colorbar=dict(
+                title=dict(text="감소량", side="top", font=dict(size=10, color="#bcd9ea")),
+                thickness=6,
+                len=0.62,
+                x=1.01,
+                y=0.50,
+                tickmode="array",
+                tickvals=list(range(0, int(legend_max) + 1)),
+                ticktext=[str(v) for v in range(0, int(legend_max) + 1)],
+                tickfont=dict(size=9, color="#c7dfed"),
+                outlinecolor="rgba(174,228,255,0.20)",
+                outlinewidth=1,
             ),
-            line=dict(color="rgba(240,248,255,0.95)", width=2.2),
         )
     )
 
+    # Draw each zone boundary independently. A soft thick pass underneath creates
+    # the neon-like outline without filling the zone interior.
+    for idx, zid in enumerate(zone_labels):
+        accent = zone_accents[idx % len(zone_accents)]
+        mask_grid = np.where(
+            np.isclose(zone_grid_idx, float(idx), atol=0.49),
+            1.0,
+            0.0,
+        )
+
+        # soft glow
+        fig.add_trace(
+            go.Contour(
+                z=mask_grid,
+                x=grid_len_axis,
+                y=grid_wid_axis,
+                showscale=False,
+                hoverinfo="skip",
+                contours=dict(start=0.5, end=0.5, size=1, coloring="none", showlines=True),
+                line=dict(color=accent, width=6.0),
+                opacity=0.18,
+            )
+        )
+        # crisp colored zone border
+        fig.add_trace(
+            go.Contour(
+                z=mask_grid,
+                x=grid_len_axis,
+                y=grid_wid_axis,
+                showscale=False,
+                hoverinfo="skip",
+                contours=dict(start=0.5, end=0.5, size=1, coloring="none", showlines=True),
+                line=dict(color=accent, width=2.4),
+                opacity=1.0,
+            )
+        )
+
+    # Zone result cards. Emphasize the drop first; make BEFORE → AFTER bold and readable.
     for idx, zid in enumerate(zone_labels):
         mask = xy_zone_ids == int(zid)
         if not np.any(mask):
             continue
+
         cx = float(np.nanmean(zone_xy[mask, 0]))
         cy = float(np.nanmean(zone_xy[mask, 1]))
         b = float(before_zone_means[idx])
@@ -2578,46 +2602,60 @@ def make_zone_mean_map(
         drop = float(drop_values[idx])
         bdev = abs(b - float(target))
         adev = abs(a - float(target))
-        text = (
+        accent = zone_accents[idx % len(zone_accents)]
+
+        label = (
+            f"<span style='color:{accent};font-size:13px'>▌</span> "
             f"<b>ZONE {idx + 1}</b><br>"
-            f"<span style='font-size:16px'><b>↓ {drop:.1f}°C</b></span><br>"
-            f"<span style='font-size:10px'>{b:.1f} → {a:.1f}°C</span><br>"
-            f"<span style='font-size:9px'>목표 편차 {bdev:.1f} → {adev:.1f}°C</span>"
+            f"<span style='color:{accent};font-size:19px'><b>↓ {drop:.1f}°C</b></span><br>"
+            f"<span style='font-size:12.5px;color:#ffffff'><b>{b:.1f} → {a:.1f}°C</b></span><br>"
+            f"<span style='font-size:9.5px;color:#c6dce8'>목표 편차 {bdev:.1f} → {adev:.1f}°C</span>"
         )
+
         fig.add_annotation(
             x=cx,
             y=cy,
-            text=text,
+            text=label,
             showarrow=False,
             align="center",
-            font=dict(size=11, color="#f7fbff"),
-            bgcolor="rgba(7, 33, 54, 0.82)",
-            bordercolor="rgba(173, 228, 255, 0.36)",
-            borderwidth=1,
-            borderpad=6,
+            font=dict(size=11, color="#eaf7ff"),
+            bgcolor="rgba(7, 31, 52, 0.88)",
+            bordercolor=accent,
+            borderwidth=1.0,
+            borderpad=7,
             xanchor="center",
             yanchor="middle",
         )
 
     fig.update_layout(
         height=height,
-        margin=dict(l=0, r=4, t=0, b=0),
+        margin=dict(l=4, r=34, t=4, b=4),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#0b2b47",
         showlegend=False,
         xaxis=dict(
             range=[float(grid_len_axis.min()), float(grid_len_axis.max())],
             showgrid=False,
             zeroline=False,
             showticklabels=False,
+            showline=True,
+            linecolor="rgba(82,164,216,0.42)",
+            linewidth=1,
+            mirror=True,
+            fixedrange=True,
         ),
         yaxis=dict(
             range=[float(grid_wid_axis.min()), float(grid_wid_axis.max())],
             showgrid=False,
             zeroline=False,
             showticklabels=False,
+            showline=True,
+            linecolor="rgba(82,164,216,0.42)",
+            linewidth=1,
+            mirror=True,
             scaleanchor="x",
             scaleratio=1,
+            fixedrange=True,
         ),
     )
     return fig
