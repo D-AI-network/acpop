@@ -17,6 +17,7 @@ import io
 import os
 import re
 import tempfile
+import textwrap
 import time
 import zipfile
 from pathlib import Path
@@ -4391,38 +4392,42 @@ elif st.session_state.app_view == "COMPARE":
             else:
                 _accent = "#6ee7b7"
 
+            # Streamlit Markdown interprets HTML lines indented by 4+ spaces as a
+            # Markdown code block. Dedent every generated card before rendering.
             _zone_cards.append(
-                f"""
-                <div class="zone-card" style="--zone-accent:{_accent};">
-                    <div class="zone-card-top">
-                        <div class="zone-name">ZONE {_idx + 1}</div>
-                        <div class="zone-mode">{compare_field_mode}</div>
+                textwrap.dedent(
+                    f"""
+                    <div class="zone-card" style="--zone-accent:{_accent};">
+                        <div class="zone-card-top">
+                            <div class="zone-name">ZONE {_idx + 1}</div>
+                            <div class="zone-mode">{compare_field_mode}</div>
+                        </div>
+                        <div class="zone-main-temp">{_selected:.2f}°C</div>
+                        <div class="zone-flow">
+                            <span>{_b:.1f}°C</span>
+                            <span class="arrow">→</span>
+                            <span class="after">{_a:.1f}°C</span>
+                        </div>
+                        <div class="zone-target-dev">
+                            목표 편차 <strong>{_bdev:.1f} → {_adev:.1f}°C</strong>
+                        </div>
                     </div>
-                    <div class="zone-main-temp">{_selected:.2f}°C</div>
-                    <div class="zone-flow">
-                        <span>{_b:.1f}°C</span>
-                        <span class="arrow">→</span>
-                        <span class="after">{_a:.1f}°C</span>
-                    </div>
-                    <div class="zone-target-dev">
-                        목표 편차 <strong>{_bdev:.1f} → {_adev:.1f}°C</strong>
-                    </div>
-                </div>
-                """
+                    """
+                ).strip()
             )
 
-        st.markdown(
+        _zone_html = textwrap.dedent(
             f"""
             <div class="zone-view-head">
                 <div class="zone-view-title">4개 Zone 온도 변화</div>
                 <div class="zone-view-sub">{_zone_mode_label}<br>목표 {target:.1f}°C</div>
             </div>
             <div class="zone-grid">
-                {''.join(_zone_cards)}
+            {''.join(_zone_cards)}
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            """
+        ).strip()
+        st.markdown(_zone_html, unsafe_allow_html=True)
     else:
         if compare_field_mode == "BEFORE":
             st.markdown(
