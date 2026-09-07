@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import io
+import inspect
 import os
 import re
 import tempfile
@@ -2706,6 +2707,39 @@ def make_zone_mean_map(
             font=dict(size=9.5, color="#cfe5f3"),
         )
 
+    # Dense, almost-transparent click targets across the actual zone geometry.
+    # Each point carries its 1-based zone number so Streamlit can open a detail popup.
+    click_step = max(1, int(np.ceil(len(zone_xy) / 900.0)))
+    click_xy = zone_xy[::click_step]
+    click_ids_raw = xy_zone_ids[::click_step]
+    label_to_number = {int(zid): idx + 1 for idx, zid in enumerate(zone_labels)}
+    click_zone_numbers = np.asarray(
+        [label_to_number.get(int(zid), 0) for zid in click_ids_raw],
+        dtype=np.int64,
+    )
+    valid_click = click_zone_numbers > 0
+    if np.any(valid_click):
+        fig.add_trace(
+            go.Scatter(
+                x=click_xy[valid_click, 0],
+                y=click_xy[valid_click, 1],
+                mode="markers",
+                marker=dict(
+                    size=20,
+                    color="rgba(255,255,255,0.001)",
+                    line=dict(width=0),
+                ),
+                customdata=click_zone_numbers[valid_click].reshape(-1, 1),
+                hovertemplate=(
+                    "<b>ZONE %{customdata[0]}</b><br>"
+                    "클릭하여 상세 분석 보기"
+                    "<extra></extra>"
+                ),
+                showlegend=False,
+                name="zone_click_targets",
+            )
+        )
+
     fig.update_layout(
         height=height,
         margin=dict(l=0, r=0, t=0, b=0),
@@ -2730,6 +2764,121 @@ def make_zone_mean_map(
         ),
     )
     return fig
+
+
+def _extract_zone_from_plotly_selection(event):
+    """Return a 1-based zone number from Streamlit Plotly selection state."""
+    if event is None:
+        return None
+
+    selection = None
+    try:
+        selection = event.selection
+    except Exception:
+        pass
+    if selection is None and isinstance(event, dict):
+        selection = event.get("selection")
+
+    points = None
+    if selection is not None:
+        try:
+            points = selection.points
+        except Exception:
+            pass
+        if points is None and isinstance(selection, dict):
+            points = selection.get("points")
+
+    if not points:
+        return None
+
+    point = points[-1]
+    customdata = None
+    if isinstance(point, dict):
+        customdata = point.get("customdata")
+    else:
+        try:
+            customdata = point.customdata
+        except Exception:
+            pass
+
+    if isinstance(customdata, (list, tuple, np.ndarray)) and len(customdata):
+        customdata = customdata[0]
+
+    try:
+        zone_number = int(customdata)
+    except Exception:
+        return None
+
+    return zone_number if 1 <= zone_number <= 4 else None
+
+
+def _zone_detail_panel_html(zone_number, before_zone_means, after_zone_means, target):
+    """Build the compact detail card shown inside the zone dialog."""
+    idx = int(zone_number) - 1
+    before_zone_means = np.asarray(before_zone_means, dtype=float)
+    after_zone_means = np.asarray(after_zone_means, dtype=float)
+    if idx < 0 or idx >= len(before_zone_means) or idx >= len(after_zone_means):
+        return ""
+
+    palette = {1: "#ffad47", 2: "#45d2ff", 3: "#54e39b", 4: "#a86bff"}
+    accent = palette.get(int(zone_number), "#7fdcff")
+    before = float(before_zone_means[idx])
+    after = float(after_zone_means[idx])
+    temp_drop = max(0.0, before - after)
+    before_dev = abs(before - float(target))
+    after_dev = abs(after - float(target))
+    dev_drop = max(0.0, before_dev - after_dev)
+
+    return textwrap.dedent(
+        f"""
+        <div style="background:linear-gradient(150deg,rgba(8,35,58,.98),rgba(12,48,76,.96));border:1px solid {accent};border-radius:20px;padding:18px 16px 16px 16px;box-shadow:0 10px 28px rgba(0,15,30,.24);">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px;">
+                <span style="display:inline-block;width:6px;height:28px;border-radius:99px;background:{accent};box-shadow:0 0 12px {accent};"></span>
+                <div>
+                    <div style="color:#f3fbff;font-size:20px;font-weight:850;line-height:1.05;">ZONE {zone_number}</div>
+                    <div style="color:#9dc6dc;font-size:11px;font-weight:700;margin-top:4px;">목표 온도 {float(target):.1f}°C 기준</div>
+                </div>
+            </div>
+            <div style="background:rgba(6,28,48,.55);border-radius:15px;padding:14px;margin-bottom:10px;">
+                <div style="color:#9fc5d9;font-size:11px;font-weight:700;margin-bottom:5px;">평균 온도 변화</div>
+                <div style="color:#ffffff;font-size:24px;font-weight:900;letter-spacing:-.5px;">{before:.1f}°C <span style="color:#6fdcff;">→</span> {after:.1f}°C</div>
+                <div style="color:{accent};font-size:25px;font-weight:900;margin-top:5px;">↓ {temp_drop:.1f}°C</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
+                <div style="background:rgba(6,28,48,.55);border-radius:14px;padding:12px;">
+                    <div style="color:#9fc5d9;font-size:10px;font-weight:700;margin-bottom:5px;">목표 편차</div>
+                    <div style="color:#f5fbff;font-size:16px;font-weight:850;">{before_dev:.1f} → {after_dev:.1f}°C</div>
+                </div>
+                <div style="background:rgba(6,28,48,.55);border-radius:14px;padding:12px;">
+                    <div style="color:#9fc5d9;font-size:10px;font-weight:700;margin-bottom:5px;">편차 감소</div>
+                    <div style="color:#7de8b5;font-size:16px;font-weight:850;">↓ {dev_drop:.1f}°C</div>
+                </div>
+            </div>
+        </div>
+        """
+    ).strip()
+
+
+def _show_zone_detail_popup(zone_number, before_zone_means, after_zone_means, target):
+    """Show a modal dialog when supported; otherwise render an inline detail panel."""
+    panel_html = _zone_detail_panel_html(zone_number, before_zone_means, after_zone_means, target)
+    if not panel_html:
+        return
+
+    if hasattr(st, "dialog"):
+        @st.dialog(f"ZONE {int(zone_number)} 상세 분석")
+        def _zone_dialog():
+            st.markdown(panel_html, unsafe_allow_html=True)
+            if st.button("닫기", use_container_width=True, key=f"close_zone_detail_{int(zone_number)}"):
+                st.session_state.selected_zone_detail = None
+                st.rerun()
+        _zone_dialog()
+    else:
+        st.markdown(f'<div class="section-title" style="margin-top:10px;">ZONE {int(zone_number)} 상세 분석</div>', unsafe_allow_html=True)
+        st.markdown(panel_html, unsafe_allow_html=True)
+        if st.button("상세 보기 닫기", use_container_width=True, key=f"close_zone_detail_inline_{int(zone_number)}"):
+            st.session_state.selected_zone_detail = None
+            st.rerun()
 
 def _select_adaptive_sensor_points(coords_xyz, temp_nodes, sensor_count):
     """
@@ -4648,6 +4797,10 @@ elif st.session_state.app_view == "COMPARE":
             f'<div class="zone-view-head"><div class="zone-view-title">4개 Zone 평균 온도 감소 맵</div><div class="zone-view-sub">BEFORE → AFTER<br>목표 {target:.1f}°C</div></div>',
             unsafe_allow_html=True,
         )
+        st.markdown(
+            '<div style="color:#8fb9d0;font-size:10.5px;font-weight:650;margin:-4px 0 6px 2px;">Zone 영역을 클릭하면 상세 결과를 확인할 수 있습니다.</div>',
+            unsafe_allow_html=True,
+        )
         zone_fig = make_zone_mean_map(
             result_current_coords,
             _zone_ids,
@@ -4657,12 +4810,57 @@ elif st.session_state.app_view == "COMPARE":
             target=target,
             height=345,
         )
-        st.plotly_chart(
-            zone_fig,
-            use_container_width=True,
-            config={"displayModeBar": False},
-            key="zone_map_reduction",
-        )
+
+        if "selected_zone_detail" not in st.session_state:
+            st.session_state.selected_zone_detail = None
+        if "zone_map_click_nonce" not in st.session_state:
+            st.session_state.zone_map_click_nonce = 0
+
+        try:
+            _plotly_supports_selection = "on_select" in inspect.signature(st.plotly_chart).parameters
+        except Exception:
+            _plotly_supports_selection = False
+
+        if _plotly_supports_selection:
+            _zone_chart_key = f"zone_map_reduction_click_{int(st.session_state.zone_map_click_nonce)}"
+            _zone_event = st.plotly_chart(
+                zone_fig,
+                use_container_width=True,
+                config={"displayModeBar": False},
+                key=_zone_chart_key,
+                on_select="rerun",
+                selection_mode="points",
+            )
+            _clicked_zone = _extract_zone_from_plotly_selection(_zone_event)
+            if _clicked_zone is not None:
+                st.session_state.selected_zone_detail = int(_clicked_zone)
+                st.session_state.zone_map_click_nonce = int(st.session_state.zone_map_click_nonce) + 1
+        else:
+            st.plotly_chart(
+                zone_fig,
+                use_container_width=True,
+                config={"displayModeBar": False},
+                key="zone_map_reduction",
+            )
+            _zcol1, _zcol2 = st.columns(2)
+            with _zcol1:
+                if st.button("ZONE 1 상세", use_container_width=True, key="zone_detail_btn_1"):
+                    st.session_state.selected_zone_detail = 1
+                if st.button("ZONE 3 상세", use_container_width=True, key="zone_detail_btn_3"):
+                    st.session_state.selected_zone_detail = 3
+            with _zcol2:
+                if st.button("ZONE 2 상세", use_container_width=True, key="zone_detail_btn_2"):
+                    st.session_state.selected_zone_detail = 2
+                if st.button("ZONE 4 상세", use_container_width=True, key="zone_detail_btn_4"):
+                    st.session_state.selected_zone_detail = 4
+
+        if st.session_state.selected_zone_detail in (1, 2, 3, 4):
+            _show_zone_detail_popup(
+                int(st.session_state.selected_zone_detail),
+                _before_zone_means,
+                _after_zone_means,
+                target,
+            )
     else:
         if compare_field_mode == "BEFORE":
             st.markdown(
