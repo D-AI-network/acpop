@@ -2390,11 +2390,16 @@ if current_field is None:
     }
 
 current_coords = np.asarray(current_field["coords"], dtype=np.float32)
+current_temp_nodes = np.asarray(current_field["temp_c"], dtype=np.float32)
+
+# 사용자 입력 현재온도에 Current Field 평균을 맞춤
 requested_current_temp = float(st.session_state.current_temp_query)
 retrieved_mean_temp = float(np.nanmean(current_temp_nodes))
 temp_offset = requested_current_temp - retrieved_mean_temp
-current_temp_nodes = np.asarray(current_field["temp_c"], dtype=np.float32)
-avg_room_temp = float(current_field["mean_temp_c"])
+
+current_temp_nodes = current_temp_nodes + temp_offset
+avg_room_temp = requested_current_temp
+
 current_field_source = str(current_field["source"])
 matched_dp_id = int(matched_scenario["dp_id"]) if matched_scenario is not None else 0
 matched_mean_temp_c = float(matched_scenario["mean_temp_c"]) if matched_scenario is not None else avg_room_temp
