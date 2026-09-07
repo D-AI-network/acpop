@@ -4660,8 +4660,13 @@ elif st.session_state.app_view == "COMPARE":
     _before_zone_target_dev = np.abs(_before_zone_means - target)
     _after_zone_target_dev = np.abs(_after_zone_means - target)
 
-    before_spread = max(0.0, float(np.nanmax(_before_zone_spreads)))
-    after_spread = max(0.0, float(np.nanmax(_after_zone_spreads)))
+    before_spread = float(
+    np.nanmax(_before_zone_means) - np.nanmin(_before_zone_means)
+    )
+    
+    after_spread = float(
+        np.nanmax(_after_zone_means) - np.nanmin(_after_zone_means)
+    )
 
     # "목표 초과 영역" is easier to understand than HVAC-specific hotspot jargon.
     # We count points more than 1°C above the target.
