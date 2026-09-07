@@ -6,7 +6,7 @@ from __future__ import annotations
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
 # FACTOR_UI_BUILD = 2026-09-04-v69
-# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v2_CLOSED_BORDERS_TEMP32
+# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v4_HTML_HOVER_CLICK_POPUP_TEMP32
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import io
 import inspect
+import json
 import os
 import re
 import tempfile
@@ -2535,8 +2536,39 @@ def make_zone_mean_map(
             colorscale=[[0.0, "#0a2d4b"], [1.0, "#0a2d4b"]],
             showscale=False,
             hoverinfo="skip",
+            meta={"role": "room_background"},
         )
     )
+
+    # Interactive hover layers. They are almost invisible at rest, but the custom
+    # Plotly JS component raises their opacity when the mouse enters a zone.
+    # This gives each irregular zone a soft fill without changing the base navy map.
+    for idx, zid in enumerate(zone_labels):
+        zone_bool = np.isclose(zone_grid_idx, float(idx), atol=0.49)
+        zone_color = zone_palette.get(idx, "#aee4ff")
+        hover_fill = np.where(zone_bool, 1.0, np.nan)
+        hover_custom = np.where(zone_bool, float(idx + 1), np.nan)
+        fig.add_trace(
+            go.Heatmap(
+                z=hover_fill,
+                x=grid_len_axis,
+                y=grid_wid_axis,
+                customdata=hover_custom,
+                colorscale=[[0.0, zone_color], [1.0, zone_color]],
+                zmin=0.0,
+                zmax=1.0,
+                showscale=False,
+                opacity=0.012,
+                hoverongaps=False,
+                hovertemplate=(
+                    f"<b>ZONE {idx + 1}</b><br>"
+                    "클릭하여 상세 분석 보기"
+                    "<extra></extra>"
+                ),
+                meta={"role": "zone_fill", "zone_number": int(idx + 1)},
+                name=f"zone_fill_{idx + 1}",
+            )
+        )
 
     # Draw a CLOSED outline for every zone.  We erode each zone by one grid cell
     # before contouring it.  That places the outline slightly INSIDE its own zone,
@@ -2561,6 +2593,8 @@ def make_zone_mean_map(
                 contours=dict(start=0.5, end=0.5, size=1, coloring="none", showlines=True),
                 line=dict(color=zone_color, width=9.0),
                 opacity=0.17,
+                meta={"role": "zone_outline", "zone_number": int(idx + 1)},
+                name=f"zone_glow_{idx + 1}",
             )
         )
         # Clear zone perimeter.
@@ -2574,6 +2608,8 @@ def make_zone_mean_map(
                 contours=dict(start=0.5, end=0.5, size=1, coloring="none", showlines=True),
                 line=dict(color=zone_color, width=3.5),
                 opacity=1.0,
+                meta={"role": "zone_outline", "zone_number": int(idx + 1)},
+                name=f"zone_outline_{idx + 1}",
             )
         )
 
@@ -2707,36 +2743,27 @@ def make_zone_mean_map(
             font=dict(size=9.5, color="#cfe5f3"),
         )
 
-    # Dense, almost-transparent click targets across the actual zone geometry.
-    # Each point carries its 1-based zone number so Streamlit can open a detail popup.
-    click_step = max(1, int(np.ceil(len(zone_xy) / 900.0)))
-    click_xy = zone_xy[::click_step]
-    click_ids_raw = xy_zone_ids[::click_step]
-    label_to_number = {int(zid): idx + 1 for idx, zid in enumerate(zone_labels)}
-    click_zone_numbers = np.asarray(
-        [label_to_number.get(int(zid), 0) for zid in click_ids_raw],
-        dtype=np.int64,
-    )
-    valid_click = click_zone_numbers > 0
-    if np.any(valid_click):
+        # Transparent square target makes the visible zone card itself clickable too.
         fig.add_trace(
             go.Scatter(
-                x=click_xy[valid_click, 0],
-                y=click_xy[valid_click, 1],
+                x=[ax],
+                y=[ay],
                 mode="markers",
                 marker=dict(
-                    size=20,
+                    size=88,
+                    symbol="square",
                     color="rgba(255,255,255,0.001)",
                     line=dict(width=0),
                 ),
-                customdata=click_zone_numbers[valid_click].reshape(-1, 1),
+                customdata=[[int(idx + 1)]],
                 hovertemplate=(
-                    "<b>ZONE %{customdata[0]}</b><br>"
+                    f"<b>ZONE {idx + 1}</b><br>"
                     "클릭하여 상세 분석 보기"
                     "<extra></extra>"
                 ),
+                meta={"role": "zone_card_target", "zone_number": int(idx + 1)},
                 showlegend=False,
-                name="zone_click_targets",
+                name=f"zone_card_target_{idx + 1}",
             )
         )
 
@@ -2764,6 +2791,184 @@ def make_zone_mean_map(
         ),
     )
     return fig
+
+
+
+def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, target, height=365):
+    """Render Plotly in an HTML component with true hover-fill and click popup behavior."""
+    before_zone_means = np.asarray(before_zone_means, dtype=float)
+    after_zone_means = np.asarray(after_zone_means, dtype=float)
+    palette = {1: "#ffad47", 2: "#45d2ff", 3: "#54e39b", 4: "#a86bff"}
+
+    zone_data = {}
+    for zone_number in range(1, min(4, len(before_zone_means), len(after_zone_means)) + 1):
+        idx = zone_number - 1
+        before = float(before_zone_means[idx])
+        after = float(after_zone_means[idx])
+        temp_drop = max(0.0, before - after)
+        before_dev = abs(before - float(target))
+        after_dev = abs(after - float(target))
+        dev_drop = max(0.0, before_dev - after_dev)
+        zone_data[str(zone_number)] = {
+            "zone": zone_number,
+            "color": palette[zone_number],
+            "before": round(before, 2),
+            "after": round(after, 2),
+            "drop": round(temp_drop, 2),
+            "beforeDev": round(before_dev, 2),
+            "afterDev": round(after_dev, 2),
+            "devDrop": round(dev_drop, 2),
+            "target": round(float(target), 2),
+        }
+
+    # Keep the map itself free of Plotly toolbars; all interaction is direct hover/click.
+    plot_html = zone_fig.to_html(
+        full_html=False,
+        include_plotlyjs=True,
+        config={
+            "displayModeBar": False,
+            "responsive": True,
+            "scrollZoom": False,
+        },
+    )
+    zone_json = json.dumps(zone_data, ensure_ascii=False)
+
+    html = f"""
+    <div id="zone-interactive-wrap" style="position:relative;width:100%;height:{int(height)}px;overflow:hidden;border-radius:20px;background:#0a2d4b;">
+        <style>
+            #zone-interactive-wrap .plotly-graph-div {{ width:100% !important; height:{int(height)}px !important; }}
+            #zone-detail-float {{
+                position:absolute; z-index:50; width:210px; max-width:calc(100% - 24px);
+                display:none; border-radius:16px; padding:13px 13px 12px 13px;
+                background:linear-gradient(150deg,rgba(6,30,51,.98),rgba(10,47,75,.98));
+                border:1px solid #45d2ff; box-shadow:0 16px 34px rgba(0,8,20,.46);
+                backdrop-filter:blur(8px); color:white; font-family:'Noto Sans KR','Inter',sans-serif;
+                pointer-events:auto;
+            }}
+            #zone-detail-float .zclose {{
+                position:absolute; right:8px; top:7px; width:24px; height:24px; border:0; border-radius:50%;
+                color:#cfeafb; background:rgba(255,255,255,.08); font-size:15px; line-height:24px; cursor:pointer;
+            }}
+            #zone-detail-float .zhead {{display:flex;align-items:center;gap:8px;margin-bottom:10px;}}
+            #zone-detail-float .zbar {{width:5px;height:25px;border-radius:99px;background:#45d2ff;box-shadow:0 0 12px rgba(69,210,255,.5);}}
+            #zone-detail-float .zname {{font-size:16px;font-weight:900;color:#f4fbff;}}
+            #zone-detail-float .ztarget {{font-size:9px;font-weight:700;color:#91bbd1;margin-top:1px;}}
+            #zone-detail-float .ztemp {{font-size:18px;font-weight:900;color:#fff;letter-spacing:-.4px;}}
+            #zone-detail-float .zarrow {{color:#68d9ff;padding:0 4px;}}
+            #zone-detail-float .zdrop {{font-size:24px;font-weight:950;margin-top:2px;}}
+            #zone-detail-float .zgrid {{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;}}
+            #zone-detail-float .zmini {{background:rgba(255,255,255,.055);border-radius:10px;padding:8px 8px 7px 8px;}}
+            #zone-detail-float .zlabel {{font-size:8.5px;color:#91bbd1;font-weight:750;margin-bottom:3px;}}
+            #zone-detail-float .zvalue {{font-size:12px;color:#f5fbff;font-weight:850;white-space:nowrap;}}
+        </style>
+        {plot_html}
+        <div id="zone-detail-float">
+            <button class="zclose" id="zone-detail-close">×</button>
+            <div class="zhead"><span class="zbar" id="zone-detail-bar"></span><div><div class="zname" id="zone-detail-name"></div><div class="ztarget" id="zone-detail-target"></div></div></div>
+            <div class="ztemp"><span id="zone-before"></span><span class="zarrow">→</span><span id="zone-after"></span></div>
+            <div class="zdrop" id="zone-drop"></div>
+            <div class="zgrid">
+                <div class="zmini"><div class="zlabel">목표 편차</div><div class="zvalue" id="zone-dev"></div></div>
+                <div class="zmini"><div class="zlabel">편차 감소</div><div class="zvalue" id="zone-devdrop"></div></div>
+            </div>
+        </div>
+    </div>
+    <script>
+    (() => {{
+        const zoneData = {zone_json};
+        const wrap = document.getElementById('zone-interactive-wrap');
+        const plot = wrap.querySelector('.plotly-graph-div');
+        const panel = document.getElementById('zone-detail-float');
+        const closeBtn = document.getElementById('zone-detail-close');
+        let activeZone = null;
+        let hoverZone = null;
+
+        function traceZone(trace) {{
+            if (!trace || !trace.meta) return null;
+            const z = Number(trace.meta.zone_number || 0);
+            return z >= 1 && z <= 4 ? z : null;
+        }}
+
+        function fillIndexForZone(zone) {{
+            for (let i = 0; i < plot.data.length; i++) {{
+                const tr = plot.data[i];
+                if (tr && tr.meta && tr.meta.role === 'zone_fill' && Number(tr.meta.zone_number) === Number(zone)) return i;
+            }}
+            return -1;
+        }}
+
+        function setZoneHover(zone) {{
+            if (hoverZone === zone) return;
+            for (let z = 1; z <= 4; z++) {{
+                const idx = fillIndexForZone(z);
+                if (idx >= 0) Plotly.restyle(plot, {{opacity: (z === zone ? 0.20 : 0.012)}}, [idx]);
+            }}
+            hoverZone = zone;
+        }}
+
+        function clearHover() {{
+            for (let z = 1; z <= 4; z++) {{
+                const idx = fillIndexForZone(z);
+                if (idx >= 0) Plotly.restyle(plot, {{opacity: 0.012}}, [idx]);
+            }}
+            hoverZone = null;
+        }}
+
+        function showPanel(zone, ev) {{
+            const d = zoneData[String(zone)];
+            if (!d) return;
+            activeZone = zone;
+            panel.style.borderColor = d.color;
+            document.getElementById('zone-detail-bar').style.background = d.color;
+            document.getElementById('zone-detail-bar').style.boxShadow = `0 0 12px ${{d.color}}`;
+            document.getElementById('zone-detail-name').textContent = `ZONE ${{zone}} 상세 분석`;
+            document.getElementById('zone-detail-target').textContent = `목표 온도 ${{d.target.toFixed(1)}}°C 기준`;
+            document.getElementById('zone-before').textContent = `${{d.before.toFixed(1)}}°C`;
+            document.getElementById('zone-after').textContent = `${{d.after.toFixed(1)}}°C`;
+            const drop = document.getElementById('zone-drop');
+            drop.textContent = `↓ ${{d.drop.toFixed(1)}}°C`;
+            drop.style.color = d.color;
+            document.getElementById('zone-dev').textContent = `${{d.beforeDev.toFixed(1)}} → ${{d.afterDev.toFixed(1)}}°C`;
+            const dd = document.getElementById('zone-devdrop');
+            dd.textContent = `↓ ${{d.devDrop.toFixed(1)}}°C`;
+            dd.style.color = '#79e6b4';
+            panel.style.display = 'block';
+
+            const wr = wrap.getBoundingClientRect();
+            const prW = Math.min(210, wr.width - 24);
+            let x = wr.width - prW - 10;
+            let y = 10;
+            if (ev && Number.isFinite(ev.clientX) && Number.isFinite(ev.clientY)) {{
+                x = ev.clientX - wr.left + 14;
+                y = ev.clientY - wr.top + 12;
+                if (x + prW > wr.width - 8) x = ev.clientX - wr.left - prW - 14;
+                x = Math.max(8, Math.min(x, wr.width - prW - 8));
+                y = Math.max(8, Math.min(y, wr.height - 150));
+            }}
+            panel.style.left = `${{x}}px`;
+            panel.style.top = `${{y}}px`;
+        }}
+
+        plot.on('plotly_hover', (data) => {{
+            if (!data || !data.points || !data.points.length) return;
+            const zone = traceZone(data.points[0].data);
+            if (zone) setZoneHover(zone);
+        }});
+        plot.on('plotly_unhover', () => clearHover());
+        plot.on('plotly_click', (data) => {{
+            if (!data || !data.points || !data.points.length) return;
+            const zone = traceZone(data.points[0].data);
+            if (!zone) return;
+            const ev = data.event || null;
+            showPanel(zone, ev);
+            setZoneHover(zone);
+        }});
+        closeBtn.addEventListener('click', () => {{ panel.style.display = 'none'; activeZone = null; }});
+        wrap.addEventListener('mouseleave', () => {{ if (!activeZone) clearHover(); }});
+    }})();
+    </script>
+    """
+    components.html(html, height=int(height), scrolling=False)
 
 
 def _extract_zone_from_plotly_selection(event):
@@ -4798,7 +5003,7 @@ elif st.session_state.app_view == "COMPARE":
             unsafe_allow_html=True,
         )
         st.markdown(
-            '<div style="color:#8fb9d0;font-size:10.5px;font-weight:650;margin:-4px 0 6px 2px;">Zone 영역을 클릭하면 상세 결과를 확인할 수 있습니다.</div>',
+            '<div style="color:#8fb9d0;font-size:10.5px;font-weight:650;margin:-4px 0 6px 2px;">Zone에 마우스를 올리면 영역이 강조되고, 클릭하면 상세 결과가 표시됩니다.</div>',
             unsafe_allow_html=True,
         )
         zone_fig = make_zone_mean_map(
@@ -4810,57 +5015,13 @@ elif st.session_state.app_view == "COMPARE":
             target=target,
             height=345,
         )
-
-        if "selected_zone_detail" not in st.session_state:
-            st.session_state.selected_zone_detail = None
-        if "zone_map_click_nonce" not in st.session_state:
-            st.session_state.zone_map_click_nonce = 0
-
-        try:
-            _plotly_supports_selection = "on_select" in inspect.signature(st.plotly_chart).parameters
-        except Exception:
-            _plotly_supports_selection = False
-
-        if _plotly_supports_selection:
-            _zone_chart_key = f"zone_map_reduction_click_{int(st.session_state.zone_map_click_nonce)}"
-            _zone_event = st.plotly_chart(
-                zone_fig,
-                use_container_width=True,
-                config={"displayModeBar": False},
-                key=_zone_chart_key,
-                on_select="rerun",
-                selection_mode="points",
-            )
-            _clicked_zone = _extract_zone_from_plotly_selection(_zone_event)
-            if _clicked_zone is not None:
-                st.session_state.selected_zone_detail = int(_clicked_zone)
-                st.session_state.zone_map_click_nonce = int(st.session_state.zone_map_click_nonce) + 1
-        else:
-            st.plotly_chart(
-                zone_fig,
-                use_container_width=True,
-                config={"displayModeBar": False},
-                key="zone_map_reduction",
-            )
-            _zcol1, _zcol2 = st.columns(2)
-            with _zcol1:
-                if st.button("ZONE 1 상세", use_container_width=True, key="zone_detail_btn_1"):
-                    st.session_state.selected_zone_detail = 1
-                if st.button("ZONE 3 상세", use_container_width=True, key="zone_detail_btn_3"):
-                    st.session_state.selected_zone_detail = 3
-            with _zcol2:
-                if st.button("ZONE 2 상세", use_container_width=True, key="zone_detail_btn_2"):
-                    st.session_state.selected_zone_detail = 2
-                if st.button("ZONE 4 상세", use_container_width=True, key="zone_detail_btn_4"):
-                    st.session_state.selected_zone_detail = 4
-
-        if st.session_state.selected_zone_detail in (1, 2, 3, 4):
-            _show_zone_detail_popup(
-                int(st.session_state.selected_zone_detail),
-                _before_zone_means,
-                _after_zone_means,
-                target,
-            )
+        _render_interactive_zone_map(
+            zone_fig,
+            _before_zone_means,
+            _after_zone_means,
+            target=target,
+            height=365,
+        )
     else:
         if compare_field_mode == "BEFORE":
             st.markdown(
