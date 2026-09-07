@@ -1413,6 +1413,7 @@ def _first_existing_path(candidates):
 
 
 CASE_INFO_PATH = _first_existing_path([
+    "Case_Info_MIX198T40_PSEUDO200_trainonly.xlsx",
     "Case Info 200 DesignPoints - 최종본.xlsx",
     "Case Info 200 DesignPoints - 최종본 (1).xlsx",
     "Case Info 200 DesignPoints.xlsx",
