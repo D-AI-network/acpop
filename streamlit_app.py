@@ -6,7 +6,7 @@ from __future__ import annotations
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
 # FACTOR_UI_BUILD = 2026-09-04-v69
-# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v1
+# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v2_CLOSED_BORDERS_TEMP32
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from scipy.interpolate import griddata
+from scipy.ndimage import binary_erosion
 
 # ------------------------------------------------------------------
 # Real PopField inference backend.
@@ -2536,12 +2537,19 @@ def make_zone_mean_map(
         )
     )
 
-    # Draw each zone boundary separately so each one gets its own color.
+    # Draw a CLOSED outline for every zone.  We erode each zone by one grid cell
+    # before contouring it.  That places the outline slightly INSIDE its own zone,
+    # so shared borders appear as two parallel colored lines instead of one zone
+    # overwriting the other (the mockup-style separation the demo needs).
     for idx, zid in enumerate(zone_labels):
-        zone_mask = np.where(np.isclose(zone_grid_idx, float(idx), atol=0.49), 1.0, 0.0)
+        zone_bool = np.isclose(zone_grid_idx, float(idx), atol=0.49)
+        inset_bool = binary_erosion(zone_bool, iterations=1, border_value=0)
+        if not np.any(inset_bool):
+            inset_bool = zone_bool
+        zone_mask = inset_bool.astype(float)
         zone_color = zone_palette.get(idx, "#aee4ff")
 
-        # Outer soft glow
+        # Soft neon halo.
         fig.add_trace(
             go.Contour(
                 z=zone_mask,
@@ -2550,11 +2558,11 @@ def make_zone_mean_map(
                 showscale=False,
                 hoverinfo="skip",
                 contours=dict(start=0.5, end=0.5, size=1, coloring="none", showlines=True),
-                line=dict(color=zone_color, width=8.0),
-                opacity=0.18,
+                line=dict(color=zone_color, width=9.0),
+                opacity=0.17,
             )
         )
-        # Crisp main outline
+        # Clear zone perimeter.
         fig.add_trace(
             go.Contour(
                 z=zone_mask,
@@ -2563,8 +2571,8 @@ def make_zone_mean_map(
                 showscale=False,
                 hoverinfo="skip",
                 contours=dict(start=0.5, end=0.5, size=1, coloring="none", showlines=True),
-                line=dict(color=zone_color, width=3.2),
-                opacity=0.98,
+                line=dict(color=zone_color, width=3.5),
+                opacity=1.0,
             )
         )
 
@@ -2593,7 +2601,7 @@ def make_zone_mean_map(
     x_span = float(grid_len_axis.max() - grid_len_axis.min())
     y_span = float(grid_wid_axis.max() - grid_wid_axis.min())
     card_w = 0.30 * x_span
-    card_h = 0.23 * y_span
+    card_h = 0.28 * y_span
 
     def _clamp(v, lo, hi):
         return max(lo, min(hi, v))
@@ -2618,26 +2626,18 @@ def make_zone_mean_map(
             x1=ax + half_w,
             y0=ay - half_h,
             y1=ay + half_h,
-            fillcolor="rgba(8, 31, 52, 0.82)",
-            line=dict(color=zone_color, width=1.6),
+            fillcolor="rgba(8, 31, 52, 0.88)",
+            line=dict(color="rgba(126, 190, 225, 0.30)", width=1.2),
             layer="above",
         )
+        # Small zone-color accent bar, matching the visual mockup.
         fig.add_shape(
             type="line",
             x0=ax - half_w + 0.10,
             x1=ax - half_w + 0.10,
-            y0=ay + half_h - 0.14,
-            y1=ay + half_h - 0.30,
+            y0=ay + half_h - 0.12 * card_h,
+            y1=ay + half_h - 0.30 * card_h,
             line=dict(color=zone_color, width=8),
-            layer="above",
-        )
-        fig.add_shape(
-            type="line",
-            x0=ax - half_w + 0.15,
-            x1=ax + half_w - 0.15,
-            y0=ay - 0.02,
-            y1=ay - 0.02,
-            line=dict(color="rgba(214,238,255,0.36)", width=1.2),
             layer="above",
         )
 
@@ -2647,19 +2647,37 @@ def make_zone_mean_map(
         bdev = abs(b - float(target))
         adev = abs(a - float(target))
 
+        # Layout is expressed as fractions of card height to prevent text collisions
+        # when Streamlit changes the plot's rendered pixel size.
+        name_y = ay + 0.34 * card_h
+        drop_y = ay + 0.11 * card_h
+        divider_y = ay - 0.08 * card_h
+        temp_y = ay - 0.20 * card_h
+        dev_y = ay - 0.36 * card_h
+
+        fig.add_shape(
+            type="line",
+            x0=ax - half_w + 0.16,
+            x1=ax + half_w - 0.16,
+            y0=divider_y,
+            y1=divider_y,
+            line=dict(color="rgba(214,238,255,0.34)", width=1.1),
+            layer="above",
+        )
+
         fig.add_annotation(
-            x=ax - half_w + 0.34,
-            y=ay + half_h - 0.18,
+            x=ax - half_w + 0.30,
+            y=name_y,
             text=f"<b>ZONE {idx + 1}</b>",
             showarrow=False,
             xanchor="left",
-            yanchor="top",
+            yanchor="middle",
             align="left",
-            font=dict(size=13, color="#eefaff"),
+            font=dict(size=12, color="#eefaff"),
         )
         fig.add_annotation(
-            x=ax - half_w + 0.22,
-            y=ay + 0.16,
+            x=ax - half_w + 0.18,
+            y=drop_y,
             text=f"<b>↓ {drop:.1f}°C</b>",
             showarrow=False,
             xanchor="left",
@@ -2669,23 +2687,23 @@ def make_zone_mean_map(
         )
         fig.add_annotation(
             x=ax - half_w + 0.18,
-            y=ay - 0.14,
+            y=temp_y,
             text=f"<b>{b:.1f} → {a:.1f}°C</b>",
             showarrow=False,
             xanchor="left",
             yanchor="middle",
             align="left",
-            font=dict(size=15, color="#f7fbff"),
+            font=dict(size=14, color="#ffffff"),
         )
         fig.add_annotation(
             x=ax - half_w + 0.18,
-            y=ay - 0.34,
+            y=dev_y,
             text=f"목표 편차 {bdev:.1f} → {adev:.1f}°C",
             showarrow=False,
             xanchor="left",
             yanchor="middle",
             align="left",
-            font=dict(size=10, color="#d9ecfb"),
+            font=dict(size=9.5, color="#cfe5f3"),
         )
 
     fig.update_layout(
@@ -2792,13 +2810,13 @@ def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, co
             colorscale=temp_scale,
             hoverongaps=False,
             zmin=18.0,
-            zmax=35.0,
+            zmax=32.0,
             colorbar=dict(
                 title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
                 thickness=5,
                 len=0.68,
                 x=0.99,
-                tickvals=[18, 22, 26, 30, 35],
+                tickvals=[18, 22, 26, 30, 32],
                 tickfont=dict(size=8, color="#d9f3ff"),
                 outlinecolor="rgba(174,228,255,0.18)",
             ),
@@ -2908,13 +2926,14 @@ def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5
                     [1.00, "#e63a32"],
                 ],
             cmin=18.0,
-            cmax=35.0,
+            cmax=32.0,
             showscale=True,
             colorbar=dict(
                 title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
                 thickness=8,
                 len=0.72,
                 x=0.965,
+                tickvals=[18, 22, 26, 30, 32],
                 tickfont=dict(size=9, color="#d9f3ff"),
                 outlinecolor="rgba(174,228,255,0.18)",
             ),
@@ -2992,7 +3011,7 @@ def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5
             ),
             zaxis=dict(
                 title="",
-                range=[18.0, 35.0],
+                range=[18.0, 32.0],
                 showbackground=False,
                 showgrid=False,
                 zeroline=False,
@@ -3090,7 +3109,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
                 color=interp_temp,
                 colorscale=temp_scale,
                 cmin=18.0,
-                cmax=35.0,
+                cmax=32.0,
                 opacity=0.82,
                 colorbar=dict(
                     title=dict(text="°C", font=dict(size=11, color="#eefaff")),
@@ -3098,7 +3117,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
                     len=0.56,
                     x=0.992,
                     xpad=2,
-                    tickvals=[18, 22, 26, 30, 35],
+                    tickvals=[18, 22, 26, 30, 32],
                     tickfont=dict(size=8, color="#dff4ff"),
                     outlinecolor="rgba(174,228,255,0.20)",
                 ),
