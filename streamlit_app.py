@@ -1826,15 +1826,15 @@ if st.session_state.app_view == "INTRO":
     st.markdown(
         """
         <style>
-        /* Dedicated splash layout: the generated artwork itself is the first app screen. */
+        /* INTRO uses the same smartphone shell language as the main app. */
         .stApp {
-            background: #071a2f !important;
+            background: #0d243a !important;
         }
 
         .block-container {
             max-width: 440px !important;
             padding: 0 !important;
-            margin: 0 auto !important;
+            margin: 1.1rem auto !important;
             background: transparent !important;
             border: none !important;
             border-radius: 0 !important;
@@ -1849,11 +1849,40 @@ if st.session_state.app_view == "INTRO":
             width: 100%;
             max-width: 440px;
             margin: 0 auto;
-            padding: 0;
-            background: #071a2f;
-            border: none;
-            box-shadow: none;
+            padding: 1.05rem 1.05rem 1.15rem 1.05rem;
+            box-sizing: border-box;
+            background: linear-gradient(180deg, #173a59 0%, #102c47 100%);
+            border: 1.2px solid rgba(133, 202, 245, 0.20);
+            border-radius: 36px;
+            box-shadow: 0 22px 48px -16px rgba(0, 8, 20, 0.48);
             overflow: hidden;
+        }
+
+        .coollins-intro-shell .phone-notch {
+            width: 86px;
+            height: 15px;
+            margin: 0 auto 18px auto;
+            background: #07192b;
+            border: 1px solid rgba(56, 189, 248, 0.16);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .coollins-intro-shell .notch-cam {
+            width: 5px;
+            height: 5px;
+            background: #37536a;
+            border-radius: 50%;
+        }
+
+        .coollins-intro-shell .notch-speaker {
+            width: 22px;
+            height: 3px;
+            background: #37536a;
+            border-radius: 2px;
         }
 
         .coollins-intro-target {
@@ -1863,6 +1892,7 @@ if st.session_state.app_view == "INTRO":
             line-height: 0;
             overflow: hidden;
             background: #071a2f;
+            border-radius: 28px;
         }
 
         .coollins-intro-target img {
@@ -1873,6 +1903,7 @@ if st.session_state.app_view == "INTRO":
             padding: 0;
             user-select: none;
             -webkit-user-drag: none;
+            border-radius: 28px;
         }
 
         /* Real clickable area aligned with the START button drawn in the artwork. */
@@ -1915,6 +1946,7 @@ if st.session_state.app_view == "INTRO":
 if st.session_state.app_view == "INTRO":
     intro_html = (
         f'<div class="coollins-intro-shell">'
+        f'<div class="phone-notch"><div class="notch-cam"></div><div class="notch-speaker"></div></div>'
         f'<div class="coollins-intro-target">'
         f'<img src="data:image/png;base64,{INTRO_IMAGE_PNG_B64}" '
         f'alt="COOLLINS AI Smart Cooling Optimizer 시작 화면" />'
