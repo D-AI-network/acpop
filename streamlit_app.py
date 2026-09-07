@@ -1884,31 +1884,19 @@ if st.session_state.app_view == "INTRO":
             position: relative;
             width: 100%;
             overflow: hidden;
-            border-radius: 46px;
+            border-radius: 40px;
             background: #071a2f;
             line-height: 0;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.035);
         }
 
-        .coollins-phone-screen::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            border-radius: 46px;
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
-            pointer-events: none;
-            z-index: 35;
-        }
-
-        /* Hardware strip floats above the artwork so the image reaches the true rounded top corners. */
+        /* Top phone bezel lives ABOVE the artwork, so it never darkens or cuts the COOLLINS logo. */
         .coollins-phone-hardware {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 56px;
+            position: relative;
+            height: 46px;
             width: 100%;
-            background: linear-gradient(180deg, rgba(9, 23, 37, 0.96) 0%, rgba(10, 28, 45, 0.82) 58%, rgba(10, 28, 45, 0.14) 100%);
-            border-bottom: 1px solid rgba(95, 160, 210, 0.12);
+            margin: 0;
+            background: transparent;
             z-index: 30;
             pointer-events: none;
         }
@@ -1916,7 +1904,7 @@ if st.session_state.app_view == "INTRO":
         .coollins-dynamic-island {
             position: absolute;
             left: 50%;
-            top: 9px;
+            top: 8px;
             transform: translateX(-50%);
             width: 112px;
             height: 28px;
@@ -1952,7 +1940,7 @@ if st.session_state.app_view == "INTRO":
             line-height: 0;
             overflow: hidden;
             background: #071a2f;
-            border-radius: 46px;
+            border-radius: 40px;
         }
 
         .coollins-intro-target img {
@@ -1963,7 +1951,7 @@ if st.session_state.app_view == "INTRO":
             padding: 0;
             user-select: none;
             -webkit-user-drag: none;
-            border-radius: 46px;
+            border-radius: 40px;
         }
 
         /* Physical side buttons, also pure CSS. */
@@ -2020,11 +2008,10 @@ if st.session_state.app_view == "INTRO":
             }
             .coollins-phone-device { border-radius: 52px; }
             .coollins-phone-bezel { border-radius: 48px; }
-            .coollins-phone-screen { border-radius: 42px; }
-            .coollins-phone-screen::before { border-radius: 42px; }
+            .coollins-phone-screen { border-radius: 36px; }
             .coollins-intro-target,
-            .coollins-intro-target img { border-radius: 42px; }
-            .coollins-phone-hardware { height: 52px; }
+            .coollins-intro-target img { border-radius: 36px; }
+            .coollins-phone-hardware { height: 44px; }
         }
         </style>
         """,
@@ -2045,10 +2032,10 @@ if st.session_state.app_view == "INTRO":
         f'<span class="coollins-side-button coollins-side-left-2"></span>'
         f'<span class="coollins-side-button coollins-side-right"></span>'
         f'<div class="coollins-phone-bezel">'
-        f'<div class="coollins-phone-screen">'
         f'<div class="coollins-phone-hardware">'
         f'<div class="coollins-dynamic-island"><span class="camera"></span><span class="speaker"></span></div>'
         f'</div>'
+        f'<div class="coollins-phone-screen">'
         f'<div class="coollins-intro-target">'
         f'<img src="data:image/webp;base64,{INTRO_IMAGE_WEBP_B64}" '
         f'alt="COOLLINS AI Smart Cooling Optimizer 소개 화면" />'
