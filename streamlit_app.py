@@ -2390,6 +2390,9 @@ if current_field is None:
     }
 
 current_coords = np.asarray(current_field["coords"], dtype=np.float32)
+requested_current_temp = float(st.session_state.current_temp_query)
+retrieved_mean_temp = float(np.nanmean(current_temp_nodes))
+temp_offset = requested_current_temp - retrieved_mean_temp
 current_temp_nodes = np.asarray(current_field["temp_c"], dtype=np.float32)
 avg_room_temp = float(current_field["mean_temp_c"])
 current_field_source = str(current_field["source"])
