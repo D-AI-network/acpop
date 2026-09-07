@@ -6,7 +6,7 @@ from __future__ import annotations
 
 # CFD_RETRIEVAL_BUILD = 2026-09-03-v1_NEAREST_200_REAL_CASES
 # FACTOR_UI_BUILD = 2026-09-04-v69
-# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v4_HTML_HOVER_CLICK_POPUP_TEMP32
+# COMPARE_ZONE_VIEW_BUILD = 2026-09-07-v5_SMART_POPUP_4ZONE_TITLE_TEMP32
 
 # COOLING_FACTORS_BUILD = 2026-09-03-v20
 
@@ -2936,14 +2936,29 @@ def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, 
 
             const wr = wrap.getBoundingClientRect();
             const prW = Math.min(210, wr.width - 24);
+
+            // The panel must be measured AFTER it becomes visible.  The old code
+            // assumed a fixed 150px height, so clicks in the lower zones could
+            // push the actual ~200px panel below the iframe and clip its bottom.
+            const panelRect = panel.getBoundingClientRect();
+            const prH = Math.min(panelRect.height || 205, wr.height - 16);
+
             let x = wr.width - prW - 10;
-            let y = 10;
+            let y = 8;
             if (ev && Number.isFinite(ev.clientX) && Number.isFinite(ev.clientY)) {{
-                x = ev.clientX - wr.left + 14;
-                y = ev.clientY - wr.top + 12;
-                if (x + prW > wr.width - 8) x = ev.clientX - wr.left - prW - 14;
+                const clickX = ev.clientX - wr.left;
+                const clickY = ev.clientY - wr.top;
+
+                // Prefer the right side of the click; flip left when needed.
+                x = clickX + 14;
+                if (x + prW > wr.width - 8) x = clickX - prW - 14;
                 x = Math.max(8, Math.min(x, wr.width - prW - 8));
-                y = Math.max(8, Math.min(y, wr.height - 150));
+
+                // Prefer below the click for upper zones.  For lower zones,
+                // automatically flip above so the whole mini window remains visible.
+                y = clickY + 12;
+                if (y + prH > wr.height - 8) y = clickY - prH - 12;
+                y = Math.max(8, Math.min(y, wr.height - prH - 8));
             }}
             panel.style.left = `${{x}}px`;
             panel.style.top = `${{y}}px`;
@@ -4999,11 +5014,7 @@ elif st.session_state.app_view == "COMPARE":
 
     if compare_view == "ZONE":
         st.markdown(
-            f'<div class="zone-view-head"><div class="zone-view-title">4개 Zone 평균 온도 감소 맵</div><div class="zone-view-sub">BEFORE → AFTER<br>목표 {target:.1f}°C</div></div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<div style="color:#8fb9d0;font-size:10.5px;font-weight:650;margin:-4px 0 6px 2px;">Zone에 마우스를 올리면 영역이 강조되고, 클릭하면 상세 결과가 표시됩니다.</div>',
+            f'<div class="zone-view-head"><div class="zone-view-title">4-ZONE MAP</div><div class="zone-view-sub">BEFORE → AFTER<br>목표 {target:.1f}°C</div></div>',
             unsafe_allow_html=True,
         )
         zone_fig = make_zone_mean_map(
