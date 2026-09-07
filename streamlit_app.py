@@ -1826,7 +1826,7 @@ if st.session_state.app_view == "INTRO":
     st.markdown(
         """
         <style>
-        /* INTRO uses the same smartphone shell language as the main app. */
+        /* INTRO: artwork fills the phone frame edge-to-edge. */
         .stApp {
             background: #0d243a !important;
         }
@@ -1834,7 +1834,7 @@ if st.session_state.app_view == "INTRO":
         .block-container {
             max-width: 440px !important;
             padding: 0 !important;
-            margin: 1.1rem auto !important;
+            margin: 0.35rem auto 0.7rem auto !important;
             background: transparent !important;
             border: none !important;
             border-radius: 0 !important;
@@ -1846,53 +1846,163 @@ if st.session_state.app_view == "INTRO":
         }
 
         .coollins-intro-shell {
-            width: 100%;
-            max-width: 440px;
+            position: relative;
+            width: min(440px, calc(100vw - 12px));
             margin: 0 auto;
-            padding: 0.95rem 1.05rem 1.15rem 1.05rem;
+            padding: 0;
             box-sizing: border-box;
-            background: linear-gradient(180deg, #173a59 0%, #102c47 100%);
-            border: 1.2px solid rgba(133, 202, 245, 0.20);
-            border-radius: 36px;
+            background: #102f4d;
+            border: 1.5px solid rgba(118, 196, 242, 0.32);
+            border-radius: 42px;
             box-shadow: 0 22px 48px -16px rgba(0, 8, 20, 0.48);
             overflow: hidden;
         }
 
-        .coollins-intro-shell .phone-notch {
-            width: 86px;
-            height: 15px;
-            margin: 0 auto 18px auto;
-            background: #07192b;
-            border: 1px solid rgba(56, 189, 248, 0.16);
-            border-radius: 10px;
+        /* Seamless phone status area. */
+        .coollins-intro-statusbar {
+            position: relative;
+            height: 50px;
+            width: 100%;
+            background: linear-gradient(90deg, rgb(21,33,48) 0%, rgb(14,37,64) 48%, rgb(30,61,95) 100%);
+            color: #fff;
+            z-index: 30;
+            line-height: 1;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .coollins-intro-time {
+            position: absolute;
+            left: 28px;
+            top: 16px;
+            color: #fff !important;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+        }
+
+        .coollins-intro-island {
+            position: absolute;
+            left: 50%;
+            top: 8px;
+            transform: translateX(-50%);
+            width: 112px;
+            height: 28px;
+            border-radius: 18px;
+            background: #020811;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 8px;
         }
 
-        .coollins-intro-shell .notch-cam {
-            width: 5px;
-            height: 5px;
-            background: #37536a;
+        .coollins-intro-island-cam {
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
+            background: #0a5aa7;
+            box-shadow: inset 0 0 0 2px #04233d, 0 0 3px rgba(53,163,255,0.42);
         }
 
-        .coollins-intro-shell .notch-speaker {
-            width: 22px;
-            height: 3px;
-            background: #37536a;
+        .coollins-intro-island-speaker {
+            width: 30px;
+            height: 4px;
+            border-radius: 99px;
+            background: #12618d;
+        }
+
+        .coollins-intro-status-icons {
+            position: absolute;
+            right: 25px;
+            top: 14px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .intro-signal {
+            height: 14px;
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+        }
+        .intro-signal i {
+            display: block;
+            width: 3px;
+            border-radius: 1px;
+            background: #fff;
+        }
+        .intro-signal i:nth-child(1) { height: 5px; }
+        .intro-signal i:nth-child(2) { height: 8px; }
+        .intro-signal i:nth-child(3) { height: 11px; }
+        .intro-signal i:nth-child(4) { height: 14px; }
+
+        .intro-wifi {
+            width: 18px;
+            height: 14px;
+            position: relative;
+        }
+        .intro-wifi::before,
+        .intro-wifi::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%) rotate(45deg);
+            border: 2px solid #fff;
+            border-left-color: transparent;
+            border-top-color: transparent;
             border-radius: 2px;
         }
+        .intro-wifi::before { width: 12px; height: 12px; top: -2px; }
+        .intro-wifi::after { width: 6px; height: 6px; top: 4px; }
+        .intro-wifi-dot {
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            width: 3px;
+            height: 3px;
+            transform: translateX(-50%);
+            border-radius: 50%;
+            background: #fff;
+        }
 
+        .intro-battery {
+            width: 23px;
+            height: 11px;
+            border: 1.5px solid rgba(255,255,255,0.95);
+            border-radius: 3px;
+            padding: 1.5px;
+            box-sizing: border-box;
+            position: relative;
+        }
+        .intro-battery::before {
+            content: "";
+            display: block;
+            width: 84%;
+            height: 100%;
+            border-radius: 1px;
+            background: #fff;
+        }
+        .intro-battery::after {
+            content: "";
+            position: absolute;
+            right: -3px;
+            top: 3px;
+            width: 2px;
+            height: 4px;
+            border-radius: 0 1px 1px 0;
+            background: rgba(255,255,255,0.85);
+        }
+
+        /* No inner margins/rounded box: the artwork touches the phone screen edges. */
         .coollins-intro-target {
             position: relative;
             width: 100%;
-            margin: 0 auto;
+            margin: 0;
             line-height: 0;
             overflow: hidden;
             background: #071a2f;
-            border-radius: 28px;
+            border-radius: 0 0 40px 40px;
         }
 
         .coollins-intro-target img {
@@ -1903,10 +2013,10 @@ if st.session_state.app_view == "INTRO":
             padding: 0;
             user-select: none;
             -webkit-user-drag: none;
-            border-radius: 28px;
+            border-radius: 0;
         }
 
-        /* Real clickable area aligned with the START button drawn in the artwork. */
+        /* Clickable area remains aligned with START in the embedded artwork. */
         .coollins-intro-enter {
             position: absolute;
             left: 27.0%;
@@ -1918,7 +2028,7 @@ if st.session_state.app_view == "INTRO":
             cursor: pointer;
             text-decoration: none !important;
             background: rgba(0,0,0,0.001);
-            z-index: 20;
+            z-index: 40;
             outline: none;
             -webkit-tap-highlight-color: transparent;
         }
@@ -1929,10 +2039,15 @@ if st.session_state.app_view == "INTRO":
         }
 
         @media (max-width: 480px) {
-            .coollins-intro-shell,
-            .block-container {
-                max-width: 100% !important;
+            .block-container { max-width: 100% !important; }
+            .coollins-intro-shell {
+                width: calc(100vw - 8px);
+                max-width: 440px;
+                border-radius: 38px;
             }
+            .coollins-intro-target { border-radius: 0 0 36px 36px; }
+            .coollins-intro-time { left: 24px; }
+            .coollins-intro-status-icons { right: 22px; }
         }
         </style>
         """,
@@ -1946,7 +2061,18 @@ if st.session_state.app_view == "INTRO":
 if st.session_state.app_view == "INTRO":
     intro_html = (
         f'<div class="coollins-intro-shell">'
-        f'<div class="phone-notch"><div class="notch-cam"></div><div class="notch-speaker"></div></div>'
+        f'<div class="coollins-intro-statusbar">'
+        f'<div class="coollins-intro-time">9:41</div>'
+        f'<div class="coollins-intro-island">'
+        f'<div class="coollins-intro-island-cam"></div>'
+        f'<div class="coollins-intro-island-speaker"></div>'
+        f'</div>'
+        f'<div class="coollins-intro-status-icons">'
+        f'<div class="intro-signal"><i></i><i></i><i></i><i></i></div>'
+        f'<div class="intro-wifi"><span class="intro-wifi-dot"></span></div>'
+        f'<div class="intro-battery"></div>'
+        f'</div>'
+        f'</div>'
         f'<div class="coollins-intro-target">'
         f'<img src="data:image/png;base64,{INTRO_IMAGE_PNG_B64}" '
         f'alt="COOLLINS AI Smart Cooling Optimizer 시작 화면" />'
