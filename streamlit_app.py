@@ -1935,24 +1935,21 @@ if st.session_state.app_view == "INTRO":
             z-index: 45;
         }
 
-        /* Float only the notch/island over the artwork so there is no rectangular seam. */
+        /* Keep a small dedicated top bezel area so the notch does not cover the logo. */
         .coollins-phone-hardware {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 54px;
+            position: relative;
+            height: 40px;
             width: 100%;
             margin: 0;
-            background: transparent;
-            z-index: 40;
+            background: linear-gradient(180deg, #071421 0%, #08192a 100%);
+            z-index: 4;
             pointer-events: none;
         }
 
         .coollins-dynamic-island {
             position: absolute;
             left: 50%;
-            top: 8px;
+            top: 6px;
             transform: translateX(-50%);
             width: 112px;
             height: 28px;
@@ -1988,7 +1985,7 @@ if st.session_state.app_view == "INTRO":
             line-height: 0;
             overflow: hidden;
             background: #071a2f;
-            border-radius: inherit;
+            border-radius: 0 0 40px 40px;
         }
 
         .coollins-intro-target img {
@@ -1999,7 +1996,7 @@ if st.session_state.app_view == "INTRO":
             padding: 0;
             user-select: none;
             -webkit-user-drag: none;
-            border-radius: inherit;
+            border-radius: 0 0 40px 40px;
             object-fit: cover;
         }
 
