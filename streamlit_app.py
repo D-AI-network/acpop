@@ -2492,60 +2492,60 @@ def make_zone_mean_map(
     before_zone_means,
     after_zone_means,
     target,
-    field_mode="BEFORE",
     height=335,
 ):
-    """Render a top-down temperature-like zone map using the exact optimization zones."""
+    """Render a top-down map that emphasizes average temperature reduction by zone."""
     zone_xy, xy_zone_ids = _collapse_zone_ids_to_xy(zone_coords_xyz, zone_ids)
     if len(zone_xy) == 0:
         return go.Figure()
 
     xx, yy = np.meshgrid(grid_len_axis, grid_wid_axis)
     zone_index_lookup = {int(zid): idx for idx, zid in enumerate(zone_labels)}
-    zone_index_per_xy = np.asarray([zone_index_lookup.get(int(zid), -1) for zid in xy_zone_ids], dtype=float)
-
+    zone_index_per_xy = np.asarray(
+        [zone_index_lookup.get(int(zid), -1) for zid in xy_zone_ids],
+        dtype=float,
+    )
     zone_grid_idx = griddata(zone_xy, zone_index_per_xy, (xx, yy), method="nearest")
     zone_grid_idx = np.asarray(zone_grid_idx, dtype=float)
 
-    selected_means = np.asarray(
-        before_zone_means if str(field_mode).upper() == "BEFORE" else after_zone_means,
-        dtype=float,
-    )
+    before_zone_means = np.asarray(before_zone_means, dtype=float)
+    after_zone_means = np.asarray(after_zone_means, dtype=float)
+    drop_values = np.maximum(0.0, before_zone_means - after_zone_means)
 
-    temp_grid = np.full(zone_grid_idx.shape, np.nan, dtype=float)
+    drop_grid = np.full(zone_grid_idx.shape, np.nan, dtype=float)
     for idx, _ in enumerate(zone_labels):
-        temp_grid[np.isclose(zone_grid_idx, float(idx), atol=0.49)] = float(selected_means[idx])
+        drop_grid[np.isclose(zone_grid_idx, float(idx), atol=0.49)] = float(drop_values[idx])
 
-    temp_scale = [
-        [0.00, "#8ee7ff"],
-        [0.18, "#50c9ff"],
-        [0.36, "#17bed0"],
-        [0.54, "#4edb78"],
-        [0.70, "#b9e63d"],
-        [0.84, "#ffa13a"],
-        [1.00, "#e63a32"],
+    max_drop = float(np.nanmax(drop_values)) if len(drop_values) else 0.0
+    color_max = max(0.5, max_drop)
+    drop_scale = [
+        [0.00, "#d7f4ff"],
+        [0.20, "#a8e7ff"],
+        [0.40, "#73d8ff"],
+        [0.60, "#43c8ff"],
+        [0.80, "#1caee8"],
+        [1.00, "#0e84c7"],
     ]
 
     fig = go.Figure()
     fig.add_trace(
         go.Heatmap(
-            z=temp_grid,
+            z=drop_grid,
             x=grid_len_axis,
             y=grid_wid_axis,
-            colorscale=temp_scale,
+            colorscale=drop_scale,
             hoverongaps=False,
-            zmin=18.0,
-            zmax=28.0,
+            zmin=0.0,
+            zmax=color_max,
             colorbar=dict(
-                title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
+                title=dict(text="Δ°C", font=dict(size=10, color="#d9f3ff")),
                 thickness=5,
                 len=0.68,
                 x=0.99,
-                tickvals=[18, 20, 22, 24, 26, 28],
                 tickfont=dict(size=8, color="#d9f3ff"),
                 outlinecolor="rgba(174,228,255,0.18)",
             ),
-            hovertemplate="X: %{x:.2f} m<br>Y: %{y:.2f} m<br>Zone 평균: %{z:.2f} °C<extra></extra>",
+            hovertemplate="X: %{x:.2f} m<br>Y: %{y:.2f} m<br>평균 온도 감소: %{z:.2f} °C<extra></extra>",
         )
     )
 
@@ -2556,8 +2556,14 @@ def make_zone_mean_map(
             y=grid_wid_axis,
             showscale=False,
             hoverinfo="skip",
-            contours=dict(start=0.5, end=max(0.5, len(zone_labels) - 0.5), size=1, coloring="none", showlines=True),
-            line=dict(color="rgba(240,248,255,0.92)", width=2.0),
+            contours=dict(
+                start=0.5,
+                end=max(0.5, len(zone_labels) - 0.5),
+                size=1,
+                coloring="none",
+                showlines=True,
+            ),
+            line=dict(color="rgba(240,248,255,0.95)", width=2.2),
         )
     )
 
@@ -2569,13 +2575,14 @@ def make_zone_mean_map(
         cy = float(np.nanmean(zone_xy[mask, 1]))
         b = float(before_zone_means[idx])
         a = float(after_zone_means[idx])
-        sel = float(selected_means[idx])
-        delta_to_target = abs(sel - float(target))
+        drop = float(drop_values[idx])
+        bdev = abs(b - float(target))
+        adev = abs(a - float(target))
         text = (
             f"<b>ZONE {idx + 1}</b><br>"
-            f"{sel:.1f}°C<br>"
+            f"<span style='font-size:16px'><b>↓ {drop:.1f}°C</b></span><br>"
             f"<span style='font-size:10px'>{b:.1f} → {a:.1f}°C</span><br>"
-            f"<span style='font-size:9px'>목표 편차 {delta_to_target:.1f}°C</span>"
+            f"<span style='font-size:9px'>목표 편차 {bdev:.1f} → {adev:.1f}°C</span>"
         )
         fig.add_annotation(
             x=cx,
@@ -2584,10 +2591,10 @@ def make_zone_mean_map(
             showarrow=False,
             align="center",
             font=dict(size=11, color="#f7fbff"),
-            bgcolor="rgba(7, 33, 54, 0.78)",
-            bordercolor="rgba(173, 228, 255, 0.34)",
+            bgcolor="rgba(7, 33, 54, 0.82)",
+            bordercolor="rgba(173, 228, 255, 0.36)",
             borderwidth=1,
-            borderpad=5,
+            borderpad=6,
             xanchor="center",
             yanchor="middle",
         )
@@ -2614,8 +2621,6 @@ def make_zone_mean_map(
         ),
     )
     return fig
-
-
 
 def _select_adaptive_sensor_points(coords_xyz, temp_nodes, sensor_count):
     """
@@ -4525,9 +4530,8 @@ elif st.session_state.app_view == "COMPARE":
     st.session_state.optimized_results = res
 
     if compare_view == "ZONE":
-        _zone_mode_label = "최적화 전" if compare_field_mode == "BEFORE" else "최적화 후"
         st.markdown(
-            f'<div class="zone-view-head"><div class="zone-view-title">4개 Zone 온도 맵</div><div class="zone-view-sub">{_zone_mode_label}<br>목표 {target:.1f}°C</div></div>',
+            f'<div class="zone-view-head"><div class="zone-view-title">4개 Zone 평균 온도 감소 맵</div><div class="zone-view-sub">BEFORE → AFTER<br>목표 {target:.1f}°C</div></div>',
             unsafe_allow_html=True,
         )
         zone_fig = make_zone_mean_map(
@@ -4537,24 +4541,13 @@ elif st.session_state.app_view == "COMPARE":
             _before_zone_means,
             _after_zone_means,
             target=target,
-            field_mode=compare_field_mode,
             height=345,
         )
         st.plotly_chart(
             zone_fig,
             use_container_width=True,
             config={"displayModeBar": False},
-            key=f"zone_map_{compare_field_mode}",
-        )
-        st.markdown(
-            textwrap.dedent(f"""
-            <div class="compare-summary" style="margin-top:10px;">
-                <strong>✓ Zone별 분포 확인</strong><br>
-                색상은 각 Zone의 평균 온도를 나타내고, 라벨에는 각 Zone의 현재 값과 Before → After 변화가 표시됩니다.
-                목표 편차는 선택한 화면({compare_field_mode}) 기준으로 해석하면 됩니다.
-            </div>
-            """),
-            unsafe_allow_html=True,
+            key="zone_map_reduction",
         )
     else:
         if compare_field_mode == "BEFORE":
