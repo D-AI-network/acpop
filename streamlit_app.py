@@ -13,7 +13,7 @@ from __future__ import annotations
 # SENSOR_RADAR_ROUNDED_BUILD = 2026-09-03-v12
 
 import base64
-import io
+import ioa
 import inspect
 import json
 import os
@@ -1849,24 +1849,69 @@ if st.session_state.app_view == "INTRO":
             position: relative;
             width: min(440px, calc(100vw - 12px));
             margin: 0 auto;
-            padding: 14px;
+            padding: 10px 12px 12px 12px;
             box-sizing: border-box;
-            background: linear-gradient(180deg, #17385a 0%, #143454 100%);
-            border: 1.5px solid rgba(118, 196, 242, 0.32);
+            background: linear-gradient(180deg, #183d60 0%, #123350 100%);
+            border: 1.7px solid rgba(118, 196, 242, 0.40);
             border-radius: 42px;
-            box-shadow: 0 22px 48px -16px rgba(0, 8, 20, 0.48);
+            box-shadow:
+                0 22px 48px -16px rgba(0, 8, 20, 0.50),
+                inset 0 0 0 1px rgba(133, 202, 245, 0.05);
             overflow: hidden;
         }
 
-        /* Visible phone bezel/frame around the artwork. */
+        /* Short top bezel so the intro visibly reads as the same phone shell as HOME. */
+        .coollins-intro-top-bezel {
+            position: relative;
+            height: 34px;
+            width: 100%;
+            flex: 0 0 34px;
+        }
+
+        .coollins-intro-notch {
+            position: absolute;
+            left: 50%;
+            top: 4px;
+            transform: translateX(-50%);
+            width: 92px;
+            height: 22px;
+            border-radius: 14px;
+            background: #07192b;
+            border: 1px solid rgba(56, 189, 248, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+            z-index: 60;
+        }
+
+        .coollins-intro-notch-cam {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #37536a;
+        }
+
+        .coollins-intro-notch-speaker {
+            width: 23px;
+            height: 3px;
+            border-radius: 999px;
+            background: #37536a;
+        }
+
+        /* Visible dark phone bezel around the actual artwork. */
         .coollins-intro-display {
             position: relative;
             width: 100%;
             overflow: hidden;
-            border-radius: 34px;
+            border-radius: 31px;
             background: #071a2f;
-            border: 1.2px solid rgba(85, 167, 232, 0.22);
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+            border: 3px solid #0a2944;
+            outline: 1px solid rgba(79, 176, 235, 0.34);
+            box-shadow:
+                inset 0 0 0 1px rgba(255,255,255,0.03),
+                0 0 0 1px rgba(3, 17, 31, 0.40);
             line-height: 0;
         }
 
@@ -1908,10 +1953,12 @@ if st.session_state.app_view == "INTRO":
             .coollins-intro-shell {
                 width: calc(100vw - 8px);
                 max-width: 440px;
-                padding: 12px;
+                padding: 9px 10px 10px 10px;
                 border-radius: 38px;
             }
-            .coollins-intro-display { border-radius: 30px; }
+            .coollins-intro-top-bezel { height: 32px; flex-basis: 32px; }
+            .coollins-intro-notch { top: 3px; width: 88px; height: 21px; }
+            .coollins-intro-display { border-radius: 28px; }
         }
         </style>
         """,
@@ -1925,6 +1972,11 @@ if st.session_state.app_view == "INTRO":
 if st.session_state.app_view == "INTRO":
     intro_html = (
         f'<div class="coollins-intro-shell">'
+        f'<div class="coollins-intro-top-bezel">'
+        f'<div class="coollins-intro-notch">'
+        f'<span class="coollins-intro-notch-cam"></span>'
+        f'<span class="coollins-intro-notch-speaker"></span>'
+        f'</div></div>'
         f'<div class="coollins-intro-display">'
         f'<img src="data:image/png;base64,{INTRO_IMAGE_PNG_B64}" '
         f'alt="COOLLINS AI Smart Cooling Optimizer 시작 화면" />'
