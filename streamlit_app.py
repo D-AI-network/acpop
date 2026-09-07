@@ -1889,19 +1889,34 @@ if st.session_state.app_view == "INTRO":
             line-height: 0;
         }
 
-        /* Hardware strip is code-generated, so the image can align perfectly inside the phone. */
+        .coollins-phone-screen::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 46px;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+            pointer-events: none;
+            z-index: 35;
+        }
+
+        /* Hardware strip floats above the artwork so the image reaches the true rounded top corners. */
         .coollins-phone-hardware {
-            position: relative;
-            height: 42px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
             width: 100%;
-            background: linear-gradient(180deg, #071421 0%, #0a1c2d 100%);
-            z-index: 20;
+            background: linear-gradient(180deg, rgba(9, 23, 37, 0.96) 0%, rgba(10, 28, 45, 0.82) 58%, rgba(10, 28, 45, 0.14) 100%);
+            border-bottom: 1px solid rgba(95, 160, 210, 0.12);
+            z-index: 30;
+            pointer-events: none;
         }
 
         .coollins-dynamic-island {
             position: absolute;
             left: 50%;
-            top: 7px;
+            top: 9px;
             transform: translateX(-50%);
             width: 112px;
             height: 28px;
@@ -1937,7 +1952,7 @@ if st.session_state.app_view == "INTRO":
             line-height: 0;
             overflow: hidden;
             background: #071a2f;
-            border-radius: 0 0 42px 42px;
+            border-radius: 46px;
         }
 
         .coollins-intro-target img {
@@ -1948,7 +1963,7 @@ if st.session_state.app_view == "INTRO":
             padding: 0;
             user-select: none;
             -webkit-user-drag: none;
-            border-radius: 0 0 42px 42px;
+            border-radius: 46px;
         }
 
         /* Physical side buttons, also pure CSS. */
@@ -2006,8 +2021,10 @@ if st.session_state.app_view == "INTRO":
             .coollins-phone-device { border-radius: 52px; }
             .coollins-phone-bezel { border-radius: 48px; }
             .coollins-phone-screen { border-radius: 42px; }
+            .coollins-phone-screen::before { border-radius: 42px; }
             .coollins-intro-target,
-            .coollins-intro-target img { border-radius: 0 0 38px 38px; }
+            .coollins-intro-target img { border-radius: 42px; }
+            .coollins-phone-hardware { height: 52px; }
         }
         </style>
         """,
