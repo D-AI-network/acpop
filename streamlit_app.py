@@ -4079,16 +4079,16 @@ elif st.session_state.app_view == "HEAT_LOAD":
                     "matched_loads_W": {k: float(v) for k, v in loads.items()},
                     "field_current_grid": np.asarray(
                         _temperature_plane_grid(
-                            matched_current["coords"],
-                            matched_current["temp_c"],
+                            current_coords,
+                            current_temp_nodes,
                             st.session_state.z_plane,
                             grid_len_axis,
                             grid_wid_axis,
                         ),
                         dtype=np.float32,
                     ),
-                    "field_current_coords": np.asarray(matched_current["coords"], dtype=np.float32),
-                    "field_current_temp_nodes": np.asarray(matched_current["temp_c"], dtype=np.float32),
+                    "field_current_coords": np.asarray(current_coords, dtype=np.float32),
+                    "field_current_temp_nodes": np.asarray(current_temp_nodes, dtype=np.float32),
                 }
 
                 st.session_state.has_run_optimization = True
