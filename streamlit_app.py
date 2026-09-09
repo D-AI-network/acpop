@@ -96,7 +96,7 @@ WHITE_SENSOR_DROP_SVG_B64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmc
 # ============================================================
 st.set_page_config(
     page_title="Coollins | AI Smart Cooling Optimizer",
-    page_icon="❄️",
+    page_icon="�꾬툘",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
@@ -431,7 +431,7 @@ div[data-testid="stPlotlyChart"] {
   padding: 0 4px;
 }
 
-/* AI recommended HVAC setting — compact visual 2x2 panel */
+/* AI recommended HVAC setting �� compact visual 2x2 panel */
 .optimal-dispatch-box {
   background: linear-gradient(155deg, rgba(18, 59, 89, 0.96), rgba(12, 45, 72, 0.96));
   border: 1.5px solid rgba(74, 196, 244, 0.48);
@@ -984,7 +984,7 @@ div[class*="st-key-sl_work"] [data-testid="stThumbValue"],
 }
 
 
-/* v24: make selected stage + endpoint labels about the same size as the 5단계 helper text. */
+/* v24: make selected stage + endpoint labels about the same size as the 5�④퀎 helper text. */
 .st-key-sl_ext [data-testid="stSelectSlider"] p,
 .st-key-sl_ext [data-testid="stSelectSlider"] span,
 .st-key-sl_serv [data-testid="stSelectSlider"] p,
@@ -1023,7 +1023,7 @@ div[class*="st-key-sl_work"] [data-baseweb="slider"] * {
 
 
 /* v26 FINAL OVERRIDE:
-   Force the SelectSlider's visible stage text (보통/높음/매우 낮음/매우 높음)
+   Force the SelectSlider's visible stage text (蹂댄넻/�믪쓬/留ㅼ슦 ��쓬/留ㅼ슦 �믪쓬)
    to be small. The factor title is explicitly restored below. */
 .st-key-sl_ext [data-testid="stSelectSlider"],
 .st-key-sl_serv [data-testid="stSelectSlider"],
@@ -1088,7 +1088,7 @@ div[class*="st-key-sl_work"] [data-testid="stWidgetLabel"] p {
 
 
 /* v27: hard override for the visible 5-step labels.
-   Applies to 선택값(보통/높음/매우 높음) and endpoints(매우 낮음/매우 높음). */
+   Applies to �좏깮媛�(蹂댄넻/�믪쓬/留ㅼ슦 �믪쓬) and endpoints(留ㅼ슦 ��쓬/留ㅼ슦 �믪쓬). */
 [data-testid="stSelectSlider"] [data-baseweb="slider"],
 [data-testid="stSelectSlider"] [data-baseweb="slider"] *,
 [data-testid="stSelectSlider"] [data-testid="stThumbValue"],
@@ -1242,7 +1242,7 @@ div[data-testid="stSelectSlider"] *::after {
   letter-spacing: -0.15px !important;
 }
 
-/* Restore only the factor title: 외부 열환경 / 서버 발열 / 회의공간 / 업무공간 */
+/* Restore only the factor title: �몃� �댄솚寃� / �쒕쾭 諛쒖뿴 / �뚯쓽怨듦컙 / �낅Т怨듦컙 */
 div[data-testid="stSelectSlider"] label[data-testid="stWidgetLabel"] *,
 div[data-testid="stSelectSlider"] [data-testid="stWidgetLabel"] * {
   font-size: 15px !important;
@@ -1379,16 +1379,16 @@ div[class*="st-key-result_predicted_view"] [data-testid="stRadio"] {
 # Canonical positions strictly aligned with the room heatmap:
 # Horizontal (x_plot, Length): 0 to 9.0 m | Vertical (y_plot, Width): 0 to 4.0 m
 ROA_NODES_META = {
-    653:  {"code": "S1", "name": "Sensor 1 · Node 653",  "x_plot": 6.75, "y_plot": 2.75, "z": 1.50, "zone": "Core Sensor"},
-    887:  {"code": "S2", "name": "Sensor 2 · Node 887",  "x_plot": 2.75, "y_plot": 2.75, "z": 1.50, "zone": "Core Sensor"},
-    1036: {"code": "S3", "name": "Sensor 3 · Node 1036", "x_plot": 4.25, "y_plot": 1.75, "z": 2.50, "zone": "Core Sensor"},
-    639:  {"code": "S4", "name": "Sensor 4 · Node 639",  "x_plot": 1.25, "y_plot": 1.25, "z": 2.00, "zone": "Core Sensor"},
-    1229: {"code": "S5", "name": "Sensor 5 · Node 1229", "x_plot": 5.50, "y_plot": 1.75, "z": 2.00, "zone": "Core Sensor"},
+    653:  {"code": "S1", "name": "Sensor 1 쨌 Node 653",  "x_plot": 6.75, "y_plot": 2.75, "z": 1.50, "zone": "Core Sensor"},
+    887:  {"code": "S2", "name": "Sensor 2 쨌 Node 887",  "x_plot": 2.75, "y_plot": 2.75, "z": 1.50, "zone": "Core Sensor"},
+    1036: {"code": "S3", "name": "Sensor 3 쨌 Node 1036", "x_plot": 4.25, "y_plot": 1.75, "z": 2.50, "zone": "Core Sensor"},
+    639:  {"code": "S4", "name": "Sensor 4 쨌 Node 639",  "x_plot": 1.25, "y_plot": 1.25, "z": 2.00, "zone": "Core Sensor"},
+    1229: {"code": "S5", "name": "Sensor 5 쨌 Node 1229", "x_plot": 5.50, "y_plot": 1.75, "z": 2.00, "zone": "Core Sensor"},
 }
 ROA_NODE_IDS = list(ROA_NODES_META.keys())
 
 # Validation-selected strict nested hierarchy:
-# 5 ⊂ 6 ⊂ ... ⊂ 14 ⊂ 15
+# 5 �� 6 �� ... �� 14 �� 15
 FINAL_NESTED_SENSOR_ORDER = (
     653, 887, 1036, 639, 1229,
     670, 323, 859, 1050, 551,
@@ -1414,8 +1414,8 @@ def _first_existing_path(candidates):
 
 CASE_INFO_PATH = _first_existing_path([
     "Case_Info_MIX198T40_PSEUDO200_trainonly.xlsx",
-    "Case Info 200 DesignPoints - 최종본.xlsx",
-    "Case Info 200 DesignPoints - 최종본 (1).xlsx",
+    "Case Info 200 DesignPoints - 理쒖쥌蹂�.xlsx",
+    "Case Info 200 DesignPoints - 理쒖쥌蹂� (1).xlsx",
     "Case Info 200 DesignPoints.xlsx",
 ])
 
@@ -1644,7 +1644,7 @@ def load_reconstruction_basis():
 
 
 def _nested_sensor_order(n_nodes: int):
-    """Return the validated 5→15 sensor order from the deployment NPZ."""
+    """Return the validated 5��15 sensor order from the deployment NPZ."""
     order = None
 
     if basis_assets is not None:
@@ -1675,23 +1675,23 @@ def _nested_sensor_order(n_nodes: int):
 
 def _active_sensor_count_from_temperature(reference_temp_c: float, target_temp_c: float) -> int:
     """
-    5–15 active-sensor operating policy.
+    5��15 active-sensor operating policy.
 
-    One extra active sensor is enabled for each 0.5°C of absolute target
+    One extra active sensor is enabled for each 0.5째C of absolute target
     deviation, with a hard minimum of 5 and a hard maximum of 15.
 
-    Example for target 24°C:
-      <24.5 → 5
-       24.5 → 6
-       25.0 → 7
-       25.5 → 8
-       26.0 → 9
-       26.5 → 10
-       27.0 → 11
-       27.5 → 12
-       28.0 → 13
-       28.5 → 14
-       29.0+ → 15
+    Example for target 24째C:
+      <24.5 �� 5
+       24.5 �� 6
+       25.0 �� 7
+       25.5 �� 8
+       26.0 �� 9
+       26.5 �� 10
+       27.0 �� 11
+       27.5 �� 12
+       28.0 �� 13
+       28.5 �� 14
+       29.0+ �� 15
     """
     error_c = abs(float(reference_temp_c) - float(target_temp_c))
     extra = int(np.floor((error_c + 1e-9) / 0.5))
@@ -1715,8 +1715,8 @@ VALID_VIEWS = ["INTRO", "HOME", "HEAT_LOAD", "RESULTS", "COMPARE"]
 if "app_view" not in st.session_state or st.session_state.app_view not in VALID_VIEWS:
     st.session_state.app_view = "INTRO"
 
-# INTRO 이미지의 실제 버튼 영역을 누르면 ?enter=1 로 들어옵니다.
-# 이 값을 감지해 기존 HOME 화면으로 이동합니다.
+# INTRO �대�吏��� �ㅼ젣 踰꾪듉 �곸뿭�� �꾨Ⅴ硫� ?enter=1 濡� �ㅼ뼱�듬땲��.
+# �� 媛믪쓣 媛먯��� 湲곗〈 HOME �붾㈃�쇰줈 �대룞�⑸땲��.
 if st.query_params.get("enter") == "1":
     st.session_state.app_view = "HOME"
     st.query_params.clear()
@@ -1726,14 +1726,14 @@ if "selected_dp" not in st.session_state:
 
 if "z_plane" not in st.session_state:
     st.session_state.z_plane = 1.5
-# HOME 화면에서는 측정 높이 선택을 사용하지 않고 1.5m로 고정합니다.
+# HOME �붾㈃�먯꽌�� 痢≪젙 �믪씠 �좏깮�� �ъ슜�섏� �딄퀬 1.5m濡� 怨좎젙�⑸땲��.
 st.session_state.z_plane = 1.5
 
 if "target_temp" not in st.session_state:
     st.session_state.target_temp = 24.0
 
 # User-described CURRENT room temperature used to retrieve the closest real CFD case.
-# Start the demo at 28.0 °C. The user can still edit it afterwards.
+# Start the demo at 28.0 째C. The user can still edit it afterwards.
 # This is deliberately separate from the HOME widget key so it survives navigation.
 if "current_temp_query" not in st.session_state:
     st.session_state.current_temp_query = 28.0
@@ -1747,29 +1747,29 @@ if "default_current_temp_v52_initialized" not in st.session_state:
     st.session_state.default_current_temp_v52_initialized = True
 
 # Optimization policy is intentionally fixed in the simplified UI.
-st.session_state.policy = "Balanced (균형)"
+st.session_state.policy = "Balanced (洹좏삎)"
 
 if "heat_input_mode" not in st.session_state:
-    st.session_state.heat_input_mode = "간편 단계"
+    st.session_state.heat_input_mode = "媛꾪렪 �④퀎"
 
-for k, v in {"p_ext": "보통", "p_meet": "보통", "p_serv": "보통", "p_work": "보통"}.items():
+for k, v in {"p_ext": "蹂댄넻", "p_meet": "蹂댄넻", "p_serv": "蹂댄넻", "p_work": "蹂댄넻"}.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
 # One-time migration: initialize the qualitative factors near the supplied DP 0 (Current)
 # condition so the first HOME field starts from the official current CFD scenario.
 if "cfd_retrieval_defaults_v1" not in st.session_state:
-    st.session_state.p_ext = "매우 낮음"
-    st.session_state.p_meet = "낮음"
-    st.session_state.p_serv = "매우 낮음"
-    st.session_state.p_work = "낮음"
+    st.session_state.p_ext = "留ㅼ슦 ��쓬"
+    st.session_state.p_meet = "��쓬"
+    st.session_state.p_serv = "留ㅼ슦 ��쓬"
+    st.session_state.p_work = "��쓬"
     st.session_state.cfd_retrieval_defaults_v1 = True
 
 if "has_run_optimization" not in st.session_state:
     st.session_state.has_run_optimization = False
 
-# RESULTS 화면에서 AI 추천 제어안을 "적용해 본 결과"를 보여줄지 여부.
-# 실제 BMS 전송이 아니라, 선택된 제어안을 PopField 예측 결과로 시뮬레이션합니다.
+# RESULTS �붾㈃�먯꽌 AI 異붿쿇 �쒖뼱�덉쓣 "�곸슜�� 蹂� 寃곌낵"瑜� 蹂댁뿬以꾩� �щ�.
+# �ㅼ젣 BMS �꾩넚�� �꾨땲��, �좏깮�� �쒖뼱�덉쓣 PopField �덉륫 寃곌낵濡� �쒕��덉씠�섑빀�덈떎.
 if "show_control_simulation" not in st.session_state:
     st.session_state.show_control_simulation = False
 
@@ -1778,14 +1778,14 @@ if "optimized_results" not in st.session_state:
         "status": "FEASIBLE",
         "vane": "Middle (M)",
         "flow": "40 CMM",
-        "temp": "12 °C",
+        "temp": "12 째C",
         "mean_temp": 23.8,
         "p95_temp": 24.5,
         "zone_spread": 1.42,
         "hot_fraction": 1.8,
         "cold_fraction": 0.5,
         "q_proxy": 13.8,
-        "policy_used": "Balanced (균형)",
+        "policy_used": "Balanced (洹좏삎)",
     }
 
 # Sensor-policy migration guard.
@@ -1832,10 +1832,10 @@ def _image_file_to_data_uri(path_str):
 def _load_intro_image_data_uri():
     """Load the latest intro artwork without hard-embedding megabytes into the code."""
     candidate_paths = [
-        "/mnt/data/쿨링_스마트홈_에어컨_앱_광고.png",
+        "/mnt/data/荑⑤쭅_�ㅻ쭏�명솃_�먯뼱而�_��_愿묎퀬.png",
         "/mnt/data/a_clean_high_quality_ui_advertising_style_mockup.png",
-        "/mnt/data/화이트_로고의_스마트_에어컨_앱_광고.png",
-        os.path.join(os.path.dirname(__file__), "쿨링_스마트홈_에어컨_앱_광고.png"),
+        "/mnt/data/�붿씠��_濡쒓퀬��_�ㅻ쭏��_�먯뼱而�_��_愿묎퀬.png",
+        os.path.join(os.path.dirname(__file__), "荑⑤쭅_�ㅻ쭏�명솃_�먯뼱而�_��_愿묎퀬.png"),
         os.path.join(os.path.dirname(__file__), "coollins_intro_latest.png"),
     ]
     for candidate in candidate_paths:
@@ -2084,7 +2084,7 @@ if st.session_state.app_view == "INTRO":
         f'</div>'
         f'<div class="coollins-intro-target">'
         f'<img src="{INTRO_IMAGE_DATA_URI or ""}" '
-        f'alt="COOLLINS AI Smart Cooling Optimizer 소개 화면" />'
+        f'alt="COOLLINS AI Smart Cooling Optimizer �뚭컻 �붾㈃" />'
         f'<a class="coollins-intro-enter" href="?enter=1" target="_self" '
         f'aria-label="START" title="START"></a>'
         f'</div></div></div></div></div>'
@@ -2108,7 +2108,7 @@ dp_options = (
 # ============================================================
 # 4. REAL CURRENT FIELD + POPFIELD INFERENCE ENGINE
 # ============================================================
-STAGE_OPTS = ["매우 낮음", "낮음", "보통", "높음", "매우 높음"]
+STAGE_OPTS = ["留ㅼ슦 ��쓬", "��쓬", "蹂댄넻", "�믪쓬", "留ㅼ슦 �믪쓬"]
 LOAD_COL_MAP = {
     "external": "P83 - external",
     "meeting": "P84 - meeting",
@@ -2176,7 +2176,7 @@ def load_actual_cfd_case(zip_path_str: str, dp_id: int):
                 "velocity": velocity,
                 "ra_temp_c": ra_c,
                 "mean_temp_c": float(np.nanmean(temp_c)),
-                "source": f"Actual CFD · DP {int(dp_id)}",
+                "source": f"Actual CFD 쨌 DP {int(dp_id)}",
             }
     except Exception:
         return None
@@ -2233,7 +2233,7 @@ def _predict_case_field_with_popfield(selected_dp_id: int):
             "velocity": np.asarray(pred_field[0, :, 1:4], dtype=np.float32),
             "ra_temp_c": float(pred_ra[0]),
             "mean_temp_c": float(np.mean(pred_field[0, :, 0])),
-            "source": f"PopField estimate · DP {int(selected_dp_id)}",
+            "source": f"PopField estimate 쨌 DP {int(selected_dp_id)}",
         }
     except Exception:
         return None
@@ -2263,10 +2263,10 @@ def _requested_heat_loads_from_ui():
         for key, col in LOAD_COL_MAP.items()
     }
     return {
-        "external": maps["external"][st.session_state.get("p_ext", "보통")],
-        "meeting": maps["meeting"][st.session_state.get("p_meet", "보통")],
-        "server": maps["server"][st.session_state.get("p_serv", "보통")],
-        "working": maps["working"][st.session_state.get("p_work", "보통")],
+        "external": maps["external"][st.session_state.get("p_ext", "蹂댄넻")],
+        "meeting": maps["meeting"][st.session_state.get("p_meet", "蹂댄넻")],
+        "server": maps["server"][st.session_state.get("p_serv", "蹂댄넻")],
+        "working": maps["working"][st.session_state.get("p_work", "蹂댄넻")],
     }, maps
 
 
@@ -2515,11 +2515,11 @@ scenario_table = _build_cfd_scenario_table()
 # problem clearly and let the rest of the UI load so the file can be replaced.
 if FIELD_ZIP_PATH is None and FIELD_ZIP_ERROR:
     st.warning(
-        "CFD 데이터 ZIP을 읽을 수 없습니다. GitHub의 실제 ZIP 파일을 다시 업로드해 주세요. "
+        "CFD �곗씠�� ZIP�� �쎌쓣 �� �놁뒿�덈떎. GitHub�� �ㅼ젣 ZIP �뚯씪�� �ㅼ떆 �낅줈�쒗빐 二쇱꽭��. "
         f"({FIELD_ZIP_ERROR})"
     )
 
-# Safety fallback only. Normal demo startup is fixed at 28.0 °C above.
+# Safety fallback only. Normal demo startup is fixed at 28.0 째C above.
 if st.session_state.current_temp_query is None:
     st.session_state.current_temp_query = 28.0
 
@@ -2532,7 +2532,7 @@ current_field = None
 if matched_scenario is not None and FIELD_ZIP_PATH is not None:
     current_field = load_actual_cfd_case(str(FIELD_ZIP_PATH), int(matched_scenario["dp_id"]))
     if current_field is not None:
-        current_field["source"] = f"Actual CFD · DP {int(matched_scenario['dp_id'])} (nearest scenario)"
+        current_field["source"] = f"Actual CFD 쨌 DP {int(matched_scenario['dp_id'])} (nearest scenario)"
 
 # Deployment can still boot without the raw archive, but this is explicitly a fallback.
 # The real nearest-scenario workflow requires Field data.zip in the repository.
@@ -2561,7 +2561,7 @@ if current_field is None:
 current_coords = np.asarray(current_field["coords"], dtype=np.float32)
 current_temp_nodes = np.asarray(current_field["temp_c"], dtype=np.float32)
 
-# 사용자 입력 현재온도에 Current Field 평균을 맞춤
+# �ъ슜�� �낅젰 �꾩옱�⑤룄�� Current Field �됯퇏�� 留욎땄
 requested_current_temp = float(st.session_state.current_temp_query)
 retrieved_mean_temp = float(np.nanmean(current_temp_nodes))
 temp_offset = requested_current_temp - retrieved_mean_temp
@@ -2740,7 +2740,7 @@ def make_zone_mean_map(
                 hoverongaps=False,
                 hovertemplate=(
                     f"<b>ZONE {idx + 1}</b><br>"
-                    "클릭하여 상세 분석 보기"
+                    "�대┃�섏뿬 �곸꽭 遺꾩꽍 蹂닿린"
                     "<extra></extra>"
                 ),
                 meta={"role": "zone_fill", "zone_number": int(idx + 1)},
@@ -2893,7 +2893,7 @@ def make_zone_mean_map(
         fig.add_annotation(
             x=ax - half_w + 0.18,
             y=drop_y,
-            text=f"<b>↓ {drop:.1f}°C</b>",
+            text=f"<b>�� {drop:.1f}째C</b>",
             showarrow=False,
             xanchor="left",
             yanchor="middle",
@@ -2903,7 +2903,7 @@ def make_zone_mean_map(
         fig.add_annotation(
             x=ax - half_w + 0.18,
             y=temp_y,
-            text=f"<b>{b:.1f} → {a:.1f}°C</b>",
+            text=f"<b>{b:.1f} �� {a:.1f}째C</b>",
             showarrow=False,
             xanchor="left",
             yanchor="middle",
@@ -2913,7 +2913,7 @@ def make_zone_mean_map(
         fig.add_annotation(
             x=ax - half_w + 0.18,
             y=dev_y,
-            text=f"목표 편차 {bdev:.1f} → {adev:.1f}°C",
+            text=f"紐⑺몴 �몄감 {bdev:.1f} �� {adev:.1f}째C",
             showarrow=False,
             xanchor="left",
             yanchor="middle",
@@ -2936,7 +2936,7 @@ def make_zone_mean_map(
                 customdata=[[int(idx + 1)]],
                 hovertemplate=(
                     f"<b>ZONE {idx + 1}</b><br>"
-                    "클릭하여 상세 분석 보기"
+                    "�대┃�섏뿬 �곸꽭 遺꾩꽍 蹂닿린"
                     "<extra></extra>"
                 ),
                 meta={"role": "zone_card_target", "zone_number": int(idx + 1)},
@@ -2972,10 +2972,14 @@ def make_zone_mean_map(
 
 
 
-def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, target, height=365):
+def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, target, height=365, *, before_zone_spreads, after_zone_spreads):
     """Render Plotly in an HTML component with true hover-fill and click popup behavior."""
     before_zone_means = np.asarray(before_zone_means, dtype=float)
     after_zone_means = np.asarray(after_zone_means, dtype=float)
+    before_zone_spreads = np.asarray(before_zone_spreads, dtype=float).reshape(-1)
+    after_zone_spreads = np.asarray(after_zone_spreads, dtype=float).reshape(-1)
+    if len(before_zone_spreads) != len(before_zone_means) or len(after_zone_spreads) != len(after_zone_means):
+        raise ValueError("Zone internal spread/mean count mismatch")
     palette = {1: "#ffad47", 2: "#45d2ff", 3: "#54e39b", 4: "#a86bff"}
 
     zone_data = {}
@@ -2993,6 +2997,8 @@ def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, 
             "before": round(before, 2),
             "after": round(after, 2),
             "drop": round(temp_drop, 2),
+            "beforeSpread": float(before_zone_spreads[idx]) if np.isfinite(before_zone_spreads[idx]) else None,
+            "afterSpread": float(after_zone_spreads[idx]) if np.isfinite(after_zone_spreads[idx]) else None,
             "beforeDev": round(before_dev, 2),
             "afterDev": round(after_dev, 2),
             "devDrop": round(dev_drop, 2),
@@ -3021,7 +3027,7 @@ def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, 
                 background:linear-gradient(150deg,rgba(6,30,51,.98),rgba(10,47,75,.98));
                 border:1px solid #45d2ff; box-shadow:0 16px 34px rgba(0,8,20,.46);
                 backdrop-filter:blur(8px); color:white; font-family:'Noto Sans KR','Inter',sans-serif;
-                pointer-events:auto;
+                pointer-events:auto; box-sizing:border-box; max-height:calc(100% - 16px); overflow-y:auto;
             }}
             #zone-detail-float .zclose {{
                 position:absolute; right:8px; top:7px; width:24px; height:24px; border:0; border-radius:50%;
@@ -3038,16 +3044,25 @@ def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, 
             #zone-detail-float .zmini {{background:rgba(255,255,255,.055);border-radius:10px;padding:8px 8px 7px 8px;}}
             #zone-detail-float .zlabel {{font-size:8.5px;color:#91bbd1;font-weight:750;margin-bottom:3px;}}
             #zone-detail-float .zvalue {{font-size:12px;color:#f5fbff;font-weight:850;white-space:nowrap;}}
+            #zone-detail-float .zinternal {{margin-top:8px;}}
+            #zone-detail-float .zinternal .zlabel {{font-size:10px;}}
+            #zone-detail-float .zinternal .zvalue {{font-size:16px;color:#8ce7ff;}}
+            #zone-detail-float .znote {{font-size:9px;color:#a9cbdc;line-height:1.5;margin-top:5px;}}
         </style>
         {plot_html}
         <div id="zone-detail-float">
-            <button class="zclose" id="zone-detail-close">×</button>
+            <button class="zclose" id="zone-detail-close">횞</button>
             <div class="zhead"><span class="zbar" id="zone-detail-bar"></span><div><div class="zname" id="zone-detail-name"></div><div class="ztarget" id="zone-detail-target"></div></div></div>
-            <div class="ztemp"><span id="zone-before"></span><span class="zarrow">→</span><span id="zone-after"></span></div>
+            <div class="ztemp"><span id="zone-before"></span><span class="zarrow">��</span><span id="zone-after"></span></div>
             <div class="zdrop" id="zone-drop"></div>
             <div class="zgrid">
-                <div class="zmini"><div class="zlabel">목표 편차</div><div class="zvalue" id="zone-dev"></div></div>
-                <div class="zmini"><div class="zlabel">편차 감소</div><div class="zvalue" id="zone-devdrop"></div></div>
+                <div class="zmini"><div class="zlabel">紐⑺몴 �몄감</div><div class="zvalue" id="zone-dev"></div></div>
+                <div class="zmini"><div class="zlabel">�몄감 媛먯냼</div><div class="zvalue" id="zone-devdrop"></div></div>
+            </div>
+            <div class="zmini zinternal">
+                <div class="zlabel">Zone �대� �⑤룄 �몄감</div>
+                <div class="zvalue" id="zone-internal-spread"></div>
+                <div class="znote">援ъ뿭 �� �⑤룄 P95�뭁5<br>蹂�寃� �� �� 蹂�寃� ��(�덉륫)</div>
             </div>
         </div>
     </div>
@@ -3099,16 +3114,19 @@ def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, 
             panel.style.borderColor = d.color;
             document.getElementById('zone-detail-bar').style.background = d.color;
             document.getElementById('zone-detail-bar').style.boxShadow = `0 0 12px ${{d.color}}`;
-            document.getElementById('zone-detail-name').textContent = `ZONE ${{zone}} 상세 분석`;
-            document.getElementById('zone-detail-target').textContent = `목표 온도 ${{d.target.toFixed(1)}}°C 기준`;
-            document.getElementById('zone-before').textContent = `${{d.before.toFixed(1)}}°C`;
-            document.getElementById('zone-after').textContent = `${{d.after.toFixed(1)}}°C`;
+            document.getElementById('zone-detail-name').textContent = `ZONE ${{zone}} �곸꽭 遺꾩꽍`;
+            document.getElementById('zone-detail-target').textContent = `紐⑺몴 �⑤룄 ${{d.target.toFixed(1)}}째C 湲곗�`;
+            document.getElementById('zone-before').textContent = `${{d.before.toFixed(1)}}째C`;
+            document.getElementById('zone-after').textContent = `${{d.after.toFixed(1)}}째C`;
             const drop = document.getElementById('zone-drop');
-            drop.textContent = `↓ ${{d.drop.toFixed(1)}}°C`;
+            drop.textContent = `�� ${{d.drop.toFixed(1)}}째C`;
             drop.style.color = d.color;
-            document.getElementById('zone-dev').textContent = `${{d.beforeDev.toFixed(1)}} → ${{d.afterDev.toFixed(1)}}°C`;
+            document.getElementById('zone-dev').textContent = `${{d.beforeDev.toFixed(1)}} �� ${{d.afterDev.toFixed(1)}}째C`;
+            const formatSpread = (value) => Number.isFinite(value) ? `${{value.toFixed(2)}}째C` : '怨꾩궛 遺덇�';
+            document.getElementById('zone-internal-spread').textContent =
+                `${{formatSpread(d.beforeSpread)}} �� ${{formatSpread(d.afterSpread)}}`;
             const dd = document.getElementById('zone-devdrop');
-            dd.textContent = `↓ ${{d.devDrop.toFixed(1)}}°C`;
+            dd.textContent = `�� ${{d.devDrop.toFixed(1)}}째C`;
             dd.style.color = '#79e6b4';
             panel.style.display = 'block';
 
@@ -3310,22 +3328,22 @@ def _zone_detail_panel_html(zone_number, before_zone_means, after_zone_means, ta
                 <span style="display:inline-block;width:6px;height:28px;border-radius:99px;background:{accent};box-shadow:0 0 12px {accent};"></span>
                 <div>
                     <div style="color:#f3fbff;font-size:20px;font-weight:850;line-height:1.05;">ZONE {zone_number}</div>
-                    <div style="color:#9dc6dc;font-size:11px;font-weight:700;margin-top:4px;">목표 온도 {float(target):.1f}°C 기준</div>
+                    <div style="color:#9dc6dc;font-size:11px;font-weight:700;margin-top:4px;">紐⑺몴 �⑤룄 {float(target):.1f}째C 湲곗�</div>
                 </div>
             </div>
             <div style="background:rgba(6,28,48,.55);border-radius:15px;padding:14px;margin-bottom:10px;">
-                <div style="color:#9fc5d9;font-size:11px;font-weight:700;margin-bottom:5px;">평균 온도 변화</div>
-                <div style="color:#ffffff;font-size:24px;font-weight:900;letter-spacing:-.5px;">{before:.1f}°C <span style="color:#6fdcff;">→</span> {after:.1f}°C</div>
-                <div style="color:{accent};font-size:25px;font-weight:900;margin-top:5px;">↓ {temp_drop:.1f}°C</div>
+                <div style="color:#9fc5d9;font-size:11px;font-weight:700;margin-bottom:5px;">�됯퇏 �⑤룄 蹂���</div>
+                <div style="color:#ffffff;font-size:24px;font-weight:900;letter-spacing:-.5px;">{before:.1f}째C <span style="color:#6fdcff;">��</span> {after:.1f}째C</div>
+                <div style="color:{accent};font-size:25px;font-weight:900;margin-top:5px;">�� {temp_drop:.1f}째C</div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
                 <div style="background:rgba(6,28,48,.55);border-radius:14px;padding:12px;">
-                    <div style="color:#9fc5d9;font-size:10px;font-weight:700;margin-bottom:5px;">목표 편차</div>
-                    <div style="color:#f5fbff;font-size:16px;font-weight:850;">{before_dev:.1f} → {after_dev:.1f}°C</div>
+                    <div style="color:#9fc5d9;font-size:10px;font-weight:700;margin-bottom:5px;">紐⑺몴 �몄감</div>
+                    <div style="color:#f5fbff;font-size:16px;font-weight:850;">{before_dev:.1f} �� {after_dev:.1f}째C</div>
                 </div>
                 <div style="background:rgba(6,28,48,.55);border-radius:14px;padding:12px;">
-                    <div style="color:#9fc5d9;font-size:10px;font-weight:700;margin-bottom:5px;">편차 감소</div>
-                    <div style="color:#7de8b5;font-size:16px;font-weight:850;">↓ {dev_drop:.1f}°C</div>
+                    <div style="color:#9fc5d9;font-size:10px;font-weight:700;margin-bottom:5px;">�몄감 媛먯냼</div>
+                    <div style="color:#7de8b5;font-size:16px;font-weight:850;">�� {dev_drop:.1f}째C</div>
                 </div>
             </div>
         </div>
@@ -3340,17 +3358,17 @@ def _show_zone_detail_popup(zone_number, before_zone_means, after_zone_means, ta
         return
 
     if hasattr(st, "dialog"):
-        @st.dialog(f"ZONE {int(zone_number)} 상세 분석")
+        @st.dialog(f"ZONE {int(zone_number)} �곸꽭 遺꾩꽍")
         def _zone_dialog():
             st.markdown(panel_html, unsafe_allow_html=True)
-            if st.button("닫기", use_container_width=True, key=f"close_zone_detail_{int(zone_number)}"):
+            if st.button("�リ린", use_container_width=True, key=f"close_zone_detail_{int(zone_number)}"):
                 st.session_state.selected_zone_detail = None
                 st.rerun()
         _zone_dialog()
     else:
-        st.markdown(f'<div class="section-title" style="margin-top:10px;">ZONE {int(zone_number)} 상세 분석</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title" style="margin-top:10px;">ZONE {int(zone_number)} �곸꽭 遺꾩꽍</div>', unsafe_allow_html=True)
         st.markdown(panel_html, unsafe_allow_html=True)
-        if st.button("상세 보기 닫기", use_container_width=True, key=f"close_zone_detail_inline_{int(zone_number)}"):
+        if st.button("�곸꽭 蹂닿린 �リ린", use_container_width=True, key=f"close_zone_detail_inline_{int(zone_number)}"):
             st.session_state.selected_zone_detail = None
             st.rerun()
 
@@ -3402,7 +3420,7 @@ def _select_adaptive_sensor_points(coords_xyz, temp_nodes, sensor_count):
     selected_xyz = coords_xyz[idx, :3]
     selected_temp = temp_nodes[idx]
     selected_names = [
-        f"S{i + 1} · Node {int(nid)}"
+        f"S{i + 1} 쨌 Node {int(nid)}"
         for i, nid in enumerate(selected_nodes)
     ]
 
@@ -3437,7 +3455,7 @@ def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, co
             zmin=18.0,
             zmax=temp_max,
             colorbar=dict(
-                title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
+                title=dict(text="째C", font=dict(size=10, color="#d9f3ff")),
                 thickness=5,
                 len=0.68,
                 x=0.99,
@@ -3448,7 +3466,7 @@ def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, co
             hovertemplate=(
                 "X: %{x:.2f} m<br>"
                 "Y: %{y:.2f} m<br>"
-                "온도: %{z:.2f} °C"
+                "�⑤룄: %{z:.2f} 째C"
                 "<extra></extra>"
             ),
         )
@@ -3467,7 +3485,7 @@ def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, co
                 (
                     f"<b>{name}</b><br>"
                     f"X={xyz[0]:.2f}m, Y={xyz[1]:.2f}m, Z={xyz[2]:.2f}m<br>"
-                    f"온도={temp:.2f}°C"
+                    f"�⑤룄={temp:.2f}째C"
                 )
                 for xyz, temp, name in zip(selected_xyz, selected_temp, selected_names)
             ]
@@ -3482,7 +3500,7 @@ def make_2d_heatmap(grid_data, height=315, show_sensors=True, sensor_count=5, co
                 sensor_hover.append(
                     f"<b>{meta['name']}</b><br>"
                     f"X={meta['x_plot']:.2f}m, Y={meta['y_plot']:.2f}m<br>"
-                    f"온도={sampled:.2f}°C"
+                    f"�⑤룄={sampled:.2f}째C"
                 )
 
         n_sensor_vis = max(1, len(sx))
@@ -3556,7 +3574,7 @@ def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5
             cmax=temp_max,
             showscale=True,
             colorbar=dict(
-                title=dict(text="°C", font=dict(size=10, color="#d9f3ff")),
+                title=dict(text="째C", font=dict(size=10, color="#d9f3ff")),
                 thickness=8,
                 len=0.72,
                 x=0.965,
@@ -3567,7 +3585,7 @@ def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5
             hovertemplate=(
                 "X: %{x:.2f} m<br>"
                 "Y: %{y:.2f} m<br>"
-                "온도: %{z:.2f} °C"
+                "�⑤룄: %{z:.2f} 째C"
                 "<extra></extra>"
             ),
             lighting=dict(
@@ -3588,7 +3606,7 @@ def make_mobile_heatmap(grid_data, height=340, show_sensors=True, sensor_count=5
                 f"<b>{meta['name']}</b><br>"
                 f"Zone: {meta['zone']}<br>"
                 f"Coords: (L={meta['x_plot']:.2f}, W={meta['y_plot']:.2f})m<br>"
-                f"Live: {sensor_readings.get(nid, 0.0):.2f}°C"
+                f"Live: {sensor_readings.get(nid, 0.0):.2f}째C"
             )
             for nid, meta in sensor_plot_meta.items()
         ]
@@ -3741,7 +3759,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
                 cmax=temp_max,
                 opacity=0.82,
                 colorbar=dict(
-                    title=dict(text="°C", font=dict(size=11, color="#eefaff")),
+                    title=dict(text="째C", font=dict(size=11, color="#eefaff")),
                     thickness=5,
                     len=0.56,
                     x=0.992,
@@ -3755,7 +3773,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
                 "X: %{x:.2f} m<br>"
                 "Y: %{y:.2f} m<br>"
                 "Z: %{z:.2f} m<br>"
-                "온도: %{marker.color:.2f} °C"
+                "�⑤룄: %{marker.color:.2f} 째C"
                 "<extra></extra>"
             ),
             showlegend=False,
@@ -3808,7 +3826,7 @@ def make_true_3d_field(coords_xyz, temp_nodes, height=390, max_points=2800, show
                 (
                     f"<b>{name}</b><br>"
                     f"X={xyz[0]:.2f}m, Y={xyz[1]:.2f}m, Z={xyz[2]:.2f}m<br>"
-                    f"온도={temp:.2f}°C"
+                    f"�⑤룄={temp:.2f}째C"
                 )
                 for xyz, temp, name in zip(selected_xyz, selected_temp, selected_names)
             ]
@@ -3907,7 +3925,7 @@ if st.session_state.app_view == "HOME":
     if "home_current_temp_widget" not in st.session_state:
         st.session_state.home_current_temp_widget = float(st.session_state.current_temp_query)
     st.number_input(
-        "현재 공간 평균 온도 (°C)",
+        "�꾩옱 怨듦컙 �됯퇏 �⑤룄 (째C)",
         min_value=15.0,
         max_value=40.0,
         step=0.1,
@@ -3922,24 +3940,24 @@ if st.session_state.app_view == "HOME":
     elif current_field_source.startswith("PopField"):
         if FIELD_ZIP_PATH is None:
             st.warning(
-                "실제 CFD ZIP을 앱이 찾지 못했습니다. "
-                f"진단: {FIELD_ZIP_ERROR or 'unknown'}"
+                "�ㅼ젣 CFD ZIP�� �깆씠 李얠� 紐삵뻽�듬땲��. "
+                f"吏꾨떒: {FIELD_ZIP_ERROR or 'unknown'}"
             )
         elif scenario_table is None or len(scenario_table) == 0:
             st.warning(
-                f"CFD ZIP은 로드되었습니다 ({FIELD_ZIP_PATH.name}, {FIELD_ZIP_DP_COUNT} cases). "
-                "하지만 Case Info와 CFD 시나리오 인덱스를 연결하지 못해 모델 추정값을 표시합니다."
+                f"CFD ZIP�� 濡쒕뱶�섏뿀�듬땲�� ({FIELD_ZIP_PATH.name}, {FIELD_ZIP_DP_COUNT} cases). "
+                "�섏�留� Case Info�� CFD �쒕굹由ъ삤 �몃뜳�ㅻ� �곌껐�섏� 紐삵빐 紐⑤뜽 異붿젙媛믪쓣 �쒖떆�⑸땲��."
             )
         else:
             st.warning(
-                f"CFD ZIP과 시나리오 표는 로드되었지만 DP {matched_dp_id} 실제 field를 읽지 못해 "
-                "모델 추정값을 표시합니다."
+                f"CFD ZIP怨� �쒕굹由ъ삤 �쒕뒗 濡쒕뱶�섏뿀吏�留� DP {matched_dp_id} �ㅼ젣 field瑜� �쎌� 紐삵빐 "
+                "紐⑤뜽 異붿젙媛믪쓣 �쒖떆�⑸땲��."
             )
     else:
-        st.warning("Current Field용 실제 CFD 자산을 불러오지 못했습니다.")
+        st.warning("Current Field�� �ㅼ젣 CFD �먯궛�� 遺덈윭�ㅼ� 紐삵뻽�듬땲��.")
 
     new_target = st.number_input(
-        "목표 온도 (°C)",
+        "紐⑺몴 �⑤룄 (째C)",
         min_value=18.0,
         max_value=30.0,
         value=float(st.session_state.target_temp),
@@ -3974,7 +3992,7 @@ if st.session_state.app_view == "HOME":
             config={"displayModeBar": False},
         )
 
-    if st.button("냉방 최적화", type="primary", use_container_width=True, key="btn_home_to_heat"):
+    if st.button("�됰갑 理쒖쟻��", type="primary", use_container_width=True, key="btn_home_to_heat"):
         st.session_state.app_view = "HEAT_LOAD"
         st.rerun()
 
@@ -3988,12 +4006,12 @@ elif st.session_state.app_view == "HEAT_LOAD":
         f"""
         <div class="factor-temp-summary">
             <div class="factor-temp-card">
-                <div class="factor-temp-label">현재 온도 입력</div>
-                <div class="factor-temp-value">{float(st.session_state.current_temp_query):.1f} °C</div>
+                <div class="factor-temp-label">�꾩옱 �⑤룄 �낅젰</div>
+                <div class="factor-temp-value">{float(st.session_state.current_temp_query):.1f} 째C</div>
             </div>
             <div class="factor-temp-card">
-                <div class="factor-temp-label">목표 온도</div>
-                <div class="factor-temp-value">{st.session_state.target_temp:.1f} °C</div>
+                <div class="factor-temp-label">紐⑺몴 �⑤룄</div>
+                <div class="factor-temp-value">{st.session_state.target_temp:.1f} 째C</div>
             </div>
         </div>
         """,
@@ -4012,41 +4030,41 @@ elif st.session_state.app_view == "HEAT_LOAD":
                 <circle cx="70" cy="21" r="2.4" fill="#67d7ff"/>
                 <circle cx="77" cy="21" r="2.4" fill="#67d7ff" opacity="0.75"/>
             </svg>
-            <span>냉방 영향 요소</span>
+            <span>�됰갑 �곹뼢 �붿냼</span>
         </div>
-        <div class="cooling-factor-desc">공간 온도에 영향을 주는 조건을 <span class="step-emphasis">5단계</span>로 설정하세요.</div>
+        <div class="cooling-factor-desc">怨듦컙 �⑤룄�� �곹뼢�� 二쇰뒗 議곌굔�� <span class="step-emphasis">5�④퀎</span>濡� �ㅼ젙�섏꽭��.</div>
         """,
         unsafe_allow_html=True,
     )
 
     stage_opts = STAGE_OPTS
 
-    # Old sessions are already compatible because 낮음/보통/높음 remain valid options.
+    # Old sessions are already compatible because ��쓬/蹂댄넻/�믪쓬 remain valid options.
     c1, c2 = st.columns(2)
     with c1:
         p_ext = st.select_slider(
-            "☀️ 외부 열환경",
+            "��截� �몃� �댄솚寃�",
             options=stage_opts,
-            value=st.session_state.p_ext if st.session_state.p_ext in stage_opts else "보통",
+            value=st.session_state.p_ext if st.session_state.p_ext in stage_opts else "蹂댄넻",
             key="sl_ext",
         )
         p_meet = st.select_slider(
-            "👥 회의공간",
+            "�뫁 �뚯쓽怨듦컙",
             options=stage_opts,
-            value=st.session_state.p_meet if st.session_state.p_meet in stage_opts else "보통",
+            value=st.session_state.p_meet if st.session_state.p_meet in stage_opts else "蹂댄넻",
             key="sl_meet",
         )
     with c2:
         p_serv = st.select_slider(
-            "🖥️ 서버 발열",
+            "�뼢截� �쒕쾭 諛쒖뿴",
             options=stage_opts,
-            value=st.session_state.p_serv if st.session_state.p_serv in stage_opts else "보통",
+            value=st.session_state.p_serv if st.session_state.p_serv in stage_opts else "蹂댄넻",
             key="sl_serv",
         )
         p_work = st.select_slider(
-            "💼 업무공간",
+            "�뮳 �낅Т怨듦컙",
             options=stage_opts,
-            value=st.session_state.p_work if st.session_state.p_work in stage_opts else "보통",
+            value=st.session_state.p_work if st.session_state.p_work in stage_opts else "蹂댄넻",
             key="sl_work",
         )
 
@@ -4066,34 +4084,34 @@ elif st.session_state.app_view == "HEAT_LOAD":
     # The summary is intentionally simple: all four settings contribute equally.
     stage_index = {name: i + 1 for i, name in enumerate(stage_opts)}
     factor_values = {
-        "외부 열환경": stage_index[p_ext],
-        "서버 발열": stage_index[p_serv],
-        "회의공간": stage_index[p_meet],
-        "업무공간": stage_index[p_work],
+        "�몃� �댄솚寃�": stage_index[p_ext],
+        "�쒕쾭 諛쒖뿴": stage_index[p_serv],
+        "�뚯쓽怨듦컙": stage_index[p_meet],
+        "�낅Т怨듦컙": stage_index[p_work],
     }
     burden_score = sum(factor_values.values()) / len(factor_values)
     burden_index = max(1, min(5, int(round(burden_score))))
     burden_label = stage_opts[burden_index - 1]
     burden_color_map = {
-        "매우 낮음": "#66d9ff",
-        "낮음": "#7bd6ef",
-        "보통": "#8edbcb",
-        "높음": "#ffad66",
-        "매우 높음": "#ff6b7a",
+        "留ㅼ슦 ��쓬": "#66d9ff",
+        "��쓬": "#7bd6ef",
+        "蹂댄넻": "#8edbcb",
+        "�믪쓬": "#ffad66",
+        "留ㅼ슦 �믪쓬": "#ff6b7a",
     }
     burden_label_color = burden_color_map.get(burden_label, "#f5fbff")
-    # 주요 영향 요인은 '높음(4)' 또는 '매우 높음(5)'으로 설정된 항목만 별도 표시합니다.
+    # 二쇱슂 �곹뼢 �붿씤�� '�믪쓬(4)' �먮뒗 '留ㅼ슦 �믪쓬(5)'�쇰줈 �ㅼ젙�� ��ぉ留� 蹂꾨룄 �쒖떆�⑸땲��.
     factor_icons = {
-        "외부 열환경": "☀️",
-        "서버 발열": "🖥️",
-        "회의공간": "👥",
-        "업무공간": "💼",
+        "�몃� �댄솚寃�": "��截�",
+        "�쒕쾭 諛쒖뿴": "�뼢截�",
+        "�뚯쓽怨듦컙": "�뫁",
+        "�낅Т怨듦컙": "�뮳",
     }
     factor_chip_class = {
-        "외부 열환경": "factor-ext",
-        "서버 발열": "factor-serv",
-        "회의공간": "factor-meet",
-        "업무공간": "factor-work",
+        "�몃� �댄솚寃�": "factor-ext",
+        "�쒕쾭 諛쒖뿴": "factor-serv",
+        "�뚯쓽怨듦컙": "factor-meet",
+        "�낅Т怨듦컙": "factor-work",
     }
     major_factors = [(name, level) for name, level in factor_values.items() if level >= 4]
 
@@ -4104,40 +4122,40 @@ elif st.session_state.app_view == "HEAT_LOAD":
 
     if major_factors:
         major_chips_html = "".join(
-            f'<span class="major-factor-chip {factor_chip_class[name]}">'             f'{factor_icons[name]} {name} · {stage_opts[level - 1]}</span>'
+            f'<span class="major-factor-chip {factor_chip_class[name]}">'             f'{factor_icons[name]} {name} 쨌 {stage_opts[level - 1]}</span>'
             for name, level in major_factors
         )
     else:
-        major_chips_html = '<span class="major-factor-empty">현재 열환경 수준에 영향 요인이 없습니다.</span>'
+        major_chips_html = '<span class="major-factor-empty">�꾩옱 �댄솚寃� �섏��� �곹뼢 �붿씤�� �놁뒿�덈떎.</span>'
 
     st.markdown(
         f"""
         <div class="cooling-load-card">
             <div class="cooling-load-top">
-                <div class="cooling-load-label">종합 열환경 수준</div>
+                <div class="cooling-load-label">醫낇빀 �댄솚寃� �섏�</div>
                 <div class="cooling-load-level" style="color:{burden_label_color};">{burden_label}</div>
             </div>
             <div class="cooling-load-segments">{segments_html}</div>
         </div>
 
         <div class="major-factor-card">
-            <div class="major-factor-title">주요 영향 요인</div>
+            <div class="major-factor-title">二쇱슂 �곹뼢 �붿씤</div>
             <div class="major-factor-chips">{major_chips_html}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    if st.button("AI 최적 냉방 찾기", type="primary", use_container_width=True, key="btn_run_cooling_opt"):
+    if st.button("AI 理쒖쟻 �됰갑 李얘린", type="primary", use_container_width=True, key="btn_run_cooling_opt"):
         backend = load_popfield_backend()
 
         if not backend.get("ok", False):
             st.error(
-                "PopField 모델을 실행할 수 없습니다. "
+                "PopField 紐⑤뜽�� �ㅽ뻾�� �� �놁뒿�덈떎. "
                 + str(backend.get("error", "Unknown model loading error"))
             )
         elif case_info_df is None:
-            st.error("Case Info Excel을 불러오지 못했습니다.")
+            st.error("Case Info Excel�� 遺덈윭�ㅼ� 紐삵뻽�듬땲��.")
         else:
             try:
                 target = float(st.session_state.target_temp)
@@ -4149,12 +4167,12 @@ elif st.session_state.app_view == "HEAT_LOAD":
                 )
                 if retrieval is None or FIELD_ZIP_PATH is None:
                     raise RuntimeError(
-                        "실제 CFD scenario retrieval에는 GitHub 루트의 Field data.zip이 필요합니다."
+                        "�ㅼ젣 CFD scenario retrieval�먮뒗 GitHub 猷⑦듃�� Field data.zip�� �꾩슂�⑸땲��."
                     )
 
                 matched_current = load_actual_cfd_case(str(FIELD_ZIP_PATH), int(retrieval["dp_id"]))
                 if matched_current is None:
-                    raise RuntimeError(f"dp{int(retrieval['dp_id'])}.csv를 Field data.zip에서 읽지 못했습니다.")
+                    raise RuntimeError(f"dp{int(retrieval['dp_id'])}.csv瑜� Field data.zip�먯꽌 �쎌� 紐삵뻽�듬땲��.")
 
                 # Critical consistency rule: the Current Field and the optimization share
                 # the matched scenario's ACTUAL four heat loads. Only HVAC actions change.
@@ -4200,7 +4218,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
                 runtime_dir = Path(tempfile.gettempdir()) / "acpop_streamlit_runtime"
                 runtime_dir.mkdir(parents=True, exist_ok=True)
 
-                with st.spinner("AI 예측 중..."):
+                with st.spinner("AI �덉륫 以�..."):
                     optimize_fn = backend.get("optimize_hvac_fn")
                     predict_fn = backend.get("predict_conditions_fn")
 
@@ -4209,15 +4227,15 @@ elif st.session_state.app_view == "HEAT_LOAD":
                     if not callable(optimize_fn) or not callable(predict_fn):
                         if not _lazy_import_popfield_modules():
                             raise RuntimeError(
-                                f"PopField 모듈을 불러오지 못했습니다: {POPFIELD_BACKEND_IMPORT_ERROR}"
+                                f"PopField 紐⑤뱢�� 遺덈윭�ㅼ� 紐삵뻽�듬땲��: {POPFIELD_BACKEND_IMPORT_ERROR}"
                             )
                         optimize_fn = popfield_optimize_hvac
                         predict_fn = popfield_predict_conditions
 
                     if not callable(optimize_fn):
-                        raise RuntimeError("PopField optimize_hvac 함수를 불러오지 못했습니다.")
+                        raise RuntimeError("PopField optimize_hvac �⑥닔瑜� 遺덈윭�ㅼ� 紐삵뻽�듬땲��.")
                     if not callable(predict_fn):
-                        raise RuntimeError("PopField predict_conditions 함수를 불러오지 못했습니다.")
+                        raise RuntimeError("PopField predict_conditions �⑥닔瑜� 遺덈윭�ㅼ� 紐삵뻽�듬땲��.")
 
                     opt_df = optimize_fn(
                         model=backend["model"],
@@ -4289,7 +4307,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
                     "status": status_opt,
                     "vane": _direction_label(rec),
                     "flow": f"{float(rec['CMM']):.0f} CMM",
-                    "temp": f"{float(rec['AirTemp_C']):.0f} °C",
+                    "temp": f"{float(rec['AirTemp_C']):.0f} 째C",
                     "mean_temp": float(rec["mean_temp_C"]),
                     "p95_temp": float(rec["p95_temp_C"]),
                     "zone_spread": float(rec["zone_range_C"]),
@@ -4342,7 +4360,7 @@ elif st.session_state.app_view == "HEAT_LOAD":
                 st.rerun()
 
             except Exception as exc:
-                st.error(f"PopField 최적화 실행 중 오류: {type(exc).__name__}: {exc}")
+                st.error(f"PopField 理쒖쟻�� �ㅽ뻾 以� �ㅻ쪟: {type(exc).__name__}: {exc}")
 
 
 # ============================================================
@@ -4350,32 +4368,32 @@ elif st.session_state.app_view == "HEAT_LOAD":
 # ============================================================
 elif st.session_state.app_view == "RESULTS":
     if not st.session_state.has_run_optimization:
-        st.markdown('<div class="section-title">분석 결과</div>', unsafe_allow_html=True)
-        st.info("아직 실행된 최적화 분석이 없습니다. 먼저 냉방 조건을 설정하고 AI 최적화를 실행해 주세요.")
+        st.markdown('<div class="section-title">遺꾩꽍 寃곌낵</div>', unsafe_allow_html=True)
+        st.info("�꾩쭅 �ㅽ뻾�� 理쒖쟻�� 遺꾩꽍�� �놁뒿�덈떎. 癒쇱� �됰갑 議곌굔�� �ㅼ젙�섍퀬 AI 理쒖쟻�붾� �ㅽ뻾�� 二쇱꽭��.")
 
-        if st.button("AI 최적화 설정 시작하기", type="primary", use_container_width=True):
+        if st.button("AI 理쒖쟻�� �ㅼ젙 �쒖옉�섍린", type="primary", use_container_width=True):
             st.session_state.app_view = "HOME"
             st.rerun()
 
-        if st.button("홈으로 이동", type="secondary", use_container_width=True):
+        if st.button("�덉쑝濡� �대룞", type="secondary", use_container_width=True):
             st.session_state.app_view = "HOME"
             st.rerun()
 
     else:
         st.markdown(
-            '<div class="section-title results-title-row"><span class="results-title-glyph">❄</span>AI 최적 냉방 결과</div>',
+            '<div class="section-title results-title-row"><span class="results-title-glyph">��</span>AI 理쒖쟻 �됰갑 寃곌낵</div>',
             unsafe_allow_html=True,
         )
 
         res = st.session_state.optimized_results
 
         vane_map = {
-            "Left (L)": "좌측 (L)",
-            "Middle (M)": "중앙 (M)",
-            "Right (R)": "우측 (R)",
-            "L / M": "좌측 / 중앙",
-            "M / R": "중앙 / 우측",
-            "L / R": "좌측 / 우측",
+            "Left (L)": "醫뚯륫 (L)",
+            "Middle (M)": "以묒븰 (M)",
+            "Right (R)": "�곗륫 (R)",
+            "L / M": "醫뚯륫 / 以묒븰",
+            "M / R": "以묒븰 / �곗륫",
+            "L / R": "醫뚯륫 / �곗륫",
         }
         vane_display = vane_map.get(str(res["vane"]), str(res["vane"]))
 
@@ -4383,7 +4401,7 @@ elif st.session_state.app_view == "RESULTS":
         # Visual recommendation cards
         # --------------------------------------------------------
         flow_cmm = float(str(res["flow"]).replace("CMM", "").strip())
-        supply_temp_c = float(str(res["temp"]).replace("°C", "").replace("° C", "").strip())
+        supply_temp_c = float(str(res["temp"]).replace("째C", "").replace("째 C", "").strip())
         q_kw = float(res["q_proxy"])
 
         flow_min = float(res.get("flow_min", flow_cmm))
@@ -4402,7 +4420,7 @@ elif st.session_state.app_view == "RESULTS":
         temp_pct = _pct(supply_temp_c, supply_min, supply_max)
         q_pct = _pct(q_kw, q_min, q_max)
 
-        # Convert the relative flow position into 1–5 visual bars.
+        # Convert the relative flow position into 1��5 visual bars.
         flow_level = int(np.clip(np.ceil(max(flow_pct, 1.0) / 20.0), 1, 5))
         flow_bars_html = "".join(
             f'<span class="flow-bar {"active" if i <= flow_level else ""}"></span>'
@@ -4410,54 +4428,54 @@ elif st.session_state.app_view == "RESULTS":
         )
 
         vane_raw = str(res.get("vane", ""))
-        left_on = ("Left" in vane_raw) or ("L" in vane_raw.split(" / ")) or ("좌측" in vane_display)
-        middle_on = ("Middle" in vane_raw) or ("M" in vane_raw.split(" / ")) or ("중앙" in vane_display)
-        right_on = ("Right" in vane_raw) or ("R" in vane_raw.split(" / ")) or ("우측" in vane_display)
+        left_on = ("Left" in vane_raw) or ("L" in vane_raw.split(" / ")) or ("醫뚯륫" in vane_display)
+        middle_on = ("Middle" in vane_raw) or ("M" in vane_raw.split(" / ")) or ("以묒븰" in vane_display)
+        right_on = ("Right" in vane_raw) or ("R" in vane_raw.split(" / ")) or ("�곗륫" in vane_display)
 
         direction_html = (
             f'<div class="air-direction-wrap">'
             f'<div class="ac-mini"></div>'
             f'<div class="air-rays">'
-            f'<div class="air-dir {"active" if left_on else ""}"><span class="air-ray">↙</span><span class="air-dir-tag">좌</span></div>'
-            f'<div class="air-dir {"active" if middle_on else ""}"><span class="air-ray">↓</span><span class="air-dir-tag">중</span></div>'
-            f'<div class="air-dir {"active" if right_on else ""}"><span class="air-ray">↘</span><span class="air-dir-tag">우</span></div>'
+            f'<div class="air-dir {"active" if left_on else ""}"><span class="air-ray">��</span><span class="air-dir-tag">醫�</span></div>'
+            f'<div class="air-dir {"active" if middle_on else ""}"><span class="air-ray">��</span><span class="air-dir-tag">以�</span></div>'
+            f'<div class="air-dir {"active" if right_on else ""}"><span class="air-ray">��</span><span class="air-dir-tag">��</span></div>'
             f'</div>'
             f'</div>'
         )
 
         recommendation_html = (
             f'<div class="optimal-dispatch-box">'
-            f'<h4>AI 추천 냉방 설정</h4>'
+            f'<h4>AI 異붿쿇 �됰갑 �ㅼ젙</h4>'
             f'<div class="hvac-visual-grid">'
 
             f'<div class="hvac-mini-card">'
-            f'<div><div class="hvac-mini-label">바람 방향</div>'
+            f'<div><div class="hvac-mini-label">諛붾엺 諛⑺뼢</div>'
             f'<div class="hvac-mini-value">{vane_display}</div></div>'
             f'{direction_html}'
             f'</div>'
 
             f'<div class="hvac-mini-card">'
-            f'<div><div class="hvac-mini-label">풍량</div>'
+            f'<div><div class="hvac-mini-label">�띾웾</div>'
             f'<div class="hvac-mini-value">{flow_cmm:.0f} CMM</div></div>'
             f'<div class="flow-bars">{flow_bars_html}</div>'
-            f'<div class="hvac-card-note">후보 범위 내 상대 세기</div>'
+            f'<div class="hvac-card-note">�꾨낫 踰붿쐞 �� �곷� �멸린</div>'
             f'</div>'
 
             f'<div class="hvac-mini-card">'
-            f'<div><div class="hvac-mini-label">공급 공기 온도</div>'
-            f'<div class="hvac-mini-value">{supply_temp_c:.0f}°C</div></div>'
+            f'<div><div class="hvac-mini-label">怨듦툒 怨듦린 �⑤룄</div>'
+            f'<div class="hvac-mini-value">{supply_temp_c:.0f}째C</div></div>'
             f'<div class="hvac-track-wrap">'
             f'<div class="hvac-track temp-track">'
             f'<span class="hvac-marker" style="left:{temp_pct:.1f}%;"></span>'
             f'</div>'
-            f'<div class="hvac-range"><span>{supply_min:.0f}°</span>'
-            f'<span>{supply_max:.0f}°</span></div>'
+            f'<div class="hvac-range"><span>{supply_min:.0f}째</span>'
+            f'<span>{supply_max:.0f}째</span></div>'
             f'</div>'
-            f'<div class="hvac-card-note">추천 공급 공기 설정</div>'
+            f'<div class="hvac-card-note">異붿쿇 怨듦툒 怨듦린 �ㅼ젙</div>'
             f'</div>'
 
             f'<div class="hvac-mini-card">'
-            f'<div><div class="hvac-mini-label">예상 냉방 출력</div>'
+            f'<div><div class="hvac-mini-label">�덉긽 �됰갑 異쒕젰</div>'
             f'<div class="hvac-mini-value">{q_kw:.2f} kW</div></div>'
             f'<div class="hvac-track-wrap">'
             f'<div class="hvac-track power-track">'
@@ -4467,7 +4485,7 @@ elif st.session_state.app_view == "RESULTS":
             f'<div class="hvac-range"><span>{q_min:.1f}</span>'
             f'<span>{q_max:.1f} kW</span></div>'
             f'</div>'
-            f'<div class="hvac-card-note">후보 범위 내 상대 출력</div>'
+            f'<div class="hvac-card-note">�꾨낫 踰붿쐞 �� �곷� 異쒕젰</div>'
             f'</div>'
 
             f'</div>'
@@ -4514,20 +4532,20 @@ elif st.session_state.app_view == "RESULTS":
         predicted_error_c = abs(predicted_reference_temp - target_sensor_temp)
 
         if recommended_sensor_count <= 5:
-            sensor_stage = "안정 운전"
-            sensor_reason = "목표 온도에 가까워져 검증된 핵심 센서 5개만 활성화합니다."
+            sensor_stage = "�덉젙 �댁쟾"
+            sensor_reason = "紐⑺몴 �⑤룄�� 媛�源뚯썙�� 寃�利앸맂 �듭떖 �쇱꽌 5媛쒕쭔 �쒖꽦�뷀빀�덈떎."
         elif recommended_sensor_count <= 8:
-            sensor_stage = "안정화 단계"
-            sensor_reason = f"목표 편차 {predicted_error_c:.1f}°C에 맞춰 {recommended_sensor_count}개 센서를 활성화합니다."
+            sensor_stage = "�덉젙�� �④퀎"
+            sensor_reason = f"紐⑺몴 �몄감 {predicted_error_c:.1f}째C�� 留욎떠 {recommended_sensor_count}媛� �쇱꽌瑜� �쒖꽦�뷀빀�덈떎."
         elif recommended_sensor_count <= 12:
-            sensor_stage = "정밀 모니터링"
-            sensor_reason = f"목표 편차 {predicted_error_c:.1f}°C가 남아 {recommended_sensor_count}개 센서를 활성화합니다."
+            sensor_stage = "�뺣� 紐⑤땲�곕쭅"
+            sensor_reason = f"紐⑺몴 �몄감 {predicted_error_c:.1f}째C媛� �⑥븘 {recommended_sensor_count}媛� �쇱꽌瑜� �쒖꽦�뷀빀�덈떎."
         elif recommended_sensor_count < 15:
-            sensor_stage = "고밀도 모니터링"
-            sensor_reason = f"목표 편차가 커 {recommended_sensor_count}개 센서를 활성화합니다."
+            sensor_stage = "怨좊��� 紐⑤땲�곕쭅"
+            sensor_reason = f"紐⑺몴 �몄감媛� 而� {recommended_sensor_count}媛� �쇱꽌瑜� �쒖꽦�뷀빀�덈떎."
         else:
-            sensor_stage = "최대 모니터링"
-            sensor_reason = "목표 온도와의 차이가 커 최대 15개 센서를 활성화합니다."
+            sensor_stage = "理쒕� 紐⑤땲�곕쭅"
+            sensor_reason = "紐⑺몴 �⑤룄���� 李⑥씠媛� 而� 理쒕� 15媛� �쇱꽌瑜� �쒖꽦�뷀빀�덈떎."
 
         deactivated_sensor_count = current_sensor_count - recommended_sensor_count
 
@@ -4596,11 +4614,11 @@ elif st.session_state.app_view == "RESULTS":
         )
 
         if deactivated_sensor_count > 0:
-            reduction_text = f"{deactivated_sensor_count}개 비활성화"
+            reduction_text = f"{deactivated_sensor_count}媛� 鍮꾪솢�깊솕"
         elif deactivated_sensor_count < 0:
-            reduction_text = f"{abs(deactivated_sensor_count)}개 추가 활성화"
+            reduction_text = f"{abs(deactivated_sensor_count)}媛� 異붽� �쒖꽦��"
         else:
-            reduction_text = "활성 센서 수 유지"
+            reduction_text = "�쒖꽦 �쇱꽌 �� �좎�"
 
         adaptive_sensor_html = f"""
         <style>
@@ -4721,7 +4739,7 @@ elif st.session_state.app_view == "RESULTS":
           <div class="asp-head">
             <div>
               <div class="asp-title">Adaptive Sensor Plan</div>
-              <div class="asp-sub">활성 센서 조정</div>
+              <div class="asp-sub">�쒖꽦 �쇱꽌 議곗젙</div>
             </div>
             <div class="asp-stage">{sensor_stage}</div>
           </div>
@@ -4729,19 +4747,19 @@ elif st.session_state.app_view == "RESULTS":
           <div class="asp-count">
             <div class="asp-count-side">
               <div class="asp-num">{current_sensor_count}</div>
-              <div class="asp-caption">초기 정밀 모니터링</div>
+              <div class="asp-caption">珥덇린 �뺣� 紐⑤땲�곕쭅</div>
             </div>
-            <div class="asp-arrow">→</div>
+            <div class="asp-arrow">��</div>
             <div class="asp-count-side">
               <div class="asp-num after">{recommended_sensor_count}</div>
-              <div class="asp-caption">안정화 후 핵심 유지</div>
+              <div class="asp-caption">�덉젙�� �� �듭떖 �좎�</div>
             </div>
           </div>
 
           <div class="asp-maps">
             <div>
               <div class="asp-map-title">
-                <b>Before</b><span>활성 센서 {current_sensor_count}개</span>
+                <b>Before</b><span>�쒖꽦 �쇱꽌 {current_sensor_count}媛�</span>
               </div>
               <svg class="room" viewBox="0 0 100 100">
                 <rect x="5" y="5" width="90" height="90" rx="5"
@@ -4758,7 +4776,7 @@ elif st.session_state.app_view == "RESULTS":
 
             <div>
               <div class="asp-map-title">
-                <b>After</b><span>활성 센서 {recommended_sensor_count}개</span>
+                <b>After</b><span>�쒖꽦 �쇱꽌 {recommended_sensor_count}媛�</span>
               </div>
               <svg class="room" viewBox="0 0 100 100">
                 <rect x="5" y="5" width="90" height="90" rx="5"
@@ -4780,7 +4798,7 @@ elif st.session_state.app_view == "RESULTS":
         components.html(adaptive_sensor_html, height=410, scrolling=False)
 
         if st.button(
-            "AI 제어안 시뮬레이션",
+            "AI �쒖뼱�� �쒕��덉씠��",
             type="primary",
             use_container_width=True,
             key="btn_control_simulation",
@@ -4790,7 +4808,7 @@ elif st.session_state.app_view == "RESULTS":
             st.rerun()
 
         if st.button(
-            "새로운 최적화 실행",
+            "�덈줈�� 理쒖쟻�� �ㅽ뻾",
             type="secondary",
             use_container_width=True,
             key="btn_restart_from_results",
@@ -4801,7 +4819,7 @@ elif st.session_state.app_view == "RESULTS":
 
 
 # ============================================================
-# 9. SCREEN 4: BEFORE → AFTER EFFECT COMPARISON
+# 9. SCREEN 4: BEFORE �� AFTER EFFECT COMPARISON
 # ============================================================
 elif st.session_state.app_view == "COMPARE":
     if not st.session_state.has_run_optimization:
@@ -4913,8 +4931,8 @@ elif st.session_state.app_view == "COMPARE":
         np.nanmax(_after_zone_means) - np.nanmin(_after_zone_means)
     )
 
-    # "목표 초과 영역" is easier to understand than HVAC-specific hotspot jargon.
-    # We count points more than 1°C above the target.
+    # "紐⑺몴 珥덇낵 �곸뿭" is easier to understand than HVAC-specific hotspot jargon.
+    # We count points more than 1째C above the target.
     before_hot = float(np.mean(result_current_nodes > (target + 1.0)) * 100.0)
     after_hot = float(np.mean(result_pred_nodes > (target + 1.0)) * 100.0)
 
@@ -4934,7 +4952,7 @@ elif st.session_state.app_view == "COMPARE":
 
     # Show spatial temperature spread under the 4-ZONE MAP only when BOTH hold:
     #   1) the spread improved versus BEFORE
-    #   2) the AFTER spread is within 2.0°C
+    #   2) the AFTER spread is within 2.0째C
     spatial_spread_pass = (
         np.isfinite(before_spread)
         and np.isfinite(after_spread)
@@ -4945,12 +4963,12 @@ elif st.session_state.app_view == "COMPARE":
     hot_improve_pp = before_hot - after_hot
 
     # Keep the model's raw feasibility status for diagnostics, but do not turn it
-    # into a pass/fail message on the demo screen. "완료" means the optimization
+    # into a pass/fail message on the demo screen. "�꾨즺" means the optimization
     # process finished; the numerical cards below still show the actual outcome.
     status = str(res.get("status", "INFEASIBLE"))
-    status_text = "AI 냉방 최적화 완료"
+    status_text = "AI �됰갑 理쒖쟻�� �꾨즺"
     status_color = "#74e0a8"
-    status_symbol = "✓"
+    status_symbol = "��"
 
     # Comparison-screen-only styling.
     st.markdown(
@@ -5194,18 +5212,18 @@ elif st.session_state.app_view == "COMPARE":
         unsafe_allow_html=True,
     )
 
-    st.markdown('<div class="compare-eyebrow">BEFORE → AFTER</div>', unsafe_allow_html=True)
-    st.markdown('<div class="compare-title">AI 냉방 효과 분석</div>', unsafe_allow_html=True)
+    st.markdown('<div class="compare-eyebrow">BEFORE �� AFTER</div>', unsafe_allow_html=True)
+    st.markdown('<div class="compare-title">AI �됰갑 �④낵 遺꾩꽍</div>', unsafe_allow_html=True)
 
     st.markdown(
         f"""
         <div class="compare-hero">
             <div class="compare-temp-row">
-                <div class="compare-temp">{before_mean:.1f}°C</div>
-                <div class="compare-arrow">→</div>
-                <div class="compare-temp">{after_mean:.1f}°C</div>
+                <div class="compare-temp">{before_mean:.1f}째C</div>
+                <div class="compare-arrow">��</div>
+                <div class="compare-temp">{after_mean:.1f}째C</div>
             </div>
-            <div class="compare-target">목표 온도 {target:.1f}°C</div>
+            <div class="compare-target">紐⑺몴 �⑤룄 {target:.1f}째C</div>
             <div class="compare-status" style="color:{status_color};">
                 {status_symbol} {status_text}
             </div>
@@ -5217,39 +5235,39 @@ elif st.session_state.app_view == "COMPARE":
     st.markdown(
         f"""
         <div class="compare-card">
-            <div class="compare-card-title">평균 온도</div>
+            <div class="compare-card-title">�됯퇏 �⑤룄</div>
             <div class="compare-values">
-                <div class="compare-before">{before_mean:.2f}°C</div>
-                <div class="compare-mini-arrow">→</div>
-                <div class="compare-after">{after_mean:.2f}°C</div>
+                <div class="compare-before">{before_mean:.2f}째C</div>
+                <div class="compare-mini-arrow">��</div>
+                <div class="compare-after">{after_mean:.2f}째C</div>
             </div>
-            <div class="compare-change">{abs(mean_delta):.2f}°C 변화</div>
+            <div class="compare-change">{abs(mean_delta):.2f}째C 蹂���</div>
         </div>
 
         <div class="compare-card">
-            <div class="compare-card-title">목표 온도 편차</div>
+            <div class="compare-card-title">紐⑺몴 �⑤룄 �몄감</div>
             <div class="compare-values">
-                <div class="compare-before">{before_target_dev:.2f}°C</div>
-                <div class="compare-mini-arrow">→</div>
-                <div class="compare-after">{after_target_dev:.2f}°C</div>
+                <div class="compare-before">{before_target_dev:.2f}째C</div>
+                <div class="compare-mini-arrow">��</div>
+                <div class="compare-after">{after_target_dev:.2f}째C</div>
             </div>
-            <div class="compare-change">목표 {target:.1f}°C와 현재 {after_target_dev:.2f}°C 차이</div>
+            <div class="compare-change">紐⑺몴 {target:.1f}째C�� �꾩옱 {after_target_dev:.2f}째C 李⑥씠</div>
         </div>
 
         <div class="compare-card">
-            <div class="compare-card-title">목표 초과 영역</div>
+            <div class="compare-card-title">紐⑺몴 珥덇낵 �곸뿭</div>
             <div class="compare-values">
                 <div class="compare-before">{before_hot:.1f}%</div>
-                <div class="compare-mini-arrow">→</div>
+                <div class="compare-mini-arrow">��</div>
                 <div class="compare-after">{after_hot:.1f}%</div>
             </div>
-            <div class="compare-change">{max(0.0, hot_improve_pp):.1f}%p 감소</div>
+            <div class="compare-change">{max(0.0, hot_improve_pp):.1f}%p 媛먯냼</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.markdown('<div class="section-title" style="margin-top:18px;">공간 온도 변화</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title" style="margin-top:18px;">怨듦컙 �⑤룄 蹂���</div>', unsafe_allow_html=True)
 
     if "compare_field_mode" not in st.session_state:
         st.session_state.compare_field_mode = "BEFORE"
@@ -5297,7 +5315,7 @@ elif st.session_state.app_view == "COMPARE":
 
     if compare_view == "ZONE":
         st.markdown(
-            f'<div class="zone-view-head"><div class="zone-view-title">4-ZONE MAP</div><div class="zone-view-sub">BEFORE → AFTER<br>목표 {target:.1f}°C</div></div>',
+            f'<div class="zone-view-head"><div class="zone-view-title">4-ZONE MAP</div><div class="zone-view-sub">BEFORE �� AFTER<br>紐⑺몴 {target:.1f}째C</div></div>',
             unsafe_allow_html=True,
         )
         zone_fig = make_zone_mean_map(
@@ -5315,6 +5333,8 @@ elif st.session_state.app_view == "COMPARE":
             _after_zone_means,
             target=target,
             height=365,
+            before_zone_spreads=_before_zone_spreads,
+            after_zone_spreads=_after_zone_spreads,
         )
 
         # Spatial spread is intentionally hidden unless the result satisfies
@@ -5323,14 +5343,14 @@ elif st.session_state.app_view == "COMPARE":
             st.markdown(
                 f"""
                 <div class="compare-card" style="margin-top:12px;">
-                    <div class="compare-card-title">공간 온도 편차</div>
+                    <div class="compare-card-title">怨듦컙 �⑤룄 �몄감</div>
                     <div class="compare-values">
-                        <div class="compare-before">{before_spread:.2f}°C</div>
-                        <div class="compare-mini-arrow">→</div>
-                        <div class="compare-after">{after_spread:.2f}°C</div>
+                        <div class="compare-before">{before_spread:.2f}째C</div>
+                        <div class="compare-mini-arrow">��</div>
+                        <div class="compare-after">{after_spread:.2f}째C</div>
                     </div>
                     <div class="compare-change">
-                        온도 불균형 {spread_improve_pct:.0f}% 개선 · 2.0°C 이내
+                        �⑤룄 遺덇퇏�� {spread_improve_pct:.0f}% 媛쒖꽑 쨌 2.0째C �대궡
                     </div>
                 </div>
                 """,
@@ -5339,7 +5359,7 @@ elif st.session_state.app_view == "COMPARE":
     else:
         if compare_field_mode == "BEFORE":
             st.markdown(
-                f'<div class="compare-map-label"><span>Current Field</span><span class="sensor-count">· 활성 센서 {before_active_sensor_count}개</span></div>',
+                f'<div class="compare-map-label"><span>Current Field</span><span class="sensor-count">쨌 �쒖꽦 �쇱꽌 {before_active_sensor_count}媛�</span></div>',
                 unsafe_allow_html=True,
             )
             if compare_view == "3D":
@@ -5361,7 +5381,7 @@ elif st.session_state.app_view == "COMPARE":
                 )
         else:
             st.markdown(
-                f'<div class="compare-map-label"><span>Predicted Field</span><span class="sensor-count">· 활성 센서 {after_active_sensor_count}개</span></div>',
+                f'<div class="compare-map-label"><span>Predicted Field</span><span class="sensor-count">쨌 �쒖꽦 �쇱꽌 {after_active_sensor_count}媛�</span></div>',
                 unsafe_allow_html=True,
             )
             if compare_view == "3D":
@@ -5398,15 +5418,15 @@ elif st.session_state.app_view == "COMPARE":
             line-height:1.5;
             margin:4px 8px 14px 8px;
         ">
-            실제 에어컨에 명령을 전송한 결과가 아니라,
-            AI 추천 제어안을 적용했을 때의 공간 온도를 예측한 시뮬레이션입니다.
+            �ㅼ젣 �먯뼱而⑥뿉 紐낅졊�� �꾩넚�� 寃곌낵媛� �꾨땲��,
+            AI 異붿쿇 �쒖뼱�덉쓣 �곸슜�덉쓣 �뚯쓽 怨듦컙 �⑤룄瑜� �덉륫�� �쒕��덉씠�섏엯�덈떎.
         </div>
         """,
         unsafe_allow_html=True,
     )
 
     if st.button(
-        "새로운 최적화 실행",
+        "�덈줈�� 理쒖쟻�� �ㅽ뻾",
         type="secondary",
         use_container_width=True,
         key="btn_restart_from_compare",
@@ -5426,7 +5446,7 @@ if st.session_state.app_view != "INTRO":
 
     with b_col1:
         btn_home_kind = "primary" if st.session_state.app_view == "HOME" else "secondary"
-        if st.button("⌂ Home", type=btn_home_kind, use_container_width=True, key="btn_nav_home"):
+        if st.button("�� Home", type=btn_home_kind, use_container_width=True, key="btn_nav_home"):
             st.session_state.app_view = "HOME"
             st.rerun()
 
