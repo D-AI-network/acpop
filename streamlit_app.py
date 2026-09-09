@@ -4919,11 +4919,29 @@ elif st.session_state.app_view == "COMPARE":
     after_hot = float(np.mean(result_pred_nodes > (target + 1.0)) * 100.0)
 
     mean_delta = after_mean - before_mean
+
+    # Distance between the room-average temperature and the requested target.
+    # This replaces the always-visible spatial-spread card in the top summary.
+    before_target_dev = abs(before_mean - target)
+    after_target_dev = abs(after_mean - target)
+    target_dev_delta = before_target_dev - after_target_dev
+
     spread_improve_pct = (
         max(0.0, (before_spread - after_spread) / before_spread * 100.0)
         if before_spread > 1e-8
         else 0.0
     )
+
+    # Show spatial temperature spread under the 4-ZONE MAP only when BOTH hold:
+    #   1) the spread improved versus BEFORE
+    #   2) the AFTER spread is within 2.0°C
+    spatial_spread_pass = (
+        np.isfinite(before_spread)
+        and np.isfinite(after_spread)
+        and (after_spread < before_spread)
+        and (after_spread <= 2.0)
+    )
+
     hot_improve_pp = before_hot - after_hot
 
     # Keep the model's raw feasibility status for diagnostics, but do not turn it
@@ -5209,13 +5227,13 @@ elif st.session_state.app_view == "COMPARE":
         </div>
 
         <div class="compare-card">
-            <div class="compare-card-title">공간 온도 편차</div>
+            <div class="compare-card-title">목표 온도 편차</div>
             <div class="compare-values">
-                <div class="compare-before">{before_spread:.2f}°C</div>
+                <div class="compare-before">{before_target_dev:.2f}°C</div>
                 <div class="compare-mini-arrow">→</div>
-                <div class="compare-after">{after_spread:.2f}°C</div>
+                <div class="compare-after">{after_target_dev:.2f}°C</div>
             </div>
-            <div class="compare-change">온도 불균형 {spread_improve_pct:.0f}% 개선</div>
+            <div class="compare-change">목표 {target:.1f}°C와 현재 {after_target_dev:.2f}°C 차이</div>
         </div>
 
         <div class="compare-card">
@@ -5298,6 +5316,26 @@ elif st.session_state.app_view == "COMPARE":
             target=target,
             height=365,
         )
+
+        # Spatial spread is intentionally hidden unless the result satisfies
+        # both requested quality conditions.
+        if spatial_spread_pass:
+            st.markdown(
+                f"""
+                <div class="compare-card" style="margin-top:12px;">
+                    <div class="compare-card-title">공간 온도 편차</div>
+                    <div class="compare-values">
+                        <div class="compare-before">{before_spread:.2f}°C</div>
+                        <div class="compare-mini-arrow">→</div>
+                        <div class="compare-after">{after_spread:.2f}°C</div>
+                    </div>
+                    <div class="compare-change">
+                        온도 불균형 {spread_improve_pct:.0f}% 개선 · 2.0°C 이내
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
     else:
         if compare_field_mode == "BEFORE":
             st.markdown(
