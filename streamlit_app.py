@@ -2973,10 +2973,14 @@ def make_zone_mean_map(
 
 
 
-def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, target, height=365):
+def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, target, height=365, *, before_zone_spreads, after_zone_spreads):
     """Render Plotly in an HTML component with true hover-fill and click popup behavior."""
     before_zone_means = np.asarray(before_zone_means, dtype=float)
     after_zone_means = np.asarray(after_zone_means, dtype=float)
+    before_zone_spreads = np.asarray(before_zone_spreads, dtype=float).reshape(-1)
+    after_zone_spreads = np.asarray(after_zone_spreads, dtype=float).reshape(-1)
+    if len(before_zone_spreads) != len(before_zone_means) or len(after_zone_spreads) != len(after_zone_means):
+        raise ValueError("Zone internal spread/mean count mismatch")
     palette = {1: "#ffad47", 2: "#45d2ff", 3: "#54e39b", 4: "#a86bff"}
 
     zone_data = {}
@@ -2994,6 +2998,8 @@ def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, 
             "before": round(before, 2),
             "after": round(after, 2),
             "drop": round(temp_drop, 2),
+            "beforeSpread": float(before_zone_spreads[idx]) if np.isfinite(before_zone_spreads[idx]) else None,
+            "afterSpread": float(after_zone_spreads[idx]) if np.isfinite(after_zone_spreads[idx]) else None,
             "beforeDev": round(before_dev, 2),
             "afterDev": round(after_dev, 2),
             "devDrop": round(dev_drop, 2),
@@ -3022,7 +3028,7 @@ def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, 
                 background:linear-gradient(150deg,rgba(6,30,51,.98),rgba(10,47,75,.98));
                 border:1px solid #45d2ff; box-shadow:0 16px 34px rgba(0,8,20,.46);
                 backdrop-filter:blur(8px); color:white; font-family:'Noto Sans KR','Inter',sans-serif;
-                pointer-events:auto;
+                pointer-events:auto; box-sizing:border-box; max-height:calc(100% - 16px); overflow-y:auto;
             }}
             #zone-detail-float .zclose {{
                 position:absolute; right:8px; top:7px; width:24px; height:24px; border:0; border-radius:50%;
@@ -3039,6 +3045,10 @@ def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, 
             #zone-detail-float .zmini {{background:rgba(255,255,255,.055);border-radius:10px;padding:8px 8px 7px 8px;}}
             #zone-detail-float .zlabel {{font-size:8.5px;color:#91bbd1;font-weight:750;margin-bottom:3px;}}
             #zone-detail-float .zvalue {{font-size:12px;color:#f5fbff;font-weight:850;white-space:nowrap;}}
+            #zone-detail-float .zinternal {{margin-top:8px;}}
+            #zone-detail-float .zinternal .zlabel {{font-size:10px;}}
+            #zone-detail-float .zinternal .zvalue {{font-size:16px;color:#8ce7ff;}}
+            #zone-detail-float .znote {{font-size:9px;color:#a9cbdc;line-height:1.5;margin-top:5px;}}
         </style>
         {plot_html}
         <div id="zone-detail-float">
@@ -3049,6 +3059,11 @@ def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, 
             <div class="zgrid">
                 <div class="zmini"><div class="zlabel">목표 편차</div><div class="zvalue" id="zone-dev"></div></div>
                 <div class="zmini"><div class="zlabel">편차 감소</div><div class="zvalue" id="zone-devdrop"></div></div>
+            </div>
+            <div class="zmini zinternal">
+                <div class="zlabel">Zone 내부 온도 편차</div>
+                <div class="zvalue" id="zone-internal-spread"></div>
+                <div class="znote">구역 내 온도 P95−P5<br>변경 전 → 변경 후(예측)</div>
             </div>
         </div>
     </div>
@@ -3108,6 +3123,9 @@ def _render_interactive_zone_map(zone_fig, before_zone_means, after_zone_means, 
             drop.textContent = `↓ ${{d.drop.toFixed(1)}}°C`;
             drop.style.color = d.color;
             document.getElementById('zone-dev').textContent = `${{d.beforeDev.toFixed(1)}} → ${{d.afterDev.toFixed(1)}}°C`;
+            const formatSpread = (value) => Number.isFinite(value) ? `${{value.toFixed(2)}}°C` : '계산 불가';
+            document.getElementById('zone-internal-spread').textContent =
+                `${{formatSpread(d.beforeSpread)}} → ${{formatSpread(d.afterSpread)}}`;
             const dd = document.getElementById('zone-devdrop');
             dd.textContent = `↓ ${{d.devDrop.toFixed(1)}}°C`;
             dd.style.color = '#79e6b4';
@@ -5316,6 +5334,8 @@ elif st.session_state.app_view == "COMPARE":
             _after_zone_means,
             target=target,
             height=365,
+            before_zone_spreads=_before_zone_spreads,
+            after_zone_spreads=_after_zone_spreads,
         )
 
         # Spatial spread is intentionally hidden unless the result satisfies
